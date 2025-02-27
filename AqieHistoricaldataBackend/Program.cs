@@ -8,6 +8,8 @@ using System.Diagnostics.CodeAnalysis;
 using AqieHistoricaldataBackend.Config;
 using AqieHistoricaldataBackend.Utils.Logging;
 using Serilog;
+using AqieHistoricaldataBackend.Atomfeed.Endpoints;
+using AqieHistoricaldataBackend.Atomfeed.Services;
 
 var app = CreateWebApplication(args);
 await app.RunAsync();
@@ -66,6 +68,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     
     // Set up the endpoints and their dependencies
     builder.Services.AddSingleton<IExamplePersistence, ExamplePersistence>();
+    builder.Services.AddSingleton<IAtomHistoryService, AtomHistoryService>();
 }
 
 [ExcludeFromCodeCoverage]
@@ -77,6 +80,6 @@ static WebApplication SetupApplication(WebApplication app)
 
     // Example module, remove before deploying!
     app.UseExampleEndpoints();
-
+    app.UseServiceAtomHistoryEndpoints();
     return app;
 }
