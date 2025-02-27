@@ -49,7 +49,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     XmlDocument doc1 = new XmlDocument();
 
                     doc1.LoadXml(doc.ToString());
-
+                    logger.LogInformation("Load Document completed {atomurl}", atomurl.atom_url);
                     string jsonresult = Newtonsoft.Json.JsonConvert.SerializeXmlNode(doc1);
                     if(jsonresult is not null)
                     {
@@ -58,7 +58,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError("Error Info {Error}", ex.StackTrace);
+                    logger.LogError("Error Info message {Error}", ex.Message);
+                    logger.LogError("Error Info stacktrace {Error}", ex.StackTrace);
                 }
                 }
                     return "Success";
