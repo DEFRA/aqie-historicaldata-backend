@@ -8,11 +8,18 @@ using Newtonsoft.Json;
 using System.Formats.Asn1;
 using System.Globalization;
 using CsvHelper;
+using AqieHistoricaldataBackend.Utils.Mongo;
+using AqieHistoricaldataBackend.Atomfeed.Models;
+using Microsoft.Extensions.Logging;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AtomHistoryService: IAtomHistoryService
+    public class AtomHistoryService(ILogger<AtomHistoryService> logger): IAtomHistoryService //MongoService<AtomHistoryModel>, 
     {
+    //    public AtomHistoryService(IMongoDbClientFactory connectionFactory, ILoggerFactory loggerFactory)
+    //: base(connectionFactory, "AqieHistoricaldata", loggerFactory)
+    //        {
+    //        }
         public async Task<string> AtomHealthcheck()
         {
             //var result = await Collection.Find(b => b.Name == name).FirstOrDefaultAsync();
@@ -34,7 +41,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 try
                 {
+                    logger.LogInformation("Before Fetching URL {atomurl}", atomurl);
                     XmlTextReader reader = new XmlTextReader(atomurl.atom_url);
+                    logger.LogInformation("After Fetching URL {atomurl}", atomurl);
                     XDocument doc = XDocument.Load(atomurl.atom_url);
                     XmlDocument doc1 = new XmlDocument();
 
