@@ -1,4 +1,4 @@
-﻿using AqieHistoricaldataBackend.Example.Models;
+using AqieHistoricaldataBackend.Example.Models;
 using AqieHistoricaldataBackend.Example.Services;
 using FluentValidation;
 using FluentValidation.Results;
