@@ -40,11 +40,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             foreach (var atomurl in pollutant_history_url)
             {
                 try
-                {
-                    logger.LogInformation("Before Fetching URL {atomurl}", atomurl);
+                {                    
+                    logger.LogInformation("Before Fetching URL {atomurl}", atomurl.atom_url);
                     XmlTextReader reader = new XmlTextReader(atomurl.atom_url);
-                    logger.LogInformation("After Fetching URL {atomurl}", atomurl);
+                    logger.LogInformation("After Fetching URL {atomurl}", atomurl.atom_url);
                     XDocument doc = XDocument.Load(atomurl.atom_url);
+                    logger.LogInformation("Load Document {atomurl}", atomurl.atom_url);
                     XmlDocument doc1 = new XmlDocument();
 
                     doc1.LoadXml(doc.ToString());
