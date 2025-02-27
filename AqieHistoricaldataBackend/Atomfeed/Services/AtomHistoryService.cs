@@ -58,7 +58,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
                 catch (Exception ex)
                 {
-
+                    logger.LogError("Error Info {Error}", ex.StackTrace);
                 }
                 }
                     return "Success";
