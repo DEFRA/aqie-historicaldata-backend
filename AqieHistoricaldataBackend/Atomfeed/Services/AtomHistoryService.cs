@@ -11,21 +11,24 @@ using CsvHelper;
 using AqieHistoricaldataBackend.Utils.Mongo;
 using AqieHistoricaldataBackend.Atomfeed.Models;
 using Microsoft.Extensions.Logging;
+using CsvHelper.Configuration;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AtomHistoryService(ILogger<AtomHistoryService> logger): IAtomHistoryService //MongoService<AtomHistoryModel>, 
+    public class AtomHistoryService(ILogger<AtomHistoryService> logger, IHttpClientFactory httpClientFactory) : IAtomHistoryService //MongoService<AtomHistoryModel>, 
     {
-    //    public AtomHistoryService(IMongoDbClientFactory connectionFactory, ILoggerFactory loggerFactory)
-    //: base(connectionFactory, "AqieHistoricaldata", loggerFactory)
-    //        {
-    //        }
+        private readonly IAtomHistoryService _client;
+     
         public async Task<string> AtomHealthcheck()
         {
-            //var result = await Collection.Find(b => b.Name == name).FirstOrDefaultAsync();
-            //Logger.LogInformation("Searching for {Name}, found {Result}", name, result);
-            //return result;
 
+            var client = httpClientFactory.CreateClient();
+            var response = await client.GetAsync("https://uk-air.defra.gov.uk/data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml");
+            response.EnsureSuccessStatusCode();
+
+            var data = await response.Content.ReadAsStringAsync();
+            return data;
+            //exporttocsv_nextrecord();
             var pollutant_history_url = new List<pollutanturl>
                 {
                     new pollutanturl {year = "2019", stationname = "London Bloomsbury", atom_url = "https://uk-air.defra.gov.uk/data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml", end_date = "2019-11-11T14:00:13Z"},
@@ -195,6 +198,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
+                var csvpath = Path.Combine(Environment.CurrentDirectory, $"Atomfiledownload-{DateTime.Now.ToFileTime()}.csv");
                 using (var writer = new StreamWriter("file.csv"))
                 using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
                 {
@@ -202,6 +206,61 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
             }
             catch (Exception ex) { }
+        }
+
+        //public class Foo
+        //{
+        //    public int Id { get; set; }
+        //    public string Name { get; set; }
+        //}
+        //public class FooMap : ClassMap<Foo>
+        //{
+        //    public FooMap()
+        //    {
+        //        Map(m => m.Id).Index(6).Name("id");
+        //        Map(m => m.Name).Index(7).Name("name");
+        //    }
+        //}
+        public void exporttocsv_nextrecord()
+        {
+            //using (var writer = new StreamWriter("test_nextrecord.csv"))
+            //using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+            //{
+            //    // Write header
+            //    csv.WriteField("Id");
+            //    csv.WriteField("Name");
+            //    csv.WriteField("Email");
+            //    csv.NextRecord();
+
+            //    // Write first record
+            //    csv.WriteField(1);
+            //    csv.WriteField("John Doe");
+            //    csv.WriteField("john.doe@example.com");
+            //    csv.NextRecord();
+
+            //    // Write second record
+            //    csv.WriteField(2);
+            //    csv.WriteField("Jane Smith");
+            //    csv.WriteField("jane.smith@example.com");
+            //    csv.NextRecord();
+            //}
+            //    var records = new List<Foo>
+            //    {
+            //        new Foo { Id = 1, Name = "one" },
+            //        new Foo { Id = 2, Name = "two" },
+            //    };
+            //using (var writer = new StreamWriter("test_nextrecord.csv"))
+            //using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+            //{
+            //    csv.WriteHeader<Foo>();
+            //    csv.NextRecord();
+            //    foreach (var record in records)
+            //    {
+            //        csv.WriteRecord(record);
+            //        csv.NextRecord();
+            //    }
+
+          
         }
     }
 }
