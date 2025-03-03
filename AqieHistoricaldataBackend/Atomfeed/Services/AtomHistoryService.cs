@@ -31,10 +31,19 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
             var client = httpClientFactory.CreateClient();
             //var response = await client.GetAsync("https://uk-air.defra.gov.uk/data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml");
-            var response = await client.GetAsync("https://aqie-back-end.dev.cdp-int.defra.cloud/measurements");
-            response.EnsureSuccessStatusCode();
 
-            var data = await response.Content.ReadAsStringAsync();
+            logger.LogInformation("Before Fetching citizen URL {starttime}", DateTime.Now);
+            var response = await client.GetAsync("https://aqie-back-end.dev.cdp-int.defra.cloud/measurements");
+            logger.LogInformation("After Fetching response citizen URL {endtime}", DateTime.Now);
+
+            logger.LogInformation("Before Fetching Atom URL {atomurl}", DateTime.Now);
+            var Atomresponse = await client.GetAsync("https://uk-air.defra.gov.uk/data/atom-dls/auto/2024/GB_FixedObservations_2024_BEX.atom.en.xml");
+            logger.LogInformation("After Fetching response Atom URL {atomurl}", DateTime.Now);
+            Atomresponse.EnsureSuccessStatusCode();
+
+            logger.LogInformation("Before data Reading the Atom URL {atomurl}", DateTime.Now);
+            var data = await Atomresponse.Content.ReadAsStringAsync();
+            logger.LogInformation("After data Fetching the Atom URL {atomurl}", DateTime.Now);
             return data;
             exporttocsv_nextrecord();
             var pollutant_history_url = new List<pollutanturl>
