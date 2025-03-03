@@ -12,6 +12,13 @@ using AqieHistoricaldataBackend.Utils.Mongo;
 using AqieHistoricaldataBackend.Atomfeed.Models;
 using Microsoft.Extensions.Logging;
 using CsvHelper.Configuration;
+using System.Collections.Generic;
+using System.IO;
+using SharpCompress.Writers;
+using System.Text;
+using AqieHistoricaldataBackend.Utils.Http;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
@@ -23,12 +30,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
 
             var client = httpClientFactory.CreateClient();
-            var response = await client.GetAsync("https://uk-air.defra.gov.uk/data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml");
+            //var response = await client.GetAsync("https://uk-air.defra.gov.uk/data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml");
+            var response = await client.GetAsync("https://aqie-back-end.dev.cdp-int.defra.cloud/measurements");
             response.EnsureSuccessStatusCode();
 
             var data = await response.Content.ReadAsStringAsync();
             return data;
-            //exporttocsv_nextrecord();
+            exporttocsv_nextrecord();
             var pollutant_history_url = new List<pollutanturl>
                 {
                     new pollutanturl {year = "2019", stationname = "London Bloomsbury", atom_url = "https://uk-air.defra.gov.uk/data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml", end_date = "2019-11-11T14:00:13Z"},
@@ -130,7 +138,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                                                         //var value = item.Split(",");
                                                         //List<string> pollutant_value_split_list = new List<String>(item.Split(','));
-                                                        List<string> pollutant_value_split_list = new List<String>(item.Split(','));
+                                                        List<string> pollutant_value_split_list = new List<System.String>(item.Split(','));
 
                                                         Finaldata finaldata = new Finaldata();
                                                         finaldata.StartTime = pollutant_value_split_list[0];
@@ -210,17 +218,37 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         //public class Foo
         //{
-        //    public int Id { get; set; }
-        //    public string Name { get; set; }
+        //    public string SiteName { get; set; }
+        //    public string SiteType { get; set; }
         //}
         //public class FooMap : ClassMap<Foo>
         //{
         //    public FooMap()
         //    {
-        //        Map(m => m.Id).Index(6).Name("id");
-        //        Map(m => m.Name).Index(7).Name("name");
+        //        Map(m => m.SiteName).Index(6).Name("SiteName");
+        //        Map(m => m.SiteType).Index(7).Name("SiteType");
         //    }
         //}
+        public class Employee
+        {
+            public string Name { get; set; }
+            public int Age { get; set; }
+            public string Department { get; set; }
+            
+        }
+        public class CsvRow
+        {
+            public string Column1 { get; set; }
+            public bool Column2 { get; set; }
+
+            public CsvRow(string column1, bool column2)
+            {
+                Column1 = column1;
+                Column2 = column2;
+            }
+        }
+
+
         public void exporttocsv_nextrecord()
         {
             //using (var writer = new StreamWriter("test_nextrecord.csv"))
@@ -244,10 +272,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             //    csv.WriteField("jane.smith@example.com");
             //    csv.NextRecord();
             //}
-            //    var records = new List<Foo>
+            //var records = new List<Foo>
             //    {
-            //        new Foo { Id = 1, Name = "one" },
-            //        new Foo { Id = 2, Name = "two" },
+            //        new Foo { SiteName = "Birmingham A4540 Roadside", SiteType = "Urban Traffic" }
             //    };
             //using (var writer = new StreamWriter("test_nextrecord.csv"))
             //using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
@@ -259,8 +286,58 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             //        csv.WriteRecord(record);
             //        csv.NextRecord();
             //    }
+            //}
+            //using (var textWriter = new StreamWriter(@"C:\mypath\myfile.csv"))
+            //{
+            //    var writer = new CsvWriter(textWriter, CultureInfo.InvariantCulture);
+            //    writer.Configuration.Delimiter = ",";
 
-          
+            //    foreach (var item in list)
+            //    {
+            //        writer.WriteField("a");
+            //        writer.WriteField(2);
+            //        writer.WriteField(true);
+            //        writer.NextRecord();
+            //    }
+            //}
+            //            IEnumerable<CsvRow> rows = new[] {
+            //    new CsvRow("value1", true),
+            //    new CsvRow("value2", false)
+            //};
+            //            using (var textWriter = new StreamWriter("test_nextrecord.csv"))
+            //            {
+            //                var csv = new CsvWriter(textWriter, CultureInfo.InvariantCulture);
+
+            //                csv.WriteRecords(rows);
+            //            }
+            var records = new List<Employee>
+        {
+            new Employee { Name = "George King", Age = 50, Department = "Finance" },
+            new Employee { Name = "Hannah Scott", Age = 34, Department = "HR" },
+            new Employee { Name = "Ian Clark", Age = 29, Department = "IT" }
+        };
+
+            //var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+            //{
+            //    Delimiter = ";"
+            //};
+
+            //using (var writer = new StreamWriter("output_custom_delimiter.csv"))
+            //using (var csv = new CsvWriter(writer, config))
+            //{
+            //    csv.WriteRecords(records);
+            //}
+            string csvFilePath = "output_without_headers.csv";
+            using (var writer = new StreamWriter(csvFilePath))
+            {
+                // Write the data without headers
+                foreach (var record in records)
+                {
+                    writer.WriteLine($"{record.Name},{record.Age},{record.Department}");
+                }
+            }
+
         }
+
     }
 }
