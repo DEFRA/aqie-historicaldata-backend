@@ -38,7 +38,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 logger.LogInformation("After Fetching response citizen URL {endtime}", DateTime.Now);
 
                 logger.LogInformation("Before Fetching Atom URL {atomurl}", DateTime.Now);
-                var Atomresponse = await client.GetAsync("https://uk-air.defra.gov.uk/data/atom-dls/auto/2024/GB_FixedObservations_2024_BEX.atom.en.xml");
+                var Atomresponse = await client.GetAsync("https://api.os.uk/search/places/v1/postcode?postcode=bt666ru&key=uNHeHXTD4X0ZcAqdGEjAj9I0Boew75PT&maxresults=1");
                 logger.LogInformation("After Fetching response Atom URL {atomurl}", DateTime.Now);
                 Atomresponse.EnsureSuccessStatusCode();
 
@@ -50,6 +50,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             catch (Exception ex)
             {
                 logger.LogError("Error Info message {Error}", ex.Message);
+                logger.LogError("Error Info stacktrace {Error}", ex.StackTrace);
                 return "Error";
             }
             //exporttocsv_nextrecord();
