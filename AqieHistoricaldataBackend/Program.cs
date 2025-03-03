@@ -10,6 +10,7 @@ using AqieHistoricaldataBackend.Utils.Logging;
 using Serilog;
 using AqieHistoricaldataBackend.Atomfeed.Endpoints;
 using AqieHistoricaldataBackend.Atomfeed.Services;
+using Microsoft.Net.Http.Headers;
 
 var app = CreateWebApplication(args);
 await app.RunAsync();
@@ -47,6 +48,12 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services
         .AddHttpClient("proxy")
         .ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
+
+    builder.Services.AddHttpClient("Atomfeed", httpClient =>
+    {
+        httpClient.BaseAddress = new Uri("https://api.os.uk/");
+    
+    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>(); ;
 
     // Propagate trace header.
     builder.Services.AddHeaderPropagation(options =>

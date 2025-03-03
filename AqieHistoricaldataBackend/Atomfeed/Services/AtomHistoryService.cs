@@ -30,15 +30,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                var client = httpClientFactory.CreateClient();
+                var client = httpClientFactory.CreateClient("Atomfeed");
                 //var response = await client.GetAsync("https://uk-air.defra.gov.uk/data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml");
-
+                logger.LogInformation("client base address {client}", client.ToString());
                 logger.LogInformation("Before Fetching citizen URL {starttime}", DateTime.Now);
                 var response = await client.GetAsync("https://aqie-back-end.dev.cdp-int.defra.cloud/measurements");
                 logger.LogInformation("After Fetching response citizen URL {endtime}", DateTime.Now);
 
                 logger.LogInformation("Before Fetching Atom URL {atomurl}", DateTime.Now);
-                var Atomresponse = await client.GetAsync("https://api.os.uk/search/places/v1/postcode?postcode=bt666ru&key=uNHeHXTD4X0ZcAqdGEjAj9I0Boew75PT&maxresults=1");
+                var Atomresponse = await client.GetAsync("search/places/v1/postcode?postcode=bt666ru&key=uNHeHXTD4X0ZcAqdGEjAj9I0Boew75PT&maxresults=1");
                 logger.LogInformation("After Fetching response Atom URL {atomurl}", DateTime.Now);
                 Atomresponse.EnsureSuccessStatusCode();
 
