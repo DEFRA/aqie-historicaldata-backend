@@ -38,9 +38,9 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Host.UseSerilog(CdpLogging.Configuration);
     
     // Default HTTP Client
-    builder.Services
-        .AddHttpClient("DefaultClient")
-        .AddHeaderPropagation();
+    //builder.Services
+    //    .AddHttpClient("DefaultClient")
+    //    .AddHeaderPropagation();
 
     // Proxy HTTP Client
     builder.Services.AddTransient<ProxyHttpMessageHandler>();
