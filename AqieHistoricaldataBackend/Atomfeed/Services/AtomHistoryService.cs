@@ -24,6 +24,8 @@ using Amazon.S3.Model;
 using Amazon.S3;
 using Amazon.S3.Transfer;
 using Amazon.Util;
+using static System.Net.Mime.MediaTypeNames;
+using Amazon;
 
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
@@ -67,31 +69,31 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                     new pollutanturl { year = "2023", stationname = "London Westminster", atom_url = "https://uk-air.defra.gov.uk/data/atom-dls/observations/auto/GB_FixedObservations_2023_HORS.xml", end_date = "2019-11-07T07:12:09Z"}
 
                                 };
-                foreach (var atomurl in pollutant_history_url)
-                {
-                    try
-                    {
-                        logger.LogInformation("Before Fetching URL {atomurl}", atomurl.atom_url);
-                        XmlTextReader reader = new XmlTextReader(atomurl.atom_url);
-                        logger.LogInformation("After Fetching URL {atomurl}", atomurl.atom_url);
-                        XDocument doc = XDocument.Load(atomurl.atom_url);
-                        logger.LogInformation("Load Document {atomurl}", atomurl.atom_url);
-                        XmlDocument doc1 = new XmlDocument();
+                //foreach (var atomurl in pollutant_history_url)
+                //{
+                //    try
+                //    {
+                //        logger.LogInformation("Before Fetching URL {atomurl}", atomurl.atom_url);
+                //        XmlTextReader reader = new XmlTextReader(atomurl.atom_url);
+                //        logger.LogInformation("After Fetching URL {atomurl}", atomurl.atom_url);
+                //        XDocument doc = XDocument.Load(atomurl.atom_url);
+                //        logger.LogInformation("Load Document {atomurl}", atomurl.atom_url);
+                //        XmlDocument doc1 = new XmlDocument();
 
-                        doc1.LoadXml(doc.ToString());
-                        logger.LogInformation("Load Document completed {atomurl}", atomurl.atom_url);
-                        string jsonresult = Newtonsoft.Json.JsonConvert.SerializeXmlNode(doc1);
-                        if (jsonresult is not null)
-                        {
-                            return "Success";
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError("Error Info message {Error}", ex.Message);
-                        logger.LogError("Error Info stacktrace {Error}", ex.StackTrace);
-                    }
-                }
+                //        doc1.LoadXml(doc.ToString());
+                //        logger.LogInformation("Load Document completed {atomurl}", atomurl.atom_url);
+                //        string jsonresult = Newtonsoft.Json.JsonConvert.SerializeXmlNode(doc1);
+                //        if (jsonresult is not null)
+                //        {
+                //            return "Success";
+                //        }
+                //    }
+                //    catch (Exception ex)
+                //    {
+                //        logger.LogError("Error Info message {Error}", ex.Message);
+                //        logger.LogError("Error Info stacktrace {Error}", ex.StackTrace);
+                //    }
+                //}
                 //                    return "Success";
                 return data;
             }
@@ -224,29 +226,55 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
                     dailyannualaverage dailyannualaverage = new dailyannualaverage();
 
+
+                //try
+                //{
+                //    string bucketName = "dev-aqie-historicaldata-backend-c63f2";
+                //    string keyName = "measurement_data.csv";
+                //    //To get the directory
+                //    //string filePath = System.IO.Directory.GetCurrentDirectory();
+                //    string filePath = Path.Combine(AppContext.BaseDirectory, $"measurement_data.csv");
+                //    //C:\\Users\\400433\\OneDrive - Cognizant\\Documents\\GitHub\\aqie-historicaldata-backend\\AqieHistoricaldataBackend\\bin\\Debug\\net8.0\\measurement_data.csv
+                //    // Initialize the Amazon S3 client
+                //    IAmazonS3 s3Client = new AmazonS3Client(RegionEndpoint.EUWest2);
+
+                //    // Upload the CSV file
+                //    UploadFileToS3(s3Client, bucketName, keyName, filePath).Wait();
+      
+                //}
+                //catch (Exception ex)
+                //{
+                //    logger.LogError("Error new S3 Info message {Error}", ex.Message);
+                //    logger.LogError("Error new S3 Info stacktrace {Error}", ex.StackTrace);
+                //}
+
                 try
                 {
                 var csvbyte = atomfeedexport_csv(Final_list);
                 string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
-                string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
-                string s3Key = $"dev/measurement_data.csv"; //example :  
-                var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
+                string s3BucketName = "dev-aqie-historicaldata-backend";
+                string s3Key = "measurement_data.csv"; //example :  
+                string keyNameWithSuffix = s3Key.Replace(".csv", "c63f2" + ".csv");
 
+                    logger.LogInformation("S3 region {keyNameWithSuffix}", keyNameWithSuffix);
+                    var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
+                logger.LogInformation("S3 region {regionEndpoint}", regionEndpoint);
+                   
                 using (var s3Client = new Amazon.S3.AmazonS3Client(regionEndpoint))
                 {
                     using (var transferUtility = new TransferUtility(s3Client))
                     {
                         using (var stream = new MemoryStream(csvbyte))
                         {
-                            await transferUtility.UploadAsync(stream, s3BucketName, s3Key);
+                            await transferUtility.UploadAsync(stream, s3BucketName, keyNameWithSuffix);
                         }
                     }
                 }
                 }
                 catch(Exception ex)
                 {
-                    logger.LogError("Error Info message {Error}", ex.Message);
-                    logger.LogError("Error Info stacktrace {Error}", ex.StackTrace);
+                    logger.LogError("Error S3 Info message {Error}", ex.Message);
+                    logger.LogError("Error S3 Info stacktrace {Error}", ex.StackTrace);
                 }
 
 
@@ -317,7 +345,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
 
 
-            return "Success";
+            return "S3 Bucket loaded Successfully";
         }
 
 
@@ -500,9 +528,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 File.WriteAllText(filePath, csv.ToString());
                 var bytecontent = Encoding.UTF8.GetBytes(csv.ToString());
                 return bytecontent;
+
             }
             catch (Exception ex)
             {
+                logger.LogError("Error csv Info message {Error}", ex.Message);
+                logger.LogError("Error csv Info stacktrace {Error}", ex.StackTrace);
                 return new byte[] { 0x20};
             }
 
@@ -528,5 +559,31 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
             return urlString;
         }
+
+        public static async System.Threading.Tasks.Task UploadFileToS3(IAmazonS3 client, string bucketName, string keyName, string filePath)
+        {
+            try
+            {
+                var putRequest = new PutObjectRequest
+                {
+                    BucketName = bucketName,
+                    Key = keyName,
+                    FilePath = filePath,
+                    ContentType = "text/csv"
+                };
+
+                PutObjectResponse response = await client.PutObjectAsync(putRequest);
+                Console.WriteLine($"File uploaded successfully. HTTP Status Code: {response.HttpStatusCode}");
+            }
+            catch (AmazonS3Exception ex)
+            {
+                Console.WriteLine($"Error encountered on server. Message:'{ex.Message}' when writing an object");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unknown encountered on server. Message:'{ex.Message}' when writing an object");
+            }
+        }
     }
 }
+
