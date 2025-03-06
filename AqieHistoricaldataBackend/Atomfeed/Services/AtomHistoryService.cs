@@ -229,49 +229,50 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     dailyannualaverage dailyannualaverage = new dailyannualaverage();
 
 
-                try
-                {
+                //try
+                //{
 
-                    IAmazonS3 s3Client = new AmazonS3Client(RegionEndpoint.EUWest2);                    
-                    var response = await s3Client.ListBucketsAsync();
-                    logger.LogInformation("client base address response {response}", response);
-                    Console.WriteLine("Buckets:");
-                    foreach (var bucket in response.Buckets)
-                    {
-                        logger.LogInformation("client base address with region {bucket.BucketName}", bucket.BucketName);
-                        Console.WriteLine($"- {bucket.BucketName}");
-                    }
-                }
-                catch(Exception ex)
-                {
-                    logger.LogError("Error Bucketlist with region Info message {Error}", ex.Message);
-                    logger.LogError("Error Bucketlist with region  Info stacktrace {Error}", ex.StackTrace);
-                }
-                try
-                {
+                //    IAmazonS3 s3Client = new AmazonS3Client(RegionEndpoint.EUWest2);                    
+                //    var response = await s3Client.ListBucketsAsync();
+                //    logger.LogInformation("client base address response {response}", response);
+                //    Console.WriteLine("Buckets:");
+                //    foreach (var bucket in response.Buckets)
+                //    {
+                //        logger.LogInformation("client base address with region {bucket.BucketName}", bucket.BucketName);
+                //        Console.WriteLine($"- {bucket.BucketName}");
+                //    }
+                //}
+                //catch(Exception ex)
+                //{
+                //    logger.LogError("Error Bucketlist with region Info message {Error}", ex.Message);
+                //    logger.LogError("Error Bucketlist with region  Info stacktrace {Error}", ex.StackTrace);
+                //}
+                //try
+                //{
 
-                    IAmazonS3 s3Client = new AmazonS3Client();
-                    var response = await s3Client.ListBucketsAsync();
-                    logger.LogInformation("client base address response {response}", response);
-                    Console.WriteLine("Buckets:");
-                    foreach (var bucket in response.Buckets)
-                    {
-                        logger.LogInformation("client base address without region {bucket.BucketName}", bucket.BucketName);
-                        Console.WriteLine($"- {bucket.BucketName}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError("Error Bucketlist without region Info message {Error}", ex.Message);
-                    logger.LogError("Error Bucketlistwithout region Info stacktrace {Error}", ex.StackTrace);
-                }
+                //    IAmazonS3 s3Client = new AmazonS3Client();
+                //    var response = await s3Client.ListBucketsAsync();
+                //    logger.LogInformation("client base address response {response}", response);
+                //    Console.WriteLine("Buckets:");
+                //    foreach (var bucket in response.Buckets)
+                //    {
+                //        logger.LogInformation("client base address without region {bucket.BucketName}", bucket.BucketName);
+                //        Console.WriteLine($"- {bucket.BucketName}");
+                //    }
+                //}
+                //catch (Exception ex)
+                //{
+                //    logger.LogError("Error Bucketlist without region Info message {Error}", ex.Message);
+                //    logger.LogError("Error Bucketlistwithout region Info stacktrace {Error}", ex.StackTrace);
+                //}
                 try
                 {
                     string bucketName = "dev-aqie-historicaldata-backend-c63f2";
                     string keyName = "measurement_data.csv";
                     //To get the directory
                     //string filePath = System.IO.Directory.GetCurrentDirectory();
-                    string filepath = "measurement_data.csv";
+                    string FileName = "measurement_data.csv";
+                    string filePath = Path.GetFullPath(FileName);
                     //string filePath = Path.Combine(AppContext.BaseDirectory, $"measurement_data.csv");
                     //C:\\Users\\400433\\OneDrive - Cognizant\\Documents\\GitHub\\aqie-historicaldata-backend\\AqieHistoricaldataBackend\\bin\\Debug\\net8.0\\measurement_data.csv
                     // Initialize the Amazon S3 client
@@ -279,7 +280,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                     logger.LogInformation("Info new start UploadFileToS3 Info message", DateTime.Now);
                     // Upload the CSV file
-                    UploadFileToS3(s3Client, bucketName, keyName, filepath).Wait();
+                    UploadFileToS3(s3Client, bucketName, keyName, filePath).Wait();
                     logger.LogInformation("Info new end UploadFileToS3 Info message", DateTime.Now);
                 }
                 catch (Exception ex)
@@ -288,39 +289,39 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     logger.LogError("Error new S3 Info stacktrace {Error}", ex.StackTrace);
                 }
 
-                try
-                {
-                var csvbyte = atomfeedexport_csv(Final_list);
-                    var uri = new Uri("s3://dev-aqie-historicaldata-backend-c63f2");
-                    string bucketName = uri.Host;
-                    logger.LogInformation("S3 bucketName {bucketName}", bucketName);
-                    string key = uri.AbsolutePath.TrimStart('/');
-                    logger.LogInformation("S3 key {key}", key);
+                //try
+                //{
+                //var csvbyte = atomfeedexport_csv(Final_list);
+                //    var uri = new Uri("s3://dev-aqie-historicaldata-backend-c63f2");
+                //    string bucketName = uri.Host;
+                //    logger.LogInformation("S3 bucketName {bucketName}", bucketName);
+                //    string key = uri.AbsolutePath.TrimStart('/');
+                //    logger.LogInformation("S3 key {key}", key);
 
-                    string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
-                string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
-                string s3Key = "measurement_data.csv"; //example :  
-                string keyNameWithSuffix = s3Key.Replace(".csv", "_c63f2" + ".csv");
-                    logger.LogInformation("S3 keywithsuffix {keyNameWithSuffix}", keyNameWithSuffix);
-                    var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
-                logger.LogInformation("S3 region {regionEndpoint}", regionEndpoint);
+                //    string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
+                //string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
+                //string s3Key = "measurement_data.csv"; //example :  
+                //string keyNameWithSuffix = s3Key.Replace(".csv", "_c63f2" + ".csv");
+                //    logger.LogInformation("S3 keywithsuffix {keyNameWithSuffix}", keyNameWithSuffix);
+                //    var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
+                //logger.LogInformation("S3 region {regionEndpoint}", regionEndpoint);
                    
-                using (var s3Client = new Amazon.S3.AmazonS3Client())
-                {
-                    using (var transferUtility = new TransferUtility(s3Client))
-                    {
-                        using (var stream = new MemoryStream(csvbyte))
-                        {
-                            await transferUtility.UploadAsync(stream, bucketName, keyNameWithSuffix);
-                        }
-                    }
-                }
-                }
-                catch(Exception ex)
-                {
-                    logger.LogError("Error S3 Info message {Error}", ex.Message);
-                    logger.LogError("Error S3 Info stacktrace {Error}", ex.StackTrace);
-                }
+                //using (var s3Client = new Amazon.S3.AmazonS3Client())
+                //{
+                //    using (var transferUtility = new TransferUtility(s3Client))
+                //    {
+                //        using (var stream = new MemoryStream(csvbyte))
+                //        {
+                //            await transferUtility.UploadAsync(stream, bucketName, keyNameWithSuffix);
+                //        }
+                //    }
+                //}
+                //}
+                //catch(Exception ex)
+                //{
+                //    logger.LogError("Error S3 Info message {Error}", ex.Message);
+                //    logger.LogError("Error S3 Info stacktrace {Error}", ex.StackTrace);
+                //}
 
 
 
@@ -605,7 +606,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return urlString;
         }
 
-        public static async System.Threading.Tasks.Task UploadFileToS3(IAmazonS3 client, string bucketName, string keyName, string filePath)
+        public async System.Threading.Tasks.Task UploadFileToS3(IAmazonS3 client, string bucketName, string keyName, string filePath)
         {
             try
             {
@@ -622,10 +623,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (AmazonS3Exception ex)
             {
+                logger.LogError("Error UploadFileToS3 AmazonS3Exception Info message {Error}", ex.Message);
+                logger.LogError("Error UploadFileToS3 AmazonS3Exception Info stacktrace {Error}", ex.StackTrace);
                 Console.WriteLine($"Error encountered on server. Message:'{ex.Message}' when writing an object");
             }
             catch (Exception ex)
             {
+                logger.LogError("Error UploadFileToS3 Info message {Error}", ex.Message);
+                logger.LogError("Error UploadFileToS3 Info stacktrace {Error}", ex.StackTrace);
                 Console.WriteLine($"Unknown encountered on server. Message:'{ex.Message}' when writing an object");
             }
         }
