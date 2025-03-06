@@ -271,8 +271,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     string keyName = "measurement_data.csv";
                     //To get the directory
                     //string filePath = System.IO.Directory.GetCurrentDirectory();
-                    string FileName = "measurement_data.csv";
-                    string filePath = Path.GetFullPath(FileName);
+                    string filePath = "measurement_data.csv";
+                    //string filePath = Path.GetFullPath(FileName);
                     //string filePath = Path.Combine(AppContext.BaseDirectory, $"measurement_data.csv");
                     //C:\\Users\\400433\\OneDrive - Cognizant\\Documents\\GitHub\\aqie-historicaldata-backend\\AqieHistoricaldataBackend\\bin\\Debug\\net8.0\\measurement_data.csv
                     // Initialize the Amazon S3 client
