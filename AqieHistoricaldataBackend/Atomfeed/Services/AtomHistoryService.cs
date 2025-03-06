@@ -238,14 +238,32 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     Console.WriteLine("Buckets:");
                     foreach (var bucket in response.Buckets)
                     {
-                        logger.LogInformation("client base address {bucket.BucketName}", bucket.BucketName);
+                        logger.LogInformation("client base address with region {bucket.BucketName}", bucket.BucketName);
                         Console.WriteLine($"- {bucket.BucketName}");
                     }
                 }
                 catch(Exception ex)
                 {
-                    logger.LogError("Error Bucketlist Info message {Error}", ex.Message);
-                    logger.LogError("Error Bucketlist Info stacktrace {Error}", ex.StackTrace);
+                    logger.LogError("Error Bucketlist with region Info message {Error}", ex.Message);
+                    logger.LogError("Error Bucketlist with region  Info stacktrace {Error}", ex.StackTrace);
+                }
+                try
+                {
+
+                    IAmazonS3 s3Client = new AmazonS3Client();
+                    var response = await s3Client.ListBucketsAsync();
+                    logger.LogInformation("client base address response {response}", response);
+                    Console.WriteLine("Buckets:");
+                    foreach (var bucket in response.Buckets)
+                    {
+                        logger.LogInformation("client base address without region {bucket.BucketName}", bucket.BucketName);
+                        Console.WriteLine($"- {bucket.BucketName}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError("Error Bucketlist without region Info message {Error}", ex.Message);
+                    logger.LogError("Error Bucketlistwithout region Info stacktrace {Error}", ex.StackTrace);
                 }
                 try
                 {
@@ -287,7 +305,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
                 logger.LogInformation("S3 region {regionEndpoint}", regionEndpoint);
                    
-                using (var s3Client = new Amazon.S3.AmazonS3Client(regionEndpoint))
+                using (var s3Client = new Amazon.S3.AmazonS3Client())
                 {
                     using (var transferUtility = new TransferUtility(s3Client))
                     {
