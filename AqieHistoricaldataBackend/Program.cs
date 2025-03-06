@@ -11,6 +11,7 @@ using Serilog;
 using AqieHistoricaldataBackend.Atomfeed.Endpoints;
 using AqieHistoricaldataBackend.Atomfeed.Services;
 using Microsoft.Net.Http.Headers;
+using Amazon.S3;
 
 var app = CreateWebApplication(args);
 await app.RunAsync();
@@ -54,6 +55,8 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
         httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/");
     
     }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>(); ;
+    
+    
 
     // Propagate trace header.
     builder.Services.AddHeaderPropagation(options =>
