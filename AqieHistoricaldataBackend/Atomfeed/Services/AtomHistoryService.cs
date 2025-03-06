@@ -26,6 +26,8 @@ using Amazon.S3.Transfer;
 using Amazon.Util;
 using static System.Net.Mime.MediaTypeNames;
 using Amazon;
+using Elastic.CommonSchema;
+using System.Net.Sockets;
 
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
@@ -227,26 +229,64 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     dailyannualaverage dailyannualaverage = new dailyannualaverage();
 
 
-                //try
-                //{
-                //    string bucketName = "dev-aqie-historicaldata-backend-c63f2";
-                //    string keyName = "measurement_data.csv";
-                //    //To get the directory
-                //    //string filePath = System.IO.Directory.GetCurrentDirectory();
-                //    string filePath = Path.Combine(AppContext.BaseDirectory, $"measurement_data.csv");
-                //    //C:\\Users\\400433\\OneDrive - Cognizant\\Documents\\GitHub\\aqie-historicaldata-backend\\AqieHistoricaldataBackend\\bin\\Debug\\net8.0\\measurement_data.csv
-                //    // Initialize the Amazon S3 client
-                //    IAmazonS3 s3Client = new AmazonS3Client(RegionEndpoint.EUWest2);
+                try
+                {
 
-                //    // Upload the CSV file
-                //    UploadFileToS3(s3Client, bucketName, keyName, filePath).Wait();
-      
-                //}
-                //catch (Exception ex)
-                //{
-                //    logger.LogError("Error new S3 Info message {Error}", ex.Message);
-                //    logger.LogError("Error new S3 Info stacktrace {Error}", ex.StackTrace);
-                //}
+                    IAmazonS3 s3Client = new AmazonS3Client(RegionEndpoint.EUWest2);                    
+                    var response = await s3Client.ListBucketsAsync();
+                    logger.LogInformation("client base address response {response}", response);
+                    Console.WriteLine("Buckets:");
+                    foreach (var bucket in response.Buckets)
+                    {
+                        logger.LogInformation("client base address with region {bucket.BucketName}", bucket.BucketName);
+                        Console.WriteLine($"- {bucket.BucketName}");
+                    }
+                }
+                catch(Exception ex)
+                {
+                    logger.LogError("Error Bucketlist with region Info message {Error}", ex.Message);
+                    logger.LogError("Error Bucketlist with region  Info stacktrace {Error}", ex.StackTrace);
+                }
+                try
+                {
+
+                    IAmazonS3 s3Client = new AmazonS3Client();
+                    var response = await s3Client.ListBucketsAsync();
+                    logger.LogInformation("client base address response {response}", response);
+                    Console.WriteLine("Buckets:");
+                    foreach (var bucket in response.Buckets)
+                    {
+                        logger.LogInformation("client base address without region {bucket.BucketName}", bucket.BucketName);
+                        Console.WriteLine($"- {bucket.BucketName}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError("Error Bucketlist without region Info message {Error}", ex.Message);
+                    logger.LogError("Error Bucketlistwithout region Info stacktrace {Error}", ex.StackTrace);
+                }
+                try
+                {
+                    string bucketName = "dev-aqie-historicaldata-backend-c63f2";
+                    string keyName = "measurement_data.csv";
+                    //To get the directory
+                    //string filePath = System.IO.Directory.GetCurrentDirectory();
+                    string filepath = "measurement_data.csv";
+                    //string filePath = Path.Combine(AppContext.BaseDirectory, $"measurement_data.csv");
+                    //C:\\Users\\400433\\OneDrive - Cognizant\\Documents\\GitHub\\aqie-historicaldata-backend\\AqieHistoricaldataBackend\\bin\\Debug\\net8.0\\measurement_data.csv
+                    // Initialize the Amazon S3 client
+                    IAmazonS3 s3Client = new AmazonS3Client(RegionEndpoint.EUWest2);
+
+                    logger.LogInformation("Info new start UploadFileToS3 Info message", DateTime.Now);
+                    // Upload the CSV file
+                    UploadFileToS3(s3Client, bucketName, keyName, filepath).Wait();
+                    logger.LogInformation("Info new end UploadFileToS3 Info message", DateTime.Now);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError("Error new S3 Info message {Error}", ex.Message);
+                    logger.LogError("Error new S3 Info stacktrace {Error}", ex.StackTrace);
+                }
 
                 try
                 {
@@ -265,7 +305,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
                 logger.LogInformation("S3 region {regionEndpoint}", regionEndpoint);
                    
-                using (var s3Client = new Amazon.S3.AmazonS3Client(regionEndpoint))
+                using (var s3Client = new Amazon.S3.AmazonS3Client())
                 {
                     using (var transferUtility = new TransferUtility(s3Client))
                     {
@@ -530,7 +570,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 }
                 // Writing to CSV file
-                File.WriteAllText(filePath, csv.ToString());
+                System.IO.File.WriteAllText(filePath, csv.ToString());
                 var bytecontent = Encoding.UTF8.GetBytes(csv.ToString());
                 return bytecontent;
 
