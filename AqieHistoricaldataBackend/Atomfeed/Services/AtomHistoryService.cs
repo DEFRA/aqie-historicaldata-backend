@@ -271,7 +271,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     {
                         using (var stream = new MemoryStream(csvbyte))
                         {
-                            await transferUtility.UploadAsync(stream, bucketName, key);
+                            await transferUtility.UploadAsync(stream, bucketName, keyNameWithSuffix);
                         }
                     }
                 }
