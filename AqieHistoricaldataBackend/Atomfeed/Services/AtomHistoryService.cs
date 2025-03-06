@@ -252,11 +252,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                 var csvbyte = atomfeedexport_csv(Final_list);
                 string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
-                string s3BucketName = "dev-aqie-historicaldata-backend";
+                string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
                 string s3Key = "measurement_data.csv"; //example :  
-                string keyNameWithSuffix = s3Key.Replace(".csv", "c63f2" + ".csv");
-
-                    logger.LogInformation("S3 region {keyNameWithSuffix}", keyNameWithSuffix);
+                string keyNameWithSuffix = s3Key.Replace(".csv", "_c63f2" + ".csv");
+                    logger.LogInformation("S3 keywithsuffix {keyNameWithSuffix}", keyNameWithSuffix);
                     var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
                 logger.LogInformation("S3 region {regionEndpoint}", regionEndpoint);
                    
