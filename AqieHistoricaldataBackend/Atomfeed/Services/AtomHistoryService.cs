@@ -109,7 +109,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         public async Task<string> GetAtomHourlydata(string name)
         {
-
+            string PresignedUrl = string.Empty;
             //atomfeedexport_csv();
             var pollutant_history_url = new List<pollutanturl>
                             {
@@ -292,6 +292,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 try
                 {
                     var csvbyte = atomfeedexport_csv(Final_list);
+                    //return csvbyte;
                     var uri = new Uri("s3://dev-aqie-historicaldata-backend-c63f2");
                     string bucketName = uri.Host;
                     logger.LogInformation("S3 bucketName {bucketName}", bucketName);
@@ -312,10 +313,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         {
                             using (var stream = new MemoryStream(csvbyte))
                             {
+                                logger.LogInformation("S3 upload start", DateTime.Now);
                                 await transferUtility.UploadAsync(stream, bucketName, s3Key);
+                                logger.LogInformation("S3 upload end", DateTime.Now);                                
                             }
                         }
                     }
+                    logger.LogInformation("S3 PresignedUrl start", DateTime.Now);
+                    PresignedUrl = GeneratePreSignedURL(s3BucketName, s3Key, 12);
+                    logger.LogInformation("S3 PresignedUrl final URL {PresignedUrl}", PresignedUrl);
                 }
                 catch (Exception ex)
                 {
@@ -391,7 +397,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
 
 
-            return "S3 Bucket loaded Successfully";
+            return PresignedUrl;//"S3 Bucket loaded Successfully";
         }
 
 
@@ -604,6 +610,19 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
 
             return urlString;
+        }
+        public string GeneratePreSignedURL(string bucketName, string keyName, double duration)
+        {
+            var s3Client = new AmazonS3Client();
+            var request = new GetPreSignedUrlRequest
+            {
+                BucketName = bucketName,
+                Key = keyName,
+                Expires = DateTime.UtcNow.AddDays(duration)
+            };
+
+            string url = s3Client.GetPreSignedURL(request);
+            return url;
         }
 
         public async System.Threading.Tasks.Task UploadFileToS3(IAmazonS3 client, string bucketName, string keyName, string filePath)

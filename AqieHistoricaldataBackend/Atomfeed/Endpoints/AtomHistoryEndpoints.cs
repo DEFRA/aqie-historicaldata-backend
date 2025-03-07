@@ -23,6 +23,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             if (name is not null && !string.IsNullOrWhiteSpace(name))
             {
                 var atomhourlyresult = await Persistence.GetAtomHourlydata(name);
+                //return Results.File(atomhourlyresult,)
                 return atomhourlyresult is not null ? Results.Ok(atomhourlyresult) : Results.NotFound();
             }
             else
