@@ -618,7 +618,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 BucketName = bucketName,
                 Key = keyName,
-                Expires = DateTime.UtcNow.AddMinutes(duration)
+                Expires = DateTime.UtcNow.AddSeconds(duration)
             };
 
             string url = s3Client.GetPreSignedURL(request);
