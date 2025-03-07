@@ -320,7 +320,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         }
                     }
                     logger.LogInformation("S3 PresignedUrl start", DateTime.Now);
-                    PresignedUrl = GeneratePreSignedURL(s3BucketName, s3Key, 12);
+                    PresignedUrl = GeneratePreSignedURL(s3BucketName, s3Key, 604800);
                     logger.LogInformation("S3 PresignedUrl final URL {PresignedUrl}", PresignedUrl);
                 }
                 catch (Exception ex)
@@ -618,7 +618,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 BucketName = bucketName,
                 Key = keyName,
-                Expires = DateTime.UtcNow.AddDays(duration)
+                Expires = DateTime.UtcNow.AddMinutes(duration)
             };
 
             string url = s3Client.GetPreSignedURL(request);
