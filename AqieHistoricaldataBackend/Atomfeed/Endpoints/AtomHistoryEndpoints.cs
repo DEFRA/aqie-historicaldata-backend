@@ -12,7 +12,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
         {
             app.MapGet("AtomHistoryHealthchecks", GetHealthcheckdata);
             //app.MapGet("AtomHistoryHourlydata/{name}", GetHistorydataById);
-            app.MapGet("AtomHistoryHourlydata/{data}", GetHistorydataById);
+            app.MapGet("AtomHistoryHourlydata", GetHistorydataById);
+            app.MapPost("AtomHistoryHourlydata", GetHistorydataById);
 
         }
 
