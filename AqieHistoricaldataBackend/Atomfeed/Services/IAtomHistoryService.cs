@@ -6,7 +6,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     {
         public Task<string> AtomHealthcheck();
         //public Task<string> GetAtomHourlydata(string name);
-        public Task<string> GetAtomHourlydata(string[] data);
+        public Task<string> GetAtomHourlydata(querystringdata data);
         
     }
 }

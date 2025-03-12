@@ -1,6 +1,7 @@
 using AqieHistoricaldataBackend.Atomfeed.Models;
 using AqieHistoricaldataBackend.Atomfeed.Services;
 using AqieHistoricaldataBackend.Example.Services;
+using Microsoft.AspNetCore.Mvc;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
@@ -34,7 +35,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
         //        return Results.NotFound();
         //    }
         //}
-        private static async Task<IResult> GetHistorydataById(string[] data, IAtomHistoryService Persistence)
+        private static async Task<IResult> GetHistorydataById([FromBody] querystringdata data,IAtomHistoryService Persistence)
         {
             if (data is not null)
             {

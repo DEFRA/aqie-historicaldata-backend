@@ -70,21 +70,21 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return "Error";
             }
         }
-        public async Task<string> GetAtomHourlydata(string[] data)
+        public async Task<string> GetAtomHourlydata(querystringdata data)
         {
-            logger.LogInformation("Frontend API object region {data[0]}", data[0]);
-            logger.LogInformation("Frontend API object siteType {data[1]}", data[1]);
-            logger.LogInformation("Frontend API object sitename {data[2]}", data[2]);
-            logger.LogInformation("Frontend API object siteId {data[3]}", data[3]);
-            logger.LogInformation("Frontend API object latitude {data[4]}", data[4]);
-            logger.LogInformation("Frontend API object longitude {data[5]}", data[5]);
-            logger.LogInformation("Frontend API object year {data[6]}", data[6]);
+            //logger.LogInformation("Frontend API object region {data[0]}", data[0]);
+            //logger.LogInformation("Frontend API object siteType {data[1]}", data[1]);
+            //logger.LogInformation("Frontend API object sitename {data[2]}", data[2]);
+            //logger.LogInformation("Frontend API object siteId {data[3]}", data[3]);
+            //logger.LogInformation("Frontend API object latitude {data[4]}", data[4]);
+            //logger.LogInformation("Frontend API object longitude {data[5]}", data[5]);
+            //logger.LogInformation("Frontend API object year {data[6]}", data[6]);
 
             //string siteId = "BEX";//data[3];
             //string year = "2019";//data[6];
             //string s3Key1 = "measurement_data_" + siteId + "_" + year + ".csv";
-            string siteId = data[3];
-            string year = data[6];
+            string siteId = data.siteId;
+            string year = data.year;
 
             //string[] apiparams = {
             //  region: stndetails.region,
@@ -251,15 +251,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return PresignedUrl;//PresignedUrl;//"S3 Bucket loaded Successfully";
         }             
 
-        public byte[] atomfeedexport_csv(List<Finaldata> Final_list, string[] data)
+        public byte[] atomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
         {
             try
             {
-                string region = data[0];
-                string siteType = data[1];
-                string sitename = data[2];
-                string latitude = data[4];
-                string longitude = data[5];
+                string region = data.region;       /*data[0];*/
+                string siteType = data.siteType;    /*data[1];*/
+                string sitename = data.sitename;     /*data[2];*/
+                string latitude = data.latitude;     /*data[4];*/
+                string longitude = data.longitude;    /*data[5];*/
                 //string[] apiparams = {
                 //  region: stndetails.region,
                 //  siteType: stndetails.siteType,
