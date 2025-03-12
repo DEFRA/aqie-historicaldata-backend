@@ -28,6 +28,10 @@ using static System.Net.Mime.MediaTypeNames;
 using Amazon;
 using Elastic.CommonSchema;
 using System.Net.Sockets;
+using Microsoft.Extensions.Primitives;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Amazon.Runtime.Internal;
+using static Amazon.Internal.RegionEndpointProviderV2;
 
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
@@ -66,10 +70,33 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return "Error";
             }
         }
-        public async Task<string> GetAtomHourlydata(string name)
+        public async Task<string> GetAtomHourlydata(string[] data)
         {
+            logger.LogInformation("Frontend API object region {data[0]}", data[0]);
+            logger.LogInformation("Frontend API object siteType {data[1]}", data[1]);
+            logger.LogInformation("Frontend API object sitename {data[2]}", data[2]);
+            logger.LogInformation("Frontend API object siteId {data[3]}", data[3]);
+            logger.LogInformation("Frontend API object latitude {data[4]}", data[4]);
+            logger.LogInformation("Frontend API object longitude {data[5]}", data[5]);
+            logger.LogInformation("Frontend API object year {data[6]}", data[6]);
+
+            //string siteId = "BEX";//data[3];
+            //string year = "2019";//data[6];
+            //string s3Key1 = "measurement_data_" + siteId + "_" + year + ".csv";
+            string siteId = data[3];
+            string year = data[6];
+
+            //string[] apiparams = {
+            //  region: stndetails.region,
+            //  siteType: stndetails.siteType,
+            //  sitename: stndetails.name,
+            //  siteId: stndetails.localSiteID,
+            //  latitude: stndetails.location.coordinates[0],
+            //  longitude: stndetails.location.coordinates[1],
+            // year: request.yar.get('yearselected')
+            //};
             string PresignedUrl = string.Empty;
-            //atomfeedexport_csv();
+             atomfeedexport_csv();
             var pollutant_url = new List<pollutantdetails>
                             {
                                 new pollutantdetails { polluntantname = "Nitrogen dioxide",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/8" },
@@ -84,7 +111,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 try
                 {
                 var client = httpClientFactory.CreateClient("Atomfeed");
-                var Atomresponse = await client.GetAsync("data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml");
+                string Atomurl = "data/atom-dls/observations/auto/GB_FixedObservations_" + year + "_" + siteId + ".xml";
+                //var Atomresponse = await client.GetAsync("data/atom-dls/observations/auto/GB_FixedObservations_2019_BEX.xml");
+                var Atomresponse = await client.GetAsync(Atomurl);
                 Atomresponse.EnsureSuccessStatusCode();
 
                 var AtomresponseStream = await Atomresponse.Content.ReadAsStreamAsync();
@@ -172,17 +201,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 try
                 {
-                    var csvbyte = atomfeedexport_csv(Final_list);
+                    
+                    var csvbyte = atomfeedexport_csv(Final_list, data);
                     //return csvbyte;
-                    //var uri = new Uri("s3://dev-aqie-historicaldata-backend-c63f2");
-                    //string bucketName = uri.Host;
-                    //logger.LogInformation("S3 bucketName {bucketName}", bucketName);
-                    //string key = uri.AbsolutePath.TrimStart('/');
-                    //logger.LogInformation("S3 key {key}", key);
-
                     string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
                     string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
-                    string s3Key = "measurement_data.csv";   
+                    string s3Key = "measurement_data_" + siteId + "_" + year + ".csv";   
                     var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
                     logger.LogInformation("S3 region {regionEndpoint}", regionEndpoint);
 
@@ -222,29 +246,94 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 catch (Exception ex) {
                 logger.LogError("Error in Atom feed pull Info message {Error}", ex.Message);
                 logger.LogError("Error in Atom feed pull {Error}", ex.StackTrace);
-            }         
-            return PresignedUrl;//"S3 Bucket loaded Successfully";
+            }
+
+            return PresignedUrl;//PresignedUrl;//"S3 Bucket loaded Successfully";
         }             
 
-        public byte[] atomfeedexport_csv(List<Finaldata> Final_list)
+        public byte[] atomfeedexport_csv(List<Finaldata> Final_list, string[] data)
         {
             try
             {
+                string region = data[0];
+                string siteType = data[1];
+                string sitename = data[2];
+                string latitude = data[4];
+                string longitude = data[5];
+                //string[] apiparams = {
+                //  region: stndetails.region,
+                //  siteType: stndetails.siteType,
+                //  sitename: stndetails.name,
+                //  siteId: stndetails.localSiteID,
+                //  latitude: stndetails.location.coordinates[0],
+                //  longitude: stndetails.location.coordinates[1],
+                // year: request.yar.get('yearselected')
+                //};
 
-                string sitename = "Birmingham A4540 Roadside";
+                //StringBuilder pollutantnameheaders = new StringBuilder();
+                //StringBuilder pollutantdataheaders = new StringBuilder();
+                //string Ozone = string.Empty;
+                //string PM10 = string.Empty;
+                //string PM25 = string.Empty;
+                //string SulphurDioxide = string.Empty;
+                //string NitrogenDioxide = string.Empty;
+                //var distinctpollutantFilteredNames = Final_list
+                //                                    .Select(o => o.Pollutantname)
+                //                                    .Distinct()
+                //                                    .ToList();
+                //int pollutantfiltercount = distinctpollutantFilteredNames.Count();
+
+                //foreach (var data in distinctpollutantFilteredNames)
+                //{
+                //    if(data == "Ozone")
+                //    {
+                //        Ozone = data;
+                //    }
+                //    else if (data == "Nitrogen dioxide")
+                //    {
+                //        NitrogenDioxide = data;
+                //    }
+                //    else if (data == "Sulphur dioxide")
+                //    {
+                //        SulphurDioxide = data;
+                //    }
+                //    else if (data == "PM10")
+                //    {
+                //        PM10 = data;
+                //    }
+                //    else if (data == "PM2.5")
+                //    {
+                //        PM25 = data;
+                //    }
+                //}
+                
+                //string sitename = "Birmingham A4540 Roadside";
                 var csv = new StringBuilder();
                 // Adding metadata
-                csv.AppendLine("Hourly measurement data supplied by UK-air on 10/02/2025");
+                csv.AppendLine(string.Format("Hourly measurement data supplied by UK-air on,{0}", sitename));
                 csv.AppendLine(string.Format("Site Name,{0}", sitename));
-                csv.AppendLine("Site Type,Urban Traffic");
-                csv.AppendLine("Local Authority,Birmingham");
-                csv.AppendLine("Agglomeration,West Midlands Urban Area");
-                csv.AppendLine("Zone,West Midlands");
-                csv.AppendLine("Latitude,52.476145");
-                csv.AppendLine("Longitude,-1.874978");
+                csv.AppendLine(string.Format("Site Type,{0}", siteType));
+                csv.AppendLine(string.Format("Region,{0}", region));
+                csv.AppendLine(string.Format("Latitude,{0}", latitude));
+                csv.AppendLine(string.Format("Longitude,{0}", longitude));
                 csv.AppendLine("Notes:	 [1] All Data GMT hour ending;  [2] Some shorthand is used, V = Verified, P = Provisionally Verified, N = Not Verified, S = Suspect, [3] Unit of measurement (for pollutants) = ugm-3, [4] Instrument type is included in 'Status' for PM10 and PM2.5");
-                csv.AppendLine("Date,Time,Ozone,Status,Nitrogen dioxide,Status,PM10 particulate matter (Hourly measured),Status,PM2.5 particulate matter (Hourly measured),Status");
+                //pollutantnameheaders.Append("Date,Time");                
+                //foreach (var pollutantname in distinctpollutantFilteredNames)
+                //{
+                //    if(pollutantname == "PM2.5" || pollutantname == "PM10")
+                //    {
+                //        pollutantnameheaders.Append("," + pollutantname + "particulate matter (Hourly measured),Status");
+                //    }
+                //    else
+                //    {
+                //        pollutantnameheaders.Append("," + pollutantname + ",Status");
+                //    }                        
+                //}
+                csv.AppendLine("Date,Time,Ozone,Status,Nitrogen dioxide,Status,Sulphur dioxide,Status,PM10 particulate matter (Hourly measured),Status,PM2.5 particulate matter (Hourly measured),Status");
+                //csv.AppendLine(pollutantnameheaders.ToString());
                 var groupedData = Final_list.GroupBy(x => new { Convert.ToDateTime(x.StartTime).Date, Convert.ToDateTime(x.StartTime).TimeOfDay });
+                //var groupedData1 = Final_list.GroupBy(x => new { Convert.ToDateTime(x.StartTime).Date, Convert.ToDateTime(x.StartTime).TimeOfDay })
+                //                              .Select(g => new { Key = g.Key, Items = g.Where(x => x > 3 && x < 9) });
                 string filePath = "measurement_data.csv";
                 foreach (var group in groupedData)
                 {
@@ -255,13 +344,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     var ozoneStatus = group.FirstOrDefault(x => x.Pollutantname == "Ozone")?.Verification ?? "";
                     var nitrogenDioxide = group.FirstOrDefault(x => x.Pollutantname == "Nitrogen dioxide")?.Value ?? "";
                     var nitrogenDioxideStatus = group.FirstOrDefault(x => x.Pollutantname == "Nitrogen dioxide")?.Verification ?? "";
+                    var sulphurDioxide = group.FirstOrDefault(x => x.Pollutantname == "Sulphur dioxide")?.Value ?? "";
+                    var sulphurDioxideStatus = group.FirstOrDefault(x => x.Pollutantname == "Sulphur dioxide")?.Verification ?? "";
                     var pm10 = group.FirstOrDefault(x => x.Pollutantname == "PM10")?.Value ?? "";
                     var pm10Status = group.FirstOrDefault(x => x.Pollutantname == "PM10")?.Verification ?? "";
                     var pm25 = group.FirstOrDefault(x => x.Pollutantname == "PM2.5")?.Value ?? "";
                     var pm25Status = group.FirstOrDefault(x => x.Pollutantname == "PM2.5")?.Verification ?? "";
+
                     // Adding headers
-                    var newLine = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9}", date, time, ozone, ozoneStatus, nitrogenDioxide, nitrogenDioxideStatus, pm10, pm10Status, pm25, pm25Status);
-                    csv.AppendLine(newLine);
+                    var newline = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}", date, time, ozone, ozoneStatus, nitrogenDioxide, nitrogenDioxideStatus, sulphurDioxide, sulphurDioxideStatus, pm10, pm10Status, pm25, pm25Status);
+                    csv.AppendLine(newline);
 
                 }
                 // Writing to CSV file
@@ -278,7 +370,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
 
         }
-
         public string GeneratePreSignedURL(string bucketName, string keyName, double duration)
         {
             try
@@ -295,7 +386,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return url;
             }
             catch (AmazonS3Exception ex)
-            {
+            {               
                 logger.LogError("AmazonS3Exception Error:{Error}", ex.Message);
                 return "error";
             }
@@ -305,7 +396,85 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 logger.LogError("Error in GeneratePreSignedURL {Error}", ex.StackTrace);
                 return "error";
             }
-        }        
+        }
+
+        public class Sale
+        {
+            public string Product { get; set; }
+            public string Month { get; set; }
+            public int Sales { get; set; }
+            public string Region { get; set; }
+            public string Category { get; set; }
+            public string Salesperson { get; set; }
+            public double Discount { get; set; }
+        }
+        public void atomfeedexport_csv()
+        {
+            string sitename = "Birmingham A4540 Roadside";
+            //string.Format("Site Name,{0}", sitename);
+            var salesData = new List<Sale>
+        {
+            new Sale { Product = "ProductA", Month = "January", Sales = 100, Region = "North", Category = "Electronics", Salesperson = "Alice", Discount = 0.1 },
+            new Sale { Product = "ProductA", Month = "February", Sales = 150, Region = "North", Category = "Electronics", Salesperson = "Alice", Discount = 0.15 },
+            new Sale { Product = "ProductB", Month = "January", Sales = 200, Region = "South", Category = "Furniture", Salesperson = "Bob", Discount = 0.2 },
+            new Sale { Product = "ProductB", Month = "February", Sales = 250, Region = "South", Category = "Furniture", Salesperson = "Bob", Discount = 0.25 },
+            new Sale { Product = "ProductA", Month = "March", Sales = 120, Region = "North", Category = "Electronics", Salesperson = "Alice", Discount = 0.12 },
+            new Sale { Product = "ProductB", Month = "March", Sales = 300, Region = "South", Category = "Furniture", Salesperson = "Bob", Discount = 0.3 },
+        };
+
+            var pivotData = salesData
+                .GroupBy(s => s.Product)
+                .Select(g => new
+                {
+                    Product = g.Key,
+                    SalesByMonth = g.ToDictionary(s => s.Month, s => s.Sales),
+                    Region = g.First().Region,
+                    Category = g.First().Category,
+                    Salesperson = g.First().Salesperson,
+                    Discount = g.Average(s => s.Discount)
+                }).ToList();
+
+            var months = salesData.Select(s => s.Month).Distinct().OrderBy(m => m).ToList();
+
+            //using (var writer = new StreamWriter("SalesData.csv"))
+            //{
+            //    // Write data without headers
+            //    foreach (var sale in salesData)
+            //    {
+            //        writer.WriteLine($"{sale.Product},{sale.Month},{sale.Sales},{sale.Region},{sale.Category},{sale.Salesperson},{sale.Discount}");
+            //    }
+            //}
+
+            using (var writer = new StreamWriter("PivotData.csv"))
+            {
+                writer.WriteLine(string.Format("Site Name,{0}", sitename));
+                writer.WriteLine("Site Type,Urban Traffic");
+                writer.WriteLine("Region,Birmingham");
+                writer.WriteLine("Latitude,52.476145");
+                writer.WriteLine("Longitude,-1.874978");
+                // Write headers
+                writer.Write("Product,Region,Category,Salesperson,Discount");
+                foreach (var month in months)
+                {
+                    writer.Write($",{month}");
+                }
+                writer.WriteLine();
+
+                // Write data
+                foreach (var item in pivotData)
+                {
+                    writer.Write($"{item.Product},{item.Region},{item.Category},{item.Salesperson},{item.Discount}");
+                    foreach (var month in months)
+                    {
+                        item.SalesByMonth.TryGetValue(month, out int sales);
+                        writer.Write($",{sales}");
+                    }
+                    writer.WriteLine();
+                }
+            }
+
+        }
+
     }
 }
 

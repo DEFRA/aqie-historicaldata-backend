@@ -170,8 +170,21 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public object ended_date { get; set; }
         }
 
+        public class AtomURL
+        {
+            public string PresignedUrl { get; set; }
+        }
 
+        public class querystringdata
+        {
+            public string region { get; set; }
+            public string siteType { get; set; }
+            public string sitename { get; set; }
+            public string siteId { get; set; }
+            public string latitude { get; set; }
 
-
+            public string longitude { get; set; }
+            public string year { get; set; }
+        }
     }
 }
