@@ -160,24 +160,24 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                                         finaldata.StartTime = pollutant_value_split_list[0];
                                                         finaldata.EndTime = pollutant_value_split_list[1];
                                                         finaldata.Verification = pollutant_value_split_list[2];
-                                                        //if (pollutant_value_split_list[2] == "1")
-                                                        //{
-                                                        //    //finaldata.Verification = "Verified";
-                                                        //    finaldata.Verification = "V";
-                                                        //}
-                                                        //else if (pollutant_value_split_list[2] == "2")
-                                                        //{
-                                                        //    //finaldata.Verification = "Preliminary verified";
-                                                        //    finaldata.Verification = "P";
-                                                        //}
-                                                        //else
-                                                        //{
-                                                        //    //finaldata.Verification = "Not verified";
-                                                        //    finaldata.Verification = "N";
-                                                        //}
-                                                        //finaldata.Validity = "ugm-3";
-                                                        //finaldata.Validity = pollutant_value_split_list[3];
-                                                        finaldata.Value = pollutant_value_split_list[4];
+                                                    if (pollutant_value_split_list[2] == "1")
+                                                    {
+                                                        //finaldata.Verification = "Verified";
+                                                        finaldata.Verification = "V";
+                                                    }
+                                                    else if (pollutant_value_split_list[2] == "2")
+                                                    {
+                                                        //finaldata.Verification = "Preliminary verified";
+                                                        finaldata.Verification = "P";
+                                                    }
+                                                    else
+                                                    {
+                                                        //finaldata.Verification = "Not verified";
+                                                        finaldata.Verification = "N";
+                                                    }
+                                                    //finaldata.Validity = "ugm-3";
+                                                    //finaldata.Validity = pollutant_value_split_list[3];
+                                                    finaldata.Value = pollutant_value_split_list[4];
                                                         //finaldata.DataCapture = pollutant_value_split_list[5];
                                                         finaldata.Pollutantname = url_pollutant.polluntantname;
                                                         //finaldata.Stationname = "London Bloomsbury";//atomurl.stationname;

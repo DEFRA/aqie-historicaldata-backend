@@ -35,17 +35,27 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
         //        return Results.NotFound();
         //    }
         //}
-        private static async Task<IResult> GetHistorydataById([FromBody] querystringdata data,IAtomHistoryService Persistence)
+        private static async Task<IResult> GetHistorydataById([FromBody] querystringdata data,IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {
-            if (data is not null)
+            try
             {
-                var atomhourlyresult = await Persistence.GetAtomHourlydata(data);
-                //return Results.File(atomhourlyresult,)
-                return atomhourlyresult is not null ? Results.Ok(atomhourlyresult) : Results.NotFound();
+                if (data is not null)
+                {
+                    var atomhourlyresult = await Persistence.GetAtomHourlydata(data);
+                    //return Results.File(atomhourlyresult,)
+                    return atomhourlyresult is not null ? Results.Ok(atomhourlyresult) : Results.NotFound();
+                }
+                else
+                {
+                    return Results.NotFound();
+                }
             }
-            else
+            catch(Exception ex)
             {
+                logger.LogError("Error GetHistorydataById endpoints Info message {Error}", ex.Message);
+                logger.LogError("Error GetHistorydataById endpoints Info stacktrace {Error}", ex.StackTrace);
                 return Results.NotFound();
+
             }
         }
     }
