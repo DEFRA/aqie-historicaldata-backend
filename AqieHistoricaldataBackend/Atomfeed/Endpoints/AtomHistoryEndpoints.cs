@@ -1,5 +1,7 @@
+using AqieHistoricaldataBackend.Atomfeed.Models;
 using AqieHistoricaldataBackend.Atomfeed.Services;
 using AqieHistoricaldataBackend.Example.Services;
+using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
 {
@@ -8,7 +10,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
         public static void UseServiceAtomHistoryEndpoints(this IEndpointRouteBuilder app)
         {
             app.MapGet("AtomHistoryHealthchecks", GetHealthcheckdata);
-            app.MapGet("AtomHistoryHourlydata/{name}", GetHistorydataById);
+            //app.MapGet("AtomHistoryHourlydata/{name}", GetHistorydataById);
+            app.MapGet("AtomHistoryHourlydata/{data}", GetHistorydataById);
 
         }
 
@@ -18,18 +21,31 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             return Results.Ok(matches);
         }
 
-        private static async Task<IResult> GetHistorydataById(string name, IAtomHistoryService Persistence)
+        //private static async Task<IResult> GetHistorydataById(string name, IAtomHistoryService Persistence)
+        //{
+        //    if (name is not null && !string.IsNullOrWhiteSpace(name))
+        //    {
+        //        var atomhourlyresult = await Persistence.GetAtomHourlydata(name);
+        //        //return Results.File(atomhourlyresult,)
+        //        return atomhourlyresult is not null ? Results.Ok(atomhourlyresult) : Results.NotFound();
+        //    }
+        //    else
+        //    {
+        //        return Results.NotFound();
+        //    }
+        //}
+        private static async Task<IResult> GetHistorydataById(string[] data, IAtomHistoryService Persistence)
         {
-            if (name is not null && !string.IsNullOrWhiteSpace(name))
+            if (data is not null)
             {
-                var atomhourlyresult = await Persistence.GetAtomHourlydata(name);
+                var atomhourlyresult = await Persistence.GetAtomHourlydata(data);
                 //return Results.File(atomhourlyresult,)
                 return atomhourlyresult is not null ? Results.Ok(atomhourlyresult) : Results.NotFound();
             }
             else
             {
                 return Results.NotFound();
-            }                
+            }
         }
     }
 }
