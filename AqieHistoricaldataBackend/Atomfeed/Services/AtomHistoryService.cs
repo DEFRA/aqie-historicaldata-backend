@@ -96,7 +96,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             // year: request.yar.get('yearselected')
             //};
             string PresignedUrl = string.Empty;
-             atomfeedexport_csv();
+             
             var pollutant_url = new List<pollutantdetails>
                             {
                                 new pollutantdetails { polluntantname = "Nitrogen dioxide",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/8" },
@@ -201,8 +201,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 try
                 {
-                    
                     var csvbyte = atomfeedexport_csv(Final_list, data);
+                    //var csvbyte = atomfeedexport_csv_fixedheader(Final_list, data);
                     //return csvbyte;
                     string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
                     string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
@@ -251,7 +251,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return PresignedUrl;//PresignedUrl;//"S3 Bucket loaded Successfully";
         }             
 
-        public byte[] atomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
+        public byte[] atomfeedexport_csv_fixedheader(List<Finaldata> Final_list, querystringdata data)
         {
             try
             {
@@ -398,81 +398,82 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        public class Sale
+        public byte[] atomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
         {
-            public string Product { get; set; }
-            public string Month { get; set; }
-            public int Sales { get; set; }
-            public string Region { get; set; }
-            public string Category { get; set; }
-            public string Salesperson { get; set; }
-            public double Discount { get; set; }
-        }
-        public void atomfeedexport_csv()
-        {
-            string sitename = "Birmingham A4540 Roadside";
-            //string.Format("Site Name,{0}", sitename);
-            var salesData = new List<Sale>
-        {
-            new Sale { Product = "ProductA", Month = "January", Sales = 100, Region = "North", Category = "Electronics", Salesperson = "Alice", Discount = 0.1 },
-            new Sale { Product = "ProductA", Month = "February", Sales = 150, Region = "North", Category = "Electronics", Salesperson = "Alice", Discount = 0.15 },
-            new Sale { Product = "ProductB", Month = "January", Sales = 200, Region = "South", Category = "Furniture", Salesperson = "Bob", Discount = 0.2 },
-            new Sale { Product = "ProductB", Month = "February", Sales = 250, Region = "South", Category = "Furniture", Salesperson = "Bob", Discount = 0.25 },
-            new Sale { Product = "ProductA", Month = "March", Sales = 120, Region = "North", Category = "Electronics", Salesperson = "Alice", Discount = 0.12 },
-            new Sale { Product = "ProductB", Month = "March", Sales = 300, Region = "South", Category = "Furniture", Salesperson = "Bob", Discount = 0.3 },
-        };
-
-            var pivotData = salesData
-                .GroupBy(s => s.Product)
-                .Select(g => new
-                {
-                    Product = g.Key,
-                    SalesByMonth = g.ToDictionary(s => s.Month, s => s.Sales),
-                    Region = g.First().Region,
-                    Category = g.First().Category,
-                    Salesperson = g.First().Salesperson,
-                    Discount = g.Average(s => s.Discount)
-                }).ToList();
-
-            var months = salesData.Select(s => s.Month).Distinct().OrderBy(m => m).ToList();
-
-            //using (var writer = new StreamWriter("SalesData.csv"))
-            //{
-            //    // Write data without headers
-            //    foreach (var sale in salesData)
-            //    {
-            //        writer.WriteLine($"{sale.Product},{sale.Month},{sale.Sales},{sale.Region},{sale.Category},{sale.Salesperson},{sale.Discount}");
-            //    }
-            //}
-
-            using (var writer = new StreamWriter("PivotData.csv"))
+            try
             {
-                writer.WriteLine(string.Format("Site Name,{0}", sitename));
-                writer.WriteLine("Site Type,Urban Traffic");
-                writer.WriteLine("Region,Birmingham");
-                writer.WriteLine("Latitude,52.476145");
-                writer.WriteLine("Longitude,-1.874978");
-                // Write headers
-                writer.Write("Product,Region,Category,Salesperson,Discount");
-                foreach (var month in months)
-                {
-                    writer.Write($",{month}");
-                }
-                writer.WriteLine();
+                string region = data.region;       /*data[0];*/
+                string siteType = data.siteType;    /*data[1];*/
+                string sitename = data.sitename;     /*data[2];*/
+                string latitude = data.latitude;     /*data[4];*/
+                string longitude = data.longitude;    /*data[5];*/
+                //string sitename = "Birmingham A4540 Roadside";
+                //string.Format("Site Name,{0}", sitename);
+                var groupedData = Final_list.GroupBy(x => new { Convert.ToDateTime(x.StartTime).Date, Convert.ToDateTime(x.StartTime).TimeOfDay })
+                            .Select(y => new pivotpollutant
+                            {
+                                date = y.Key.Date.ToString("yyyy-MM-dd"),
+                                time = y.Key.TimeOfDay.ToString("hh\\:mm"),
+                                Subpollutant = y.Select(x => new SubpollutantItem
+                                {
+                                    pollutantname = x.Pollutantname,
+                                    pollutantvalue = x.Value,
+                                    verification = x.Verification
+                                }).ToList()
+                            }).ToList();
 
-                // Write data
-                foreach (var item in pivotData)
+                var distinctpollutant = Final_list.Select(s => s.Pollutantname).Distinct().OrderBy(m => m).ToList();
+                // Write to MemoryStream
+                using (var memoryStream = new MemoryStream())
                 {
-                    writer.Write($"{item.Product},{item.Region},{item.Category},{item.Salesperson},{item.Discount}");
-                    foreach (var month in months)
+                    using (var writer = new StreamWriter(memoryStream))
                     {
-                        item.SalesByMonth.TryGetValue(month, out int sales);
-                        writer.Write($",{sales}");
+                        //        using (var writer = new StreamWriter("PivotData.csv"))
+                        //{
+                        writer.WriteLine(string.Format("Hourly measurement data supplied by UK-air on,{0}", DateTime.Today));
+                        writer.WriteLine(string.Format("Site Name,{0}", sitename));
+                        writer.WriteLine("Site Type,Urban Traffic");
+                        writer.WriteLine("Region,Birmingham");
+                        writer.WriteLine("Latitude,52.476145");
+                        writer.WriteLine("Longitude,-1.874978");
+                        writer.WriteLine("Notes: [1] All Data GMT hour ending;  [2] Some shorthand is used, V = Verified, P = Provisionally Verified, N = Not Verified, S = Suspect, [3] Unit of measurement (for pollutants) = ugm-3, [4] Instrument type is included in 'Status' for PM10 and PM2.5");
+                        // Write headers
+                        writer.Write("Date,Time");
+                        foreach (var pollutantname in distinctpollutant)
+                        {
+                            writer.Write($",{pollutantname},{"Status"}");
+                        }
+                        writer.WriteLine();
+                        // Write data
+                        foreach (var item in groupedData)
+                        {
+                            writer.Write($"{item.date},{item.time}");
+
+                            foreach (var pollutant in distinctpollutant)
+                            {
+                                var subpollutantvalue = item.Subpollutant.FirstOrDefault(s => s.pollutantname == pollutant);
+                                writer.Write($",{subpollutantvalue?.pollutantvalue ?? ""},{subpollutantvalue?.verification ?? ""}");
+                            }
+                            writer.WriteLine();
+                        }
+
+                        writer.Flush(); // Ensure all data is written to the MemoryStream
+
+                        // Convert MemoryStream to byte array
+                        byte[] byteArray = memoryStream.ToArray();
+
+                        // Output the byte array (for demonstration purposes)
+                        //Console.WriteLine(BitConverter.ToString(byteArray));
+                        return byteArray;
                     }
-                    writer.WriteLine();
                 }
             }
-
+            catch (Exception ex)
+            {
+                logger.LogError("Error csv Info message {Error}", ex.Message);
+                logger.LogError("Error csv Info stacktrace {Error}", ex.StackTrace);
+                return new byte[] { 0x20};
+}
         }
 
     }

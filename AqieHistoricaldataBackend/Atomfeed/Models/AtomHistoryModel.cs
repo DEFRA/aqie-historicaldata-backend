@@ -186,5 +186,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string longitude { get; set; }
             public string year { get; set; }
         }
+        public class pivotpollutant
+        {
+            public string date { get; set; }
+            public string time { get; set; }
+            public List<SubpollutantItem> Subpollutant { get; set; }
+        }
+        public class SubpollutantItem
+        {
+            public string pollutantname { get; set; }
+            public string pollutantvalue { get; set; }
+            public string verification { get; set; }
+        }
     }
 }
