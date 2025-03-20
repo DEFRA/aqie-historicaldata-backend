@@ -12,6 +12,8 @@ using AqieHistoricaldataBackend.Atomfeed.Endpoints;
 using AqieHistoricaldataBackend.Atomfeed.Services;
 using Microsoft.Net.Http.Headers;
 using Amazon.S3;
+using Hangfire;
+using Hangfire.MemoryStorage;
 
 var app = CreateWebApplication(args);
 await app.RunAsync();
@@ -67,8 +69,12 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
             options.Headers.Add(traceHeader);
         }
     });
+
+    // Add Hangfire services.
+    builder.Services.AddHangfire(config => config.UseMemoryStorage());
+    builder.Services.AddHangfireServer();
     
-    
+
     // Set up the MongoDB client. Config and credentials are injected automatically at runtime.
     builder.Services.Configure<MongoConfig>(builder.Configuration.GetSection("Mongo"));
     builder.Services.AddSingleton<IMongoDbClientFactory, MongoDbClientFactory>();
@@ -91,5 +97,6 @@ static WebApplication SetupApplication(WebApplication app)
     // Example module, remove before deploying!
     app.UseExampleEndpoints();
     app.UseServiceAtomHistoryEndpoints();
+    app.UseHangfireDashboard("/hangfire");
     return app;
 }

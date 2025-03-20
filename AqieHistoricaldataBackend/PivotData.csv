@@ -1,9 +1,11 @@
-Site Name,Birmingham A4540 Roadside
-Site Type,Urban Traffic
-Region,Birmingham
-Latitude,52.476145
-Longitude,-1.874978
-Date,Time,Nitrogen dioxide,Status,Ozone,Status,PM10,Status,PM2.5,Status,Sulphur dioxide,Status
+Hourly measurement data supplied by UK-air on,20/03/2025 00:00:00
+Site Name,London Bloomsbury
+Site Type, Urban Background
+Region, Greater London
+Latitude, 51.52229
+Longitude, -0.125889
+Notes: [1] All Data GMT hour ending;  [2] Some shorthand is used, V = Verified, P = Provisionally Verified, N = Not Verified, S = Suspect, [3] Unit of measurement (for pollutants) = ugm-3, [4] Instrument type is included in 'Status' for PM10 and PM2.5
+Date,Time,Nitrogen dioxide,Status,Ozone,Status,PM10 particulate matter (Hourly measured),Status,PM2.5 particulate matter (Hourly measured),Status,Sulphur dioxide,Status
 2024-01-01,00:00,8.92151,V,62.33236,V,-99,V,-99,V,2.18837,V
 2024-01-01,01:00,8.78182,V,63.33021,V,-99,V,-99,V,1.48809,V
 2024-01-01,02:00,8.25901,V,61.61724,V,-99,V,-99,V,1.31302,V
