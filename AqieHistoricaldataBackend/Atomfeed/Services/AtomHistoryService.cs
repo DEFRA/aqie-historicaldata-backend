@@ -32,6 +32,7 @@ using Microsoft.Extensions.Primitives;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Amazon.Runtime.Internal;
 using static Amazon.Internal.RegionEndpointProviderV2;
+using Hangfire;
 
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
@@ -44,24 +45,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 var client = httpClientFactory.CreateClient("Atomfeed");
-                //var response = await client.GetAsync("https://uk-air.defra.gov.uk/data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml");
-                logger.LogInformation("client base address {client}", client.ToString());
-                logger.LogInformation("Before Fetching citizen URL {starttime}", DateTime.Now);
-                var response = await client.GetAsync("https://aqie-back-end.dev.cdp-int.defra.cloud/measurements");
-                logger.LogInformation("After Fetching response citizen URL {endtime}", DateTime.Now);
-
-                logger.LogInformation("Before Fetching Atom URL {atomurl}", DateTime.Now);
-                //var Atomresponse = await client.GetAsync("search/places/v1/postcode?postcode=bt666ru&key=&maxresults=1");
                 var Atomresponse = await client.GetAsync("data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml");
-                logger.LogInformation("After Fetching response Atom URL {atomurl}", DateTime.Now);
                 Atomresponse.EnsureSuccessStatusCode();
-
-                logger.LogInformation("Before data Reading the Atom URL {atomurl}", DateTime.Now);
                 var data = await Atomresponse.Content.ReadAsStringAsync();
-                logger.LogInformation("After data Fetching the Atom URL {atomurl}", DateTime.Now);
 
-                //                    return "Success";
-                return data;
+                // Schedule a recurring job.
+                RecurringJob.AddOrUpdate(
+                    "call-api-job",
+                    () => CallApi(),
+                    Cron.Minutely); // Schedule to run daily
+
+                return Atomresponse.ToString();
             }
             catch (Exception ex)
             {
@@ -72,31 +66,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
         public async Task<string> GetAtomHourlydata(querystringdata data)
         {
-            //logger.LogInformation("Frontend API object region {data[0]}", data[0]);
-            //logger.LogInformation("Frontend API object siteType {data[1]}", data[1]);
-            //logger.LogInformation("Frontend API object sitename {data[2]}", data[2]);
-            //logger.LogInformation("Frontend API object siteId {data[3]}", data[3]);
-            //logger.LogInformation("Frontend API object latitude {data[4]}", data[4]);
-            //logger.LogInformation("Frontend API object longitude {data[5]}", data[5]);
-            //logger.LogInformation("Frontend API object year {data[6]}", data[6]);
-
-            //string siteId = "BEX";//data[3];
-            //string year = "2019";//data[6];
-            //string s3Key1 = "measurement_data_" + siteId + "_" + year + ".csv";
             string siteId = data.siteId;
             string year = data.year;
+            string PresignedUrl = string.Empty;           
 
-            //string[] apiparams = {
-            //  region: stndetails.region,
-            //  siteType: stndetails.siteType,
-            //  sitename: stndetails.name,
-            //  siteId: stndetails.localSiteID,
-            //  latitude: stndetails.location.coordinates[0],
-            //  longitude: stndetails.location.coordinates[1],
-            // year: request.yar.get('yearselected')
-            //};
-            string PresignedUrl = string.Empty;
-             
             var pollutant_url = new List<pollutantdetails>
                             {
                                 new pollutantdetails { polluntantname = "Nitrogen dioxide",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/8" },
@@ -125,80 +98,54 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var AtomresponseJsonCollectionString = Newtonsoft.Json.JsonConvert.SerializeObject(AtomresponseJsonCollection);
 
                 int pollutant_count = AtomresponseJsonCollection.Count();
-                    List<string[]> pollutant_data_List = new List<string[]>();
-                    //ArrayList pollutant_data_List = new ArrayList();
-                    for (int totalindex = 0; totalindex < pollutant_count - 1; totalindex++)
+                for (int totalindex = 0; totalindex < pollutant_count - 1; totalindex++)
+                {
+                    try
                     {
-                        try
+                        var featureMember = Newtonsoft.Json.Linq.JObject.Parse(AtomresponseJson)["gml:FeatureCollection"]["gml:featureMember"].ToList()[totalindex + 1];
+                        var observedProperty = featureMember["om:OM_Observation"]["om:observedProperty"];
+                        var check_observedProperty_href = observedProperty.First.ToString();
+
+                        if (check_observedProperty_href.Contains("xlink:href"))
                         {
-                            string check_observedProperty_href = Newtonsoft.Json.Linq.JObject.Parse(AtomresponseJson)["gml:FeatureCollection"]["gml:featureMember"].ToList()[totalindex + 1]["om:OM_Observation"]["om:observedProperty"].First.ToString();
-                            if (check_observedProperty_href.Contains("xlink:href"))
+                            var poolutant_API_url = observedProperty["@xlink:href"].ToString();
+
+                            if (!string.IsNullOrEmpty(poolutant_API_url))
                             {
-                                string poolutant_API_url = Newtonsoft.Json.Linq.JObject.Parse(AtomresponseJson)["gml:FeatureCollection"]["gml:featureMember"].ToList()[totalindex + 1]["om:OM_Observation"]["om:observedProperty"]["@xlink:href"].ToString();
-
-                                if (poolutant_API_url != null)
+                                foreach (var url_pollutant in pollutant_url)
                                 {
-                                    foreach (var url_pollutant in pollutant_url)
+                                    if (url_pollutant.pollutant_master_url == poolutant_API_url)
                                     {
-                                        try
+                                        var pollutant_result_data = featureMember["om:OM_Observation"]["om:result"]["swe:DataArray"]["swe:values"].ToString();
+                                        var pollutant_split_data = pollutant_result_data.Replace("\r\n", "").Trim().Split("@@");
+
+                                        foreach (var item in pollutant_split_data)
                                         {
-                                            if (url_pollutant.pollutant_master_url == poolutant_API_url)
+                                            var pollutant_value_split_list = item.Split(',').ToList();
+
+                                            Finaldata finaldata = new Finaldata
                                             {
-                                                string pollutant_result_data = Newtonsoft.Json.Linq.JObject.Parse(AtomresponseJson)["gml:FeatureCollection"]["gml:featureMember"].ToList()[totalindex + 1]["om:OM_Observation"]["om:result"]["swe:DataArray"]["swe:values"].ToString();
-                                                var pollutant_split_data = pollutant_result_data.Replace("\r\n", "").Trim().Split("@@");
-                                                if (pollutant_split_data != null)
-                                                {
+                                                StartTime = pollutant_value_split_list[0],
+                                                EndTime = pollutant_value_split_list[1],
+                                                Verification = pollutant_value_split_list[2],
+                                                Value = pollutant_value_split_list[4],
+                                                Pollutantname = url_pollutant.polluntantname
+                                            };
 
-                                                    foreach (var item in pollutant_split_data)
-                                                    {
-
-                                                        //var value = item.Split(",");
-                                                        //List<string> pollutant_value_split_list = new List<String>(item.Split(','));
-                                                        List<string> pollutant_value_split_list = new List<System.String>(item.Split(','));
-
-                                                        Finaldata finaldata = new Finaldata();
-                                                        finaldata.StartTime = pollutant_value_split_list[0];
-                                                        finaldata.EndTime = pollutant_value_split_list[1];
-                                                        finaldata.Verification = pollutant_value_split_list[2];
-                                                    if (pollutant_value_split_list[2] == "1")
-                                                    {
-                                                        //finaldata.Verification = "Verified";
-                                                        finaldata.Verification = "V";
-                                                    }
-                                                    else if (pollutant_value_split_list[2] == "2")
-                                                    {
-                                                        //finaldata.Verification = "Preliminary verified";
-                                                        finaldata.Verification = "P";
-                                                    }
-                                                    else
-                                                    {
-                                                        //finaldata.Verification = "Not verified";
-                                                        finaldata.Verification = "N";
-                                                    }
-                                                    //finaldata.Validity = "ugm-3";
-                                                    //finaldata.Validity = pollutant_value_split_list[3];
-                                                    finaldata.Value = pollutant_value_split_list[4];
-                                                        //finaldata.DataCapture = pollutant_value_split_list[5];
-                                                        finaldata.Pollutantname = url_pollutant.polluntantname;
-                                                        //finaldata.Stationname = "London Bloomsbury";//atomurl.stationname;
-                                                        Final_list.Add(finaldata);
-
-                                                    }
-
-                                                }
-                                            }
+                                            Final_list.Add(finaldata);
                                         }
-                                        catch (Exception ex) { }
                                     }
                                 }
                             }
                         }
-                        catch (Exception ex) {
-
                     }
+                    catch (Exception ex)
+                    {
+                        logger.LogError("Error in atom feed fetch {Error}", ex.Message);
+                        logger.LogError("Error in atom feed fetch {Error}", ex.StackTrace);
                     }
-                    dailyannualaverage dailyannualaverage = new dailyannualaverage();
-
+                }
+                dailyannualaverage dailyannualaverage = new dailyannualaverage();
                 try
                 {
                     var csvbyte = atomfeedexport_csv(Final_list, data);
@@ -244,132 +191,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     //xml_each_pollutant_reading_time.Sort();
                 }
                 catch (Exception ex) {
-                logger.LogError("Error in Atom feed pull Info message {Error}", ex.Message);
-                logger.LogError("Error in Atom feed pull {Error}", ex.StackTrace);
+                logger.LogError("Error in Atom feed fetch {Error}", ex.Message);
+                logger.LogError("Error in Atom feed fetch {Error}", ex.StackTrace);
             }
 
             return PresignedUrl;//PresignedUrl;//"S3 Bucket loaded Successfully";
-        }             
+        }            
 
-        public byte[] atomfeedexport_csv_fixedheader(List<Finaldata> Final_list, querystringdata data)
-        {
-            try
-            {
-                string region = data.region;       /*data[0];*/
-                string siteType = data.siteType;    /*data[1];*/
-                string sitename = data.sitename;     /*data[2];*/
-                string latitude = data.latitude;     /*data[4];*/
-                string longitude = data.longitude;    /*data[5];*/
-                //string[] apiparams = {
-                //  region: stndetails.region,
-                //  siteType: stndetails.siteType,
-                //  sitename: stndetails.name,
-                //  siteId: stndetails.localSiteID,
-                //  latitude: stndetails.location.coordinates[0],
-                //  longitude: stndetails.location.coordinates[1],
-                // year: request.yar.get('yearselected')
-                //};
-
-                //StringBuilder pollutantnameheaders = new StringBuilder();
-                //StringBuilder pollutantdataheaders = new StringBuilder();
-                //string Ozone = string.Empty;
-                //string PM10 = string.Empty;
-                //string PM25 = string.Empty;
-                //string SulphurDioxide = string.Empty;
-                //string NitrogenDioxide = string.Empty;
-                //var distinctpollutantFilteredNames = Final_list
-                //                                    .Select(o => o.Pollutantname)
-                //                                    .Distinct()
-                //                                    .ToList();
-                //int pollutantfiltercount = distinctpollutantFilteredNames.Count();
-
-                //foreach (var data in distinctpollutantFilteredNames)
-                //{
-                //    if(data == "Ozone")
-                //    {
-                //        Ozone = data;
-                //    }
-                //    else if (data == "Nitrogen dioxide")
-                //    {
-                //        NitrogenDioxide = data;
-                //    }
-                //    else if (data == "Sulphur dioxide")
-                //    {
-                //        SulphurDioxide = data;
-                //    }
-                //    else if (data == "PM10")
-                //    {
-                //        PM10 = data;
-                //    }
-                //    else if (data == "PM2.5")
-                //    {
-                //        PM25 = data;
-                //    }
-                //}
-                
-                //string sitename = "Birmingham A4540 Roadside";
-                var csv = new StringBuilder();
-                // Adding metadata
-                csv.AppendLine(string.Format("Hourly measurement data supplied by UK-air on,{0}", sitename));
-                csv.AppendLine(string.Format("Site Name,{0}", sitename));
-                csv.AppendLine(string.Format("Site Type,{0}", siteType));
-                csv.AppendLine(string.Format("Region,{0}", region));
-                csv.AppendLine(string.Format("Latitude,{0}", latitude));
-                csv.AppendLine(string.Format("Longitude,{0}", longitude));
-                csv.AppendLine("Notes:	 [1] All Data GMT hour ending;  [2] Some shorthand is used, V = Verified, P = Provisionally Verified, N = Not Verified, S = Suspect, [3] Unit of measurement (for pollutants) = ugm-3, [4] Instrument type is included in 'Status' for PM10 and PM2.5");
-                //pollutantnameheaders.Append("Date,Time");                
-                //foreach (var pollutantname in distinctpollutantFilteredNames)
-                //{
-                //    if(pollutantname == "PM2.5" || pollutantname == "PM10")
-                //    {
-                //        pollutantnameheaders.Append("," + pollutantname + "particulate matter (Hourly measured),Status");
-                //    }
-                //    else
-                //    {
-                //        pollutantnameheaders.Append("," + pollutantname + ",Status");
-                //    }                        
-                //}
-                csv.AppendLine("Date,Time,Ozone,Status,Nitrogen dioxide,Status,Sulphur dioxide,Status,PM10 particulate matter (Hourly measured),Status,PM2.5 particulate matter (Hourly measured),Status");
-                //csv.AppendLine(pollutantnameheaders.ToString());
-                var groupedData = Final_list.GroupBy(x => new { Convert.ToDateTime(x.StartTime).Date, Convert.ToDateTime(x.StartTime).TimeOfDay });
-                //var groupedData1 = Final_list.GroupBy(x => new { Convert.ToDateTime(x.StartTime).Date, Convert.ToDateTime(x.StartTime).TimeOfDay })
-                //                              .Select(g => new { Key = g.Key, Items = g.Where(x => x > 3 && x < 9) });
-                string filePath = "measurement_data.csv";
-                foreach (var group in groupedData)
-                {
-                    // Adding data rows
-                    var date = group.Key.Date.ToString("yyyy-MM-dd");
-                    var time = group.Key.TimeOfDay.ToString("hh\\:mm");
-                    var ozone = group.FirstOrDefault(x => x.Pollutantname == "Ozone")?.Value ?? "";
-                    var ozoneStatus = group.FirstOrDefault(x => x.Pollutantname == "Ozone")?.Verification ?? "";
-                    var nitrogenDioxide = group.FirstOrDefault(x => x.Pollutantname == "Nitrogen dioxide")?.Value ?? "";
-                    var nitrogenDioxideStatus = group.FirstOrDefault(x => x.Pollutantname == "Nitrogen dioxide")?.Verification ?? "";
-                    var sulphurDioxide = group.FirstOrDefault(x => x.Pollutantname == "Sulphur dioxide")?.Value ?? "";
-                    var sulphurDioxideStatus = group.FirstOrDefault(x => x.Pollutantname == "Sulphur dioxide")?.Verification ?? "";
-                    var pm10 = group.FirstOrDefault(x => x.Pollutantname == "PM10")?.Value ?? "";
-                    var pm10Status = group.FirstOrDefault(x => x.Pollutantname == "PM10")?.Verification ?? "";
-                    var pm25 = group.FirstOrDefault(x => x.Pollutantname == "PM2.5")?.Value ?? "";
-                    var pm25Status = group.FirstOrDefault(x => x.Pollutantname == "PM2.5")?.Verification ?? "";
-
-                    // Adding headers
-                    var newline = string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}", date, time, ozone, ozoneStatus, nitrogenDioxide, nitrogenDioxideStatus, sulphurDioxide, sulphurDioxideStatus, pm10, pm10Status, pm25, pm25Status);
-                    csv.AppendLine(newline);
-
-                }
-                // Writing to CSV file
-                System.IO.File.WriteAllText(filePath, csv.ToString());
-                var bytecontent = Encoding.UTF8.GetBytes(csv.ToString());
-                return bytecontent;
-
-            }
-            catch (Exception ex)
-            {
-                logger.LogError("Error csv Info message {Error}", ex.Message);
-                logger.LogError("Error csv Info stacktrace {Error}", ex.StackTrace);
-                return new byte[] { 0x20};
-            }
-
-        }
         public string GeneratePreSignedURL(string bucketName, string keyName, double duration)
         {
             try
@@ -402,11 +230,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                string region = data.region;       /*data[0];*/
-                string siteType = data.siteType;    /*data[1];*/
-                string sitename = data.sitename;     /*data[2];*/
-                string latitude = data.latitude;     /*data[4];*/
-                string longitude = data.longitude;    /*data[5];*/
+                string pollutantnameheaderchange = string.Empty;
+                string region = data.region;       
+                string siteType = data.siteType;   
+                string sitename = data.sitename;   
+                string latitude = data.latitude;   
+                string longitude = data.longitude; 
                 //string sitename = "Birmingham A4540 Roadside";
                 //string.Format("Site Name,{0}", sitename);
                 var groupedData = Final_list.GroupBy(x => new { Convert.ToDateTime(x.StartTime).Date, Convert.ToDateTime(x.StartTime).TimeOfDay })
@@ -418,7 +247,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                 {
                                     pollutantname = x.Pollutantname,
                                     pollutantvalue = x.Value,
-                                    verification = x.Verification
+                                    verification = x.Verification == "1" ? "V" :
+                                                   x.Verification == "2" ? "P" :
+                                                   x.Verification == "3" ? "N" : "no data"
                                 }).ToList()
                             }).ToList();
 
@@ -428,20 +259,33 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     using (var writer = new StreamWriter(memoryStream))
                     {
-                        //        using (var writer = new StreamWriter("PivotData.csv"))
-                        //{
-                        writer.WriteLine(string.Format("Hourly measurement data supplied by UK-air on,{0}", DateTime.Today));
+                //        using (var writer = new StreamWriter("PivotData.csv"))
+                //{
+                    writer.WriteLine(string.Format("Hourly measurement data supplied by UK-air on,{0}", DateTime.Today));
                         writer.WriteLine(string.Format("Site Name,{0}", sitename));
-                        writer.WriteLine("Site Type,Urban Traffic");
-                        writer.WriteLine("Region,Birmingham");
-                        writer.WriteLine("Latitude,52.476145");
-                        writer.WriteLine("Longitude,-1.874978");
+                        writer.WriteLine(string.Format("Site Type, {0}", siteType));
+                        writer.WriteLine(string.Format("Region, {0}", region));
+                        writer.WriteLine(string.Format("Latitude, {0}", latitude));
+                        writer.WriteLine(string.Format("Longitude, {0}", longitude));
                         writer.WriteLine("Notes: [1] All Data GMT hour ending;  [2] Some shorthand is used, V = Verified, P = Provisionally Verified, N = Not Verified, S = Suspect, [3] Unit of measurement (for pollutants) = ugm-3, [4] Instrument type is included in 'Status' for PM10 and PM2.5");
                         // Write headers
                         writer.Write("Date,Time");
                         foreach (var pollutantname in distinctpollutant)
                         {
-                            writer.Write($",{pollutantname},{"Status"}");
+                            if(pollutantname == "PM10")
+                            {
+                                pollutantnameheaderchange = "PM10 particulate matter (Hourly measured)";
+                                writer.Write($",{pollutantnameheaderchange},{"Status"}");
+                            }
+                            else if (pollutantname == "PM2.5")
+                            {
+                                pollutantnameheaderchange = "PM2.5 particulate matter (Hourly measured)";
+                                writer.Write($",{pollutantnameheaderchange},{"Status"}");
+                            }
+                            else
+                            {
+                                writer.Write($",{pollutantname},{"Status"}");
+                            }                                
                         }
                         writer.WriteLine();
                         // Write data
@@ -459,12 +303,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                         writer.Flush(); // Ensure all data is written to the MemoryStream
 
-                        // Convert MemoryStream to byte array
-                        byte[] byteArray = memoryStream.ToArray();
+                    // Convert MemoryStream to byte array
+                    byte[] byteArray = memoryStream.ToArray();
+                    //byte[] byteArray = [];
 
-                        // Output the byte array (for demonstration purposes)
-                        //Console.WriteLine(BitConverter.ToString(byteArray));
-                        return byteArray;
+                    // Output the byte array (for demonstration purposes)
+                    //Console.WriteLine(BitConverter.ToString(byteArray));
+                    return byteArray;
                     }
                 }
             }
@@ -473,7 +318,36 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 logger.LogError("Error csv Info message {Error}", ex.Message);
                 logger.LogError("Error csv Info stacktrace {Error}", ex.StackTrace);
                 return new byte[] { 0x20};
-}
+            }
+        }
+
+        public void CallApi()
+        {
+            try
+            {
+                using (var client = httpClientFactory.CreateClient("Atomfeed"))
+                {
+                    var response = client.GetAsync("data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml").Result;
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var data = response.Content.ReadAsStringAsync();
+                        if(data is not null)
+                        {
+                            logger.LogInformation("Data Fetching health check atom feed API successful {response}", response.ToString() + DateTime.Now);                        
+                        }
+                    }
+                    else
+                    {
+                        logger.LogInformation("Data Fetching health check atom feed API failed {response}", response.ToString() + DateTime.Now);
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+                logger.LogError("Error AtomHealthcheck message {Error}", ex.Message);
+                logger.LogError("Error AtomHealthcheck stacktrace {Error}", ex.StackTrace);
+            }
+
         }
 
     }
