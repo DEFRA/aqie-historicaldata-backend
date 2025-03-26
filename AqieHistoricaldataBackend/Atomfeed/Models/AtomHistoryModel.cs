@@ -177,6 +177,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
 
         public class querystringdata
         {
+            public string stationreaddate { get; set; }
             public string region { get; set; }
             public string siteType { get; set; }
             public string sitename { get; set; }
@@ -185,6 +186,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
 
             public string longitude { get; set; }
             public string year { get; set; }
+            public string downloadpollutant { get; set; }
+            public string downloadpollutanttype { get; set; }
         }
         public class pivotpollutant
         {

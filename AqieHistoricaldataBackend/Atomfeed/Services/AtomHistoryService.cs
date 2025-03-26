@@ -33,11 +33,13 @@ using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Amazon.Runtime.Internal;
 using static Amazon.Internal.RegionEndpointProviderV2;
 using Hangfire;
+using Hangfire.MemoryStorage.Database;
+using static AqieHistoricaldataBackend.Atomfeed.Services.AtomHistoryService;
 
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AtomHistoryService(ILogger<AtomHistoryService> logger, IHttpClientFactory httpClientFactory) : IAtomHistoryService //MongoService<AtomHistoryModel>, 
+    public class AtomHistoryService(ILogger<AtomHistoryService> logger, IHttpClientFactory httpClientFactory, IAtomHourlyFetchService atomHourlyFetchService) : IAtomHistoryService //MongoService<AtomHistoryModel>, 
     {
     
         public async Task<string> AtomHealthcheck()
@@ -66,9 +68,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
         public async Task<string> GetAtomHourlydata(querystringdata data)
         {
+            //getpollutantcount();
             string siteId = data.siteId;
             string year = data.year;
-            string PresignedUrl = string.Empty;           
+            string PresignedUrl = string.Empty;
+            string downloadfilter = data.downloadpollutant;
+            string downloadtype = data.downloadpollutanttype;
+
+            var result = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
 
             var pollutant_url = new List<pollutantdetails>
                             {
@@ -76,8 +83,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                 new pollutantdetails { polluntantname = "PM10",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5"  },
                                 new pollutantdetails { polluntantname = "PM2.5",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/6001"  },
                                 new pollutantdetails { polluntantname = "Ozone",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/7"  },
-                                new pollutantdetails { polluntantname = "Sulphur dioxide",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/1"  }
+                                new pollutantdetails { polluntantname = "Sulphur dioxide",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/1"  },
+                                new pollutantdetails { polluntantname = "Black Carbon",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/391"  }
                             };
+            var filterpollutant = pollutant_url.Where(P => P.polluntantname == downloadfilter);
+
+            // If filterpollutant is empty, use pollutant_url
+            var pollutantsToDisplay = filterpollutant.Any() ? filterpollutant : pollutant_url;
+
             List<Finaldata> Final_list = new List<Finaldata>();
             List<DailyAverage> DailyAverages = new List<DailyAverage>();
             List<dailyannualaverage> dailyannualaverages = new List<dailyannualaverage>();
@@ -112,7 +125,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                             if (!string.IsNullOrEmpty(poolutant_API_url))
                             {
-                                foreach (var url_pollutant in pollutant_url)
+                                foreach (var url_pollutant in pollutantsToDisplay)
                                 {
                                     if (url_pollutant.pollutant_master_url == poolutant_API_url)
                                     {
@@ -141,63 +154,112 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError("Error in atom feed fetch {Error}", ex.Message);
-                        logger.LogError("Error in atom feed fetch {Error}", ex.StackTrace);
+                        logger.LogError("Error in atom feed data processing {Error}", ex.Message);
+                        logger.LogError("Error in atom feed data processing {Error}", ex.StackTrace);
                     }
                 }
-                dailyannualaverage dailyannualaverage = new dailyannualaverage();
-                try
-                {
-                    var csvbyte = atomfeedexport_csv(Final_list, data);
-                    //var csvbyte = atomfeedexport_csv_fixedheader(Final_list, data);
-                    //return csvbyte;
-                    string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
-                    string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
-                    string s3Key = "measurement_data_" + siteId + "_" + year + ".csv";   
-                    var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
-                    logger.LogInformation("S3 region {regionEndpoint}", regionEndpoint);
 
-                    using (var s3Client = new Amazon.S3.AmazonS3Client())
-                    {
-                        using (var transferUtility = new TransferUtility(s3Client))
-                        {
-                            using (var stream = new MemoryStream(csvbyte))
-                            {
-                                logger.LogInformation("S3 upload start", DateTime.Now);
-                                await transferUtility.UploadAsync(stream, s3BucketName, s3Key);
-                                logger.LogInformation("S3 upload end", DateTime.Now);                                
-                            }
-                        }
-                    }
-                    logger.LogInformation("S3 PresignedUrl start", DateTime.Now);
-                    PresignedUrl = GeneratePreSignedURL(s3BucketName, s3Key, 604800);
-                    logger.LogInformation("S3 PresignedUrl final URL {PresignedUrl}", PresignedUrl);
+                if (downloadtype == "Daily")
+                {
+                    //To get the daily average 
+                    var Daily_Average = Final_list.GroupBy(x => new { ReportDate = Convert.ToDateTime(x.StartTime).Date.ToString(), x.Pollutantname, x.Verification })
+    .Select(x => new DailyAverage { ReportDate = x.Key.ReportDate, Pollutantname = x.Key.Pollutantname, Verification = x.Key.Verification, Total = x.Average(y => Convert.ToDecimal(y.Value)) }).ToList();
+                    PresignedUrl = await writecsvtoawss3bucket(Final_list, data);
                 }
-                catch (Exception ex)
+                else if (downloadtype == "Annual")
                 {
-                    logger.LogError("Error S3 Info message {Error}", ex.Message);
-                    logger.LogError("Error S3 Info stacktrace {Error}", ex.StackTrace);
-                }  
-
-                //To get the daily average 
-                var Daily_Total = Final_list.GroupBy(x => new { ReportDate = Convert.ToDateTime(x.StartTime).Date.ToString(), x.Pollutantname,x.Verification })
-.Select(x => new DailyAverage { ReportDate = x.Key.ReportDate, Pollutantname = x.Key.Pollutantname, Verification = x.Key.Verification, Total = x.Average(y => Convert.ToDecimal(y.Value)) }).ToList();
-
                     //To get the yearly average 
-                    var Daily_Average = Final_list.GroupBy(x => new { ReportDate = Convert.ToDateTime(x.StartTime).Year.ToString(), x.Pollutantname })
+                    var Annual_Average = Final_list.GroupBy(x => new { ReportDate = Convert.ToDateTime(x.StartTime).Year.ToString(), x.Pollutantname })
 .Select(x => new DailyAverage { ReportDate = x.Key.ReportDate, Pollutantname = x.Key.Pollutantname, Total = x.Average(y => Convert.ToDecimal(y.Value)) }).ToList();
-
-                    dailyannualaverages.Add(dailyannualaverage);
-                    //xml_each_pollutant_reading_time.Sort();
+                    PresignedUrl = await writecsvtoawss3bucket(Final_list, data);
                 }
+                else
+                {
+                    PresignedUrl = await writecsvtoawss3bucket(Final_list, data);
+                }
+
+                    //PresignedUrl = await writecsvtoawss3bucket(Final_list, data);
+                //try
+                //{
+                //    var csvbyte = atomfeedexport_csv(Final_list, data);
+                //    //var csvbyte = atomfeedexport_csv_fixedheader(Final_list, data);
+                //    //return csvbyte;
+                //    string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
+                //    string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
+                //    string s3Key = "measurement_data_" + siteId + "_" + year + ".csv";
+                //    var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
+                //    logger.LogInformation("S3 region {regionEndpoint}", regionEndpoint);
+
+                //    using (var s3Client = new Amazon.S3.AmazonS3Client())
+                //    {
+                //        using (var transferUtility = new TransferUtility(s3Client))
+                //        {
+                //            using (var stream = new MemoryStream(csvbyte))
+                //            {
+                //                logger.LogInformation("S3 upload start", DateTime.Now);
+                //                await transferUtility.UploadAsync(stream, s3BucketName, s3Key);
+                //                logger.LogInformation("S3 upload end", DateTime.Now);
+                //            }
+                //        }
+                //    }
+                //    logger.LogInformation("S3 PresignedUrl start", DateTime.Now);
+                //    PresignedUrl = GeneratePreSignedURL(s3BucketName, s3Key, 604800);
+                //    logger.LogInformation("S3 PresignedUrl final URL {PresignedUrl}", PresignedUrl);
+                //}
+                //catch (Exception ex)
+                //{
+                //    logger.LogError("Error S3 Info message {Error}", ex.Message);
+                //    logger.LogError("Error S3 Info stacktrace {Error}", ex.StackTrace);
+                //}
+
+            }
                 catch (Exception ex) {
                 logger.LogError("Error in Atom feed fetch {Error}", ex.Message);
                 logger.LogError("Error in Atom feed fetch {Error}", ex.StackTrace);
             }
 
             return PresignedUrl;//PresignedUrl;//"S3 Bucket loaded Successfully";
-        }            
+        }
 
+        //public async Task<string> writecsvtoawss3bucket1(dynamic Final_list, querystringdata data)
+        public async Task<string> writecsvtoawss3bucket(List<Finaldata> Final_list, querystringdata data)
+        {
+
+            string siteId = data.siteId;
+            string year = data.year;
+            string PresignedUrl = string.Empty;
+            try
+            {
+                var csvbyte = atomfeedexport_csv(Final_list, data);
+                string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
+                string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
+                string s3Key = "measurement_data_" + siteId + "_" + year + ".csv";
+                var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
+                logger.LogInformation("S3 bucket region {regionEndpoint}", regionEndpoint);
+
+                using (var s3Client = new Amazon.S3.AmazonS3Client())
+                {
+                    using (var transferUtility = new TransferUtility(s3Client))
+                    {
+                        using (var stream = new MemoryStream(csvbyte))
+                        {
+                            logger.LogInformation("S3 bucket upload start", DateTime.Now);
+                            await transferUtility.UploadAsync(stream, s3BucketName, s3Key);
+                            logger.LogInformation("S3 bucket upload end", DateTime.Now);
+                        }
+                    }
+                }
+                logger.LogInformation("S3 bucket PresignedUrl start", DateTime.Now);
+                PresignedUrl = GeneratePreSignedURL(s3BucketName, s3Key, 604800);
+                logger.LogInformation("S3 bucket PresignedUrl final URL {PresignedUrl}", PresignedUrl);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError("Error AWS S3 bucket Info message {Error}", ex.Message);
+                logger.LogError("Error AWS S3 bucket Info stacktrace {Error}", ex.StackTrace);
+            }
+            return PresignedUrl;
+        }
         public string GeneratePreSignedURL(string bucketName, string keyName, double duration)
         {
             try
@@ -231,13 +293,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 string pollutantnameheaderchange = string.Empty;
+                string stationfetchdate = data.stationreaddate;
                 string region = data.region;       
                 string siteType = data.siteType;   
                 string sitename = data.sitename;   
                 string latitude = data.latitude;   
                 string longitude = data.longitude; 
-                //string sitename = "Birmingham A4540 Roadside";
-                //string.Format("Site Name,{0}", sitename);
                 var groupedData = Final_list.GroupBy(x => new { Convert.ToDateTime(x.StartTime).Date, Convert.ToDateTime(x.StartTime).TimeOfDay })
                             .Select(y => new pivotpollutant
                             {
@@ -246,10 +307,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                 Subpollutant = y.Select(x => new SubpollutantItem
                                 {
                                     pollutantname = x.Pollutantname,
-                                    pollutantvalue = x.Value,
+                                    pollutantvalue = x.Value == "-99" ? "no data" : x.Value,
                                     verification = x.Verification == "1" ? "V" :
                                                    x.Verification == "2" ? "P" :
-                                                   x.Verification == "3" ? "N" : "no data"
+                                                   x.Verification == "3" ? "N" : "others"
                                 }).ToList()
                             }).ToList();
 
@@ -261,7 +322,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     {
                 //        using (var writer = new StreamWriter("PivotData.csv"))
                 //{
-                    writer.WriteLine(string.Format("Hourly measurement data supplied by UK-air on,{0}", DateTime.Today));
+                    writer.WriteLine(string.Format("Hourly measurement data from Defra on,{0}", stationfetchdate));
                         writer.WriteLine(string.Format("Site Name,{0}", sitename));
                         writer.WriteLine(string.Format("Site Type, {0}", siteType));
                         writer.WriteLine(string.Format("Region, {0}", region));
@@ -303,13 +364,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                         writer.Flush(); // Ensure all data is written to the MemoryStream
 
-                    // Convert MemoryStream to byte array
-                    byte[] byteArray = memoryStream.ToArray();
-                    //byte[] byteArray = [];
+                        // Convert MemoryStream to byte array
+                        byte[] byteArray = memoryStream.ToArray();
+                        //byte[] byteArray = [];
 
-                    // Output the byte array (for demonstration purposes)
-                    //Console.WriteLine(BitConverter.ToString(byteArray));
-                    return byteArray;
+                        // Output the byte array (for demonstration purposes)
+                        //Console.WriteLine(BitConverter.ToString(byteArray));
+                        return byteArray;
                     }
                 }
             }
@@ -350,6 +411,93 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         }
 
-    }
+        //public class Pollutant
+        //{
+        //    public string Name { get; set; }
+        //    public double Value { get; set; }
+        //}
+        //public void getpollutantcount()
+        //{
+        //    //    List<Pollutant> pollutants = new List<Pollutant>
+        //    //{
+        //    //    new Pollutant { Name = "PM10", Value = 999.99 },
+        //    //    new Pollutant { Name = "PM2.5", Value = 799.99 },
+        //    //    new Pollutant { Name = "Ozone", Value = 199.99 },
+        //    //    new Pollutant { Name = "PM10", Value = 210.99 },
+        //    //    new Pollutant { Name = "PM2.5", Value = 450.99 }
+        //    //};
+
+        //    //    var filteredPollutants = pollutants.Where(p => (p.Name == "PM10" && p.Value > 200) || (p.Name == "PM2.5" && p.Value > 350))
+        //    //                                       .GroupBy(p => p.Name)
+        //    //                                       .Select(g => new { Name = g.Key, Count = g.Count() }).OrderBy(p => p.Name);
+
+        //    //    foreach (var pollutant in filteredPollutants)
+        //    //    {
+        //    //        Console.WriteLine($"Pollutant: {pollutant.Name}, Count: {pollutant.Count}");
+        //    //    }
+
+        //    List<Pollutant> pollutants = new List<Pollutant>
+        //{
+        //    new Pollutant { Name = "PM10", Value = 999.99 },
+        //    new Pollutant { Name = "PM2.5", Value = 799.99 },
+        //    new Pollutant { Name = "Ozone", Value = 199.99 },
+        //    new Pollutant { Name = "PM10", Value = 210.99 },
+        //    new Pollutant { Name = "PM2.5", Value = 50.99 }
+        //};
+
+        //    var filteredPollutants = pollutants.Where(p =>
+        //        (p.Name == "PM10" && p.Value > 200) ||
+        //        (p.Name == "PM2.5" && p.Value > 350))
+        //        .GroupBy(p => p.Name)
+        //        .Select(g => new { Name = g.Key, Count = g.Count() })
+        //        .ToList();
+
+        //    var result = new List<string> { "PM2.5", "PM10", "Nitrogen dioxide", "Ozone", "Sulphur dioxide" }
+        //        .Select(name => new
+        //        {
+        //            Name = name,
+        //            Count = filteredPollutants.FirstOrDefault(p => p.Name == name)?.Count ?? 0
+        //        });
+
+        //    foreach (var pollutant in result)
+        //    {
+        //        Console.WriteLine($"Pollutant: {pollutant.Name}, Count: {pollutant.Count}");
+        //    }
+        //}
+
+        public async Task<dynamic> GetHistoryexceedencedata(querystringdata data)
+        {
+            try
+            {
+                string siteId = data.siteId;
+                string year = data.year;
+                string downloadfilter = "All";
+
+                var finalhourlypollutantresult = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
+                //To get the number of hourly exceedances for a selected year and selected monitoring station
+                var filteredPollutants = finalhourlypollutantresult.Where(p =>
+                                                        (p.Pollutantname == "PM10" && Convert.ToDecimal(p.Value) > 9) || //200
+                                                        (p.Pollutantname == "PM2.5" && Convert.ToDecimal(p.Value) > 8))  //350
+                                                        .GroupBy(p => p.Pollutantname)
+                                                        .Select(g => new { PollutantName = g.Key, Count = g.Count() })
+                                                        .ToList();
+
+                var hourlyexceedances = new List<string> { "PM2.5", "PM10", "Nitrogen dioxide", "Ozone", "Sulphur dioxide" }
+                    .Select(name => new
+                    {
+                        PollutantName = name,
+                        HourlyexceedancesCount = filteredPollutants.FirstOrDefault(p => p.PollutantName == name)?.Count ?? 0
+                    }).ToList();
+                return hourlyexceedances;
+            }
+            catch(Exception ex)
+            {
+                logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.Message);
+                logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.StackTrace);
+                return "Failure";
+            }
+            
+        }
+        }
 }
 
