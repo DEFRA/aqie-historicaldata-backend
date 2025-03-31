@@ -80,13 +80,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                     writer.Flush(); // Ensure all data is written to the MemoryStream
 
-                    // Convert MemoryStream to byte array
-                    //byte[] byteArray = memoryStream.ToArray();
-                    byte[] byteArray = [];
+                        // Convert MemoryStream to byte array
+                        byte[] byteArray = memoryStream.ToArray();
+                        //Comment the below line before deploying the code
+                        //byte[] byteArray = [];
 
-                    // Output the byte array (for demonstration purposes)
-                    //Console.WriteLine(BitConverter.ToString(byteArray));
-                    return byteArray;
+                        // Output the byte array (for demonstration purposes)
+                        //Console.WriteLine(BitConverter.ToString(byteArray));
+                        return byteArray;
                 }
                 }
             }
