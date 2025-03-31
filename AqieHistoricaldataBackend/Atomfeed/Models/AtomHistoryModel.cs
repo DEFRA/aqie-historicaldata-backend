@@ -36,6 +36,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             //public string DataCapture { get; set; }
             public string Pollutantname { get; set; }
             //public string Stationname { get; set; }
+            public string ReportDate { get; set; }
+            public decimal Total { get; set; }
+            public string DailyVerification { get; set; }
+            //public string Validity { get; set; }
+            public string DailyValue { get; set; }
+            //public string DataCapture { get; set; }
+            public string DailyPollutantname { get; set; }
         }
 
         public class DailyAverage
