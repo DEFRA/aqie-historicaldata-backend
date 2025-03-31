@@ -84,8 +84,12 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     
     // Set up the endpoints and their dependencies
     builder.Services.AddSingleton<IExamplePersistence, ExamplePersistence>();
-    builder.Services.AddSingleton<IAtomHourlyFetchService, AtomHourlyFetchService>();
     builder.Services.AddSingleton<IAtomHistoryService, AtomHistoryService>();
+    builder.Services.AddSingleton<IAtomHourlyFetchService, AtomHourlyFetchService>();
+    builder.Services.AddSingleton<IAWSS3BucketService, AWSS3BucketService>();
+    builder.Services.AddSingleton<IHourlyAtomFeedExportCSV, HourlyAtomFeedExportCSV>();
+    builder.Services.AddSingleton<IDailyAtomFeedExportCSV, DailyAtomFeedExportCSV>();
+    builder.Services.AddSingleton<IAWSPreSignedURLService, AWSPreSignedURLService>();
 }
 
 [ExcludeFromCodeCoverage]
