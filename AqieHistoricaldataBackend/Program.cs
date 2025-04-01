@@ -90,6 +90,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IHourlyAtomFeedExportCSV, HourlyAtomFeedExportCSV>();
     builder.Services.AddSingleton<IDailyAtomFeedExportCSV, DailyAtomFeedExportCSV>();
     builder.Services.AddSingleton<IAWSPreSignedURLService, AWSPreSignedURLService>();
+    builder.Services.AddSingleton<IHistoryexceedenceService, HistoryexceedenceService>();
 }
 
 [ExcludeFromCodeCoverage]
