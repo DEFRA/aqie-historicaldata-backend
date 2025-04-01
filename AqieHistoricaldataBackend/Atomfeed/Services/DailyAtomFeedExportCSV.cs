@@ -22,7 +22,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                 Subpollutant = y.Select(x => new SubpollutantItem
                                 {
                                     pollutantname = x.DailyPollutantname,
-                                    pollutantvalue = x.Total == -99 ? "no data" : x.Total.ToString(),
+                                    pollutantvalue = x.Total == 0 ? "no data" : x.Total.ToString(),
                                     verification = x.DailyVerification == "1" ? "V" :
                                                    x.DailyVerification == "2" ? "P" :
                                                    x.DailyVerification == "3" ? "N" : "others"
@@ -35,6 +35,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     using (var writer = new StreamWriter(memoryStream))
                     {
+                        //To check the csv writing to the local folder
                 //        using (var writer = new StreamWriter("DailyPivotData.csv"))
                 //{
                     writer.WriteLine(string.Format("Daily data from Defra on " + stationfetchdate + ""));

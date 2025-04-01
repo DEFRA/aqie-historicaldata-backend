@@ -40,7 +40,8 @@ using static AqieHistoricaldataBackend.Atomfeed.Services.AtomHistoryService;
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AtomHistoryService(ILogger<AtomHistoryService> logger, IHttpClientFactory httpClientFactory, 
-        IAtomHourlyFetchService atomHourlyFetchService, IAWSS3BucketService AWSS3BucketService) : IAtomHistoryService //MongoService<AtomHistoryModel>, 
+        IAtomHourlyFetchService atomHourlyFetchService, IAWSS3BucketService AWSS3BucketService,
+        IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService //MongoService<AtomHistoryModel>, 
     {
     
         public async Task<string> AtomHealthcheck()
@@ -83,7 +84,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     //To get the daily average 
                     var Daily_Average = finalhourlypollutantresult.GroupBy(x => new { ReportDate = Convert.ToDateTime(x.StartTime).Date.ToString(), x.Pollutantname, x.Verification })
-    .Select(x => new Finaldata { ReportDate = x.Key.ReportDate, DailyPollutantname = x.Key.Pollutantname, DailyVerification = x.Key.Verification, Total = x.Average(y => Convert.ToDecimal(y.Value)) }).ToList();
+    .Select(x => new Finaldata { ReportDate = x.Key.ReportDate, DailyPollutantname = x.Key.Pollutantname, DailyVerification = x.Key.Verification, 
+                                 Total = x.Average(y => Convert.ToDecimal(y.Value == "-99" ? "0" : y.Value)) }).ToList();
                     //PresignedUrl = await writecsvtoawss3bucket(Final_list, data);
                     PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(Daily_Average, data, downloadtype);                    
                 }
@@ -91,7 +93,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     //To get the yearly average 
                     var Annual_Average = finalhourlypollutantresult.GroupBy(x => new { ReportDate = Convert.ToDateTime(x.StartTime).Year.ToString(), x.Pollutantname })
-.Select(x => new DailyAverage { ReportDate = x.Key.ReportDate, Pollutantname = x.Key.Pollutantname, Total = x.Average(y => Convert.ToDecimal(y.Value)) }).ToList();
+.Select(x => new DailyAverage { ReportDate = x.Key.ReportDate, Pollutantname = x.Key.Pollutantname, 
+                                Total = x.Average(y => Convert.ToDecimal(y.Value == "-99" ? "" : y.Value )) }).ToList();
                     //PresignedUrl = await writecsvtoawss3bucket(Final_list, data);
                     PresignedUrl = await writecsvtoawss3bucket(finalhourlypollutantresult, data, downloadtype);
                 }
@@ -356,26 +359,29 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                string siteId = data.siteId;
-                string year = data.year;
-                string downloadfilter = "All";
 
-                var finalhourlypollutantresult = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
-                //To get the number of hourly exceedances for a selected year and selected monitoring station
-                var filteredPollutants = finalhourlypollutantresult.Where(p =>
-                                                        (p.Pollutantname == "PM10" && Convert.ToDecimal(p.Value) > 9) || //200
-                                                        (p.Pollutantname == "PM2.5" && Convert.ToDecimal(p.Value) > 8))  //350
-                                                        .GroupBy(p => p.Pollutantname)
-                                                        .Select(g => new { PollutantName = g.Key, Count = g.Count() })
-                                                        .ToList();
+                var exceedancesresult = await HistoryexceedenceService.GetHistoryexceedencedata(data);
 
-                var hourlyexceedances = new List<string> { "PM2.5", "PM10", "Nitrogen dioxide", "Ozone", "Sulphur dioxide" }
-                    .Select(name => new
-                    {
-                        PollutantName = name,
-                        HourlyexceedancesCount = filteredPollutants.FirstOrDefault(p => p.PollutantName == name)?.Count.ToString() ?? "n/a"
-                    }).ToList();
-                return hourlyexceedances;
+                //string siteId = data.siteId;
+                //string year = data.year;
+                //string downloadfilter = "All";
+
+                //var finalhourlypollutantresult = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
+                ////To get the number of hourly exceedances for a selected year and selected monitoring station
+                //var filteredPollutants = finalhourlypollutantresult.Where(p =>
+                //                                        (p.Pollutantname == "PM10" && Convert.ToDouble(p.Value) > 200.5) || //200
+                //                                        (p.Pollutantname == "PM2.5" && Convert.ToDouble(p.Value) > 350.5))  //350
+                //                                        .GroupBy(p => p.Pollutantname)
+                //                                        .Select(g => new { PollutantName = g.Key, Count = g.Count() })
+                //                                        .ToList();
+
+                //var hourlyexceedances = new List<string> { "PM2.5", "PM10", "Nitrogen dioxide", "Ozone", "Sulphur dioxide" }
+                //    .Select(name => new
+                //    {
+                //        PollutantName = name,
+                //        HourlyexceedancesCount = filteredPollutants.FirstOrDefault(p => p.PollutantName == name)?.Count.ToString() ?? "n/a"
+                //    }).ToList();
+                return exceedancesresult;
             }
             catch(Exception ex)
             {
