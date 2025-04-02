@@ -96,7 +96,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 .Select(x => new DailyAverage { ReportDate = x.Key.ReportDate, Pollutantname = x.Key.Pollutantname, 
                                 Total = x.Average(y => Convert.ToDecimal(y.Value == "-99" ? "" : y.Value )) }).ToList();
                     //PresignedUrl = await writecsvtoawss3bucket(Final_list, data);
-                    PresignedUrl = await writecsvtoawss3bucket(finalhourlypollutantresult, data, downloadtype);
+                    PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(finalhourlypollutantresult, data, downloadtype);
                 }
                 else
                 {
@@ -112,165 +112,165 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
 
         //public async Task<string> writecsvtoawss3bucket(dynamic Final_list, querystringdata data)
-        public async Task<string> writecsvtoawss3bucket(List<Finaldata> Final_list, querystringdata data, string downloadtype)
-        {
+        //public async Task<string> writecsvtoawss3bucket(List<Finaldata> Final_list, querystringdata data, string downloadtype)
+        //{
 
-            string siteId = data.siteId;
-            string year = data.year;
-            string PresignedUrl = string.Empty;
-            try
-            {
-                var csvbyte = atomfeedexport_csv(Final_list, data);
-                string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
-                string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
-                string s3Key = "measurement_data_" + siteId + "_" + year + ".csv";
-                var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
-                logger.LogInformation("S3 bucket region {regionEndpoint}", regionEndpoint);
+        //    string siteId = data.siteId;
+        //    string year = data.year;
+        //    string PresignedUrl = string.Empty;
+        //    try
+        //    {
+        //        var csvbyte = atomfeedexport_csv(Final_list, data);
+        //        string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
+        //        string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
+        //        string s3Key = "measurement_data_" + siteId + "_" + year + ".csv";
+        //        var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
+        //        logger.LogInformation("S3 bucket region {regionEndpoint}", regionEndpoint);
 
-                using (var s3Client = new Amazon.S3.AmazonS3Client())
-                {
-                    using (var transferUtility = new TransferUtility(s3Client))
-                    {
-                        using (var stream = new MemoryStream(csvbyte))
-                        {
-                            logger.LogInformation("S3 bucket upload start", DateTime.Now);
-                            await transferUtility.UploadAsync(stream, s3BucketName, s3Key);
-                            logger.LogInformation("S3 bucket upload end", DateTime.Now);
-                        }
-                    }
-                }
-                logger.LogInformation("S3 bucket PresignedUrl start", DateTime.Now);
-                PresignedUrl = GeneratePreSignedURL(s3BucketName, s3Key, 604800);
-                logger.LogInformation("S3 bucket PresignedUrl final URL {PresignedUrl}", PresignedUrl);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError("Error AWS S3 bucket Info message {Error}", ex.Message);
-                logger.LogError("Error AWS S3 bucket Info stacktrace {Error}", ex.StackTrace);
-            }
-            return PresignedUrl;
-        }
-        public string GeneratePreSignedURL(string bucketName, string keyName, double duration)
-        {
-            try
-            {
-                var s3Client = new AmazonS3Client();
-                var request = new GetPreSignedUrlRequest
-                {
-                    BucketName = bucketName,
-                    Key = keyName,
-                    Expires = DateTime.UtcNow.AddSeconds(duration)
-                };
+        //        using (var s3Client = new Amazon.S3.AmazonS3Client())
+        //        {
+        //            using (var transferUtility = new TransferUtility(s3Client))
+        //            {
+        //                using (var stream = new MemoryStream(csvbyte))
+        //                {
+        //                    logger.LogInformation("S3 bucket upload start", DateTime.Now);
+        //                    await transferUtility.UploadAsync(stream, s3BucketName, s3Key);
+        //                    logger.LogInformation("S3 bucket upload end", DateTime.Now);
+        //                }
+        //            }
+        //        }
+        //        logger.LogInformation("S3 bucket PresignedUrl start", DateTime.Now);
+        //        PresignedUrl = GeneratePreSignedURL(s3BucketName, s3Key, 604800);
+        //        logger.LogInformation("S3 bucket PresignedUrl final URL {PresignedUrl}", PresignedUrl);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        logger.LogError("Error AWS S3 bucket Info message {Error}", ex.Message);
+        //        logger.LogError("Error AWS S3 bucket Info stacktrace {Error}", ex.StackTrace);
+        //    }
+        //    return PresignedUrl;
+        //}
+        //public string GeneratePreSignedURL(string bucketName, string keyName, double duration)
+        //{
+        //    try
+        //    {
+        //        var s3Client = new AmazonS3Client();
+        //        var request = new GetPreSignedUrlRequest
+        //        {
+        //            BucketName = bucketName,
+        //            Key = keyName,
+        //            Expires = DateTime.UtcNow.AddSeconds(duration)
+        //        };
 
-                string url = s3Client.GetPreSignedURL(request);
-                return url;
-            }
-            catch (AmazonS3Exception ex)
-            {               
-                logger.LogError("AmazonS3Exception Error:{Error}", ex.Message);
-                return "error";
-            }
-            catch (Exception ex)
-            {
-                logger.LogError("Error in GeneratePreSignedURL Info message {Error}", ex.Message);
-                logger.LogError("Error in GeneratePreSignedURL {Error}", ex.StackTrace);
-                return "error";
-            }
-        }
+        //        string url = s3Client.GetPreSignedURL(request);
+        //        return url;
+        //    }
+        //    catch (AmazonS3Exception ex)
+        //    {               
+        //        logger.LogError("AmazonS3Exception Error:{Error}", ex.Message);
+        //        return "error";
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        logger.LogError("Error in GeneratePreSignedURL Info message {Error}", ex.Message);
+        //        logger.LogError("Error in GeneratePreSignedURL {Error}", ex.StackTrace);
+        //        return "error";
+        //    }
+        //}
 
-        public byte[] atomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
-        {
-            try
-            {
-                string pollutantnameheaderchange = string.Empty;
-                string stationfetchdate = data.stationreaddate;
-                string region = data.region;       
-                string siteType = data.siteType;   
-                string sitename = data.sitename;   
-                string latitude = data.latitude;   
-                string longitude = data.longitude;
-                var groupedData = Final_list.GroupBy(x => new { Convert.ToDateTime(x.StartTime).Date, Convert.ToDateTime(x.StartTime).TimeOfDay })
-                            .Select(y => new pivotpollutant
-                            {
-                                date = y.Key.Date.ToString("yyyy-MM-dd"),
-                                time = y.Key.TimeOfDay.ToString("hh\\:mm"),
-                                Subpollutant = y.Select(x => new SubpollutantItem
-                                {
-                                    pollutantname = x.Pollutantname,
-                                    pollutantvalue = x.Value == "-99" ? "no data" : x.Value,
-                                    verification = x.Verification == "1" ? "V" :
-                                                   x.Verification == "2" ? "P" :
-                                                   x.Verification == "3" ? "N" : "others"
-                                }).ToList()
-                            }).ToList();
+        //public byte[] atomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
+        //{
+        //    try
+        //    {
+        //        string pollutantnameheaderchange = string.Empty;
+        //        string stationfetchdate = data.stationreaddate;
+        //        string region = data.region;       
+        //        string siteType = data.siteType;   
+        //        string sitename = data.sitename;   
+        //        string latitude = data.latitude;   
+        //        string longitude = data.longitude;
+        //        var groupedData = Final_list.GroupBy(x => new { Convert.ToDateTime(x.StartTime).Date, Convert.ToDateTime(x.StartTime).TimeOfDay })
+        //                    .Select(y => new pivotpollutant
+        //                    {
+        //                        date = y.Key.Date.ToString("yyyy-MM-dd"),
+        //                        time = y.Key.TimeOfDay.ToString("hh\\:mm"),
+        //                        Subpollutant = y.Select(x => new SubpollutantItem
+        //                        {
+        //                            pollutantname = x.Pollutantname,
+        //                            pollutantvalue = x.Value == "-99" ? "no data" : x.Value,
+        //                            verification = x.Verification == "1" ? "V" :
+        //                                           x.Verification == "2" ? "P" :
+        //                                           x.Verification == "3" ? "N" : "others"
+        //                        }).ToList()
+        //                    }).ToList();
 
-                var distinctpollutant = Final_list.Select(s => s.Pollutantname).Distinct().OrderBy(m => m).ToList();
-                // Write to MemoryStream
-                //using (var memoryStream = new MemoryStream())
-                //{
-                //    using (var writer = new StreamWriter(memoryStream))
-                //    {
-                using (var writer = new StreamWriter("PivotData.csv"))
-                {
-                    writer.WriteLine(string.Format("Hourly measurement data from Defra on,{0}", stationfetchdate));
-                        writer.WriteLine(string.Format("Site Name,{0}", sitename));
-                        writer.WriteLine(string.Format("Site Type, {0}", siteType));
-                        writer.WriteLine(string.Format("Region, {0}", region));
-                        writer.WriteLine(string.Format("Latitude, {0}", latitude));
-                        writer.WriteLine(string.Format("Longitude, {0}", longitude));
-                        writer.WriteLine(string.Format("Notes:, {0}", "[1] All Data GMT hour ending;  [2] Some shorthand is used, V = Verified, P = Provisionally Verified, N = Not Verified, S = Suspect, [3] Unit of measurement (for pollutants) = ugm-3"));
-                        // Write headers
-                        writer.Write("Date,Time");
-                        foreach (var pollutantname in distinctpollutant)
-                        {
-                            if(pollutantname == "PM10")
-                            {
-                                pollutantnameheaderchange = "PM10 particulate matter (Hourly measured)";
-                                writer.Write($",{pollutantnameheaderchange},{"Status"}");
-                            }
-                            else if (pollutantname == "PM2.5")
-                            {
-                                pollutantnameheaderchange = "PM2.5 particulate matter (Hourly measured)";
-                                writer.Write($",{pollutantnameheaderchange},{"Status"}");
-                            }
-                            else
-                            {
-                                writer.Write($",{pollutantname},{"Status"}");
-                            }                                
-                        }
-                        writer.WriteLine();
-                        // Write data
-                        foreach (var item in groupedData)
-                        {
-                            writer.Write($"{item.date},{item.time}");
+        //        var distinctpollutant = Final_list.Select(s => s.Pollutantname).Distinct().OrderBy(m => m).ToList();
+        //        // Write to MemoryStream
+        //        //using (var memoryStream = new MemoryStream())
+        //        //{
+        //        //    using (var writer = new StreamWriter(memoryStream))
+        //        //    {
+        //        using (var writer = new StreamWriter("PivotData.csv"))
+        //        {
+        //            writer.WriteLine(string.Format("Hourly measurement data from Defra on,{0}", stationfetchdate));
+        //                writer.WriteLine(string.Format("Site Name,{0}", sitename));
+        //                writer.WriteLine(string.Format("Site Type, {0}", siteType));
+        //                writer.WriteLine(string.Format("Region, {0}", region));
+        //                writer.WriteLine(string.Format("Latitude, {0}", latitude));
+        //                writer.WriteLine(string.Format("Longitude, {0}", longitude));
+        //                writer.WriteLine(string.Format("Notes:, {0}", "[1] All Data GMT hour ending;  [2] Some shorthand is used, V = Verified, P = Provisionally Verified, N = Not Verified, S = Suspect, [3] Unit of measurement (for pollutants) = ugm-3"));
+        //                // Write headers
+        //                writer.Write("Date,Time");
+        //                foreach (var pollutantname in distinctpollutant)
+        //                {
+        //                    if(pollutantname == "PM10")
+        //                    {
+        //                        pollutantnameheaderchange = "PM10 particulate matter (Hourly measured)";
+        //                        writer.Write($",{pollutantnameheaderchange},{"Status"}");
+        //                    }
+        //                    else if (pollutantname == "PM2.5")
+        //                    {
+        //                        pollutantnameheaderchange = "PM2.5 particulate matter (Hourly measured)";
+        //                        writer.Write($",{pollutantnameheaderchange},{"Status"}");
+        //                    }
+        //                    else
+        //                    {
+        //                        writer.Write($",{pollutantname},{"Status"}");
+        //                    }                                
+        //                }
+        //                writer.WriteLine();
+        //                // Write data
+        //                foreach (var item in groupedData)
+        //                {
+        //                    writer.Write($"{item.date},{item.time}");
 
-                            foreach (var pollutant in distinctpollutant)
-                            {
-                                var subpollutantvalue = item.Subpollutant.FirstOrDefault(s => s.pollutantname == pollutant);
-                                writer.Write($",{subpollutantvalue?.pollutantvalue ?? ""},{subpollutantvalue?.verification ?? ""}");
-                            }
-                            writer.WriteLine();
-                        }
+        //                    foreach (var pollutant in distinctpollutant)
+        //                    {
+        //                        var subpollutantvalue = item.Subpollutant.FirstOrDefault(s => s.pollutantname == pollutant);
+        //                        writer.Write($",{subpollutantvalue?.pollutantvalue ?? ""},{subpollutantvalue?.verification ?? ""}");
+        //                    }
+        //                    writer.WriteLine();
+        //                }
 
-                        writer.Flush(); // Ensure all data is written to the MemoryStream
+        //                writer.Flush(); // Ensure all data is written to the MemoryStream
 
-                        // Convert MemoryStream to byte array
-                        //byte[] byteArray = memoryStream.ToArray();
-                        byte[] byteArray = [];
+        //                // Convert MemoryStream to byte array
+        //                //byte[] byteArray = memoryStream.ToArray();
+        //                byte[] byteArray = [];
 
-                        // Output the byte array (for demonstration purposes)
-                        //Console.WriteLine(BitConverter.ToString(byteArray));
-                        return byteArray;
-                    }
-                //}
-            }
-            catch (Exception ex)
-            {
-                logger.LogError("Error csv Info message {Error}", ex.Message);
-                logger.LogError("Error csv Info stacktrace {Error}", ex.StackTrace);
-                return new byte[] { 0x20};
-            }
-        }
+        //                // Output the byte array (for demonstration purposes)
+        //                //Console.WriteLine(BitConverter.ToString(byteArray));
+        //                return byteArray;
+        //            }
+        //        //}
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        logger.LogError("Error csv Info message {Error}", ex.Message);
+        //        logger.LogError("Error csv Info stacktrace {Error}", ex.StackTrace);
+        //        return new byte[] { 0x20};
+        //    }
+        //}
 
         public void CallApi()
         {
@@ -354,6 +354,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         //        Console.WriteLine($"Pollutant: {pollutant.Name}, Count: {pollutant.Count}");
         //    }
         //}
+
 
         public async Task<dynamic> GetHistoryexceedencedata(querystringdata data)
         {

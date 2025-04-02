@@ -16,8 +16,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var finalhourlypollutantresult = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
                 //To get the number of hourly exceedances for a selected year and selected monitoring station
                 var filteredPollutants = finalhourlypollutantresult.Where(p =>
-                                                        (p.Pollutantname == "PM10" && Convert.ToDouble(p.Value) > 200.5) || //200
-                                                        (p.Pollutantname == "PM2.5" && Convert.ToDouble(p.Value) > 350.5))  //350
+                                                        (p.Pollutantname == "Nitrogen dioxide" && Convert.ToDouble(p.Value) > 200.5) || //200
+                                                        (p.Pollutantname == "Sulphur dioxide" && Convert.ToDouble(p.Value) > 350.5))  //350
                                                         .GroupBy(p => p.Pollutantname)
                                                         .Select(g => new { PollutantName = g.Key, Count = g.Count() })
                                                         .ToList();
@@ -26,7 +26,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     .Select(name => new
                     {
                         PollutantName = name,
-                        HourlyexceedancesCount = filteredPollutants.FirstOrDefault(p => p.PollutantName == name)?.Count.ToString() ?? (name == "PM2.5" || name == "PM10" ? "0" : "n/a")
+                        HourlyexceedancesCount = filteredPollutants.FirstOrDefault(p => p.PollutantName == name)?.Count.ToString() ?? (name == "Nitrogen dioxide" || name == "Sulphur dioxide" ? "0" : "n/a")
                     }).ToList();
                 return hourlyexceedances;
             }

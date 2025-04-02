@@ -6,10 +6,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     {
         public async Task<byte[]> dailyatomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
         {
+
             try
             {
                 string pollutantnameheaderchange = string.Empty;
-                string stationfetchdate = data.stationreaddate;
+                string stationfetchdate = Convert.ToDateTime(data.stationreaddate).ToString(); //2025-03-20T06:05:20.893Z
                 string region = data.region;
                 string siteType = data.siteType;
                 string sitename = data.sitename;
