@@ -6,7 +6,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     {
         public async Task<byte[]> dailyatomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
         {
-
             try
             {
                 string pollutantnameheaderchange = string.Empty;
@@ -23,6 +22,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                 Subpollutant = y.Select(x => new SubpollutantItem
                                 {
                                     pollutantname = x.DailyPollutantname,
+                                    //pollutantvalue = (x.validation == 1 || x.validation == 2 || x.validation == 3 || x.validation == 4) ? x.Value.ToString() : "no data",
                                     pollutantvalue = x.Total == 0 ? "no data" : x.Total.ToString(),
                                     verification = x.DailyVerification == "1" ? "V" :
                                                    x.DailyVerification == "2" ? "P" :
@@ -78,7 +78,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         }
                         writer.WriteLine();
                     }
-
                     writer.Flush(); // Ensure all data is written to the MemoryStream
 
                         // Convert MemoryStream to byte array
