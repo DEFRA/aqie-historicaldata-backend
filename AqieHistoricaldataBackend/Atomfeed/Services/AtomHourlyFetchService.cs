@@ -50,7 +50,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         if (check_observedProperty_href.Contains("xlink:href"))
                         {
                             var poolutant_API_url = observedProperty["@xlink:href"].ToString();
-
                             if (!string.IsNullOrEmpty(poolutant_API_url))
                             {
                                 foreach (var url_pollutant in pollutantsToDisplay)
@@ -59,20 +58,18 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                     {
                                         var pollutant_result_data = featureMember["om:OM_Observation"]["om:result"]["swe:DataArray"]["swe:values"].ToString();
                                         var pollutant_split_data = pollutant_result_data.Replace("\r\n", "").Trim().Split("@@");
-
                                         foreach (var item in pollutant_split_data)
                                         {
                                             var pollutant_value_split_list = item.Split(',').ToList();
-
                                             Finaldata finaldata = new Finaldata
                                             {
                                                 StartTime = pollutant_value_split_list[0],
                                                 EndTime = pollutant_value_split_list[1],
                                                 Verification = pollutant_value_split_list[2],
+                                                Validity = pollutant_value_split_list[3],
                                                 Value = pollutant_value_split_list[4],
                                                 Pollutantname = url_pollutant.polluntantname
                                             };
-
                                             Final_list.Add(finaldata);
                                         }
                                     }

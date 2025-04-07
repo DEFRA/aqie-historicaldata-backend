@@ -11,7 +11,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         //public async Task<string> writecsvtoawss3bucket(dynamic Final_list, querystringdata data)
         public async Task<string> writecsvtoawss3bucket(List<Finaldata> Final_list, querystringdata data, string downloadtype)
         {
-
             string siteId = data.siteId;
             string year = data.year;
             string PresignedUrl = string.Empty;

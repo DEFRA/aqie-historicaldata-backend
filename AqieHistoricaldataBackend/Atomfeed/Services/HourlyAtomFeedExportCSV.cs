@@ -9,7 +9,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 string pollutantnameheaderchange = string.Empty;
-                string stationfetchdate = Convert.ToDateTime(data.stationreaddate).ToString(); //2025-03-20T06:05:20.893Z
+                string stationfetchdate = Convert.ToDateTime(data.stationreaddate).ToString(); //2025-03-20T06:05:20.893Z//
+                //string stationfetchdate = DateTime.ParseExact(data.stationreaddate, "dd/MM/yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture).ToString();
                 string region = data.region;
                 string siteType = data.siteType;
                 string sitename = data.sitename;
@@ -23,6 +24,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                 Subpollutant = y.Select(x => new SubpollutantItem
                                 {
                                     pollutantname = x.Pollutantname,
+                                    //pollutantvalue = (x.validation == 1 || x.validation == 2 || x.validation == 3 || x.validation == 4) ? x.Value.ToString() : "no data",
                                     pollutantvalue = x.Value == "-99" ? "no data" : x.Value,
                                     verification = x.Verification == "1" ? "V" :
                                                    x.Verification == "2" ? "P" :

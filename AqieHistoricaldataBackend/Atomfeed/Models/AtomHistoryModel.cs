@@ -31,7 +31,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string StartTime { get; set; }
             public string EndTime { get; set; }
             public string Verification { get; set; }
-            //public string Validity { get; set; }
+            public string Validity { get; set; }
             public string Value { get; set; }
             //public string DataCapture { get; set; }
             public string Pollutantname { get; set; }
@@ -39,7 +39,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string ReportDate { get; set; }
             public decimal Total { get; set; }
             public string DailyVerification { get; set; }
-            //public string Validity { get; set; }
+            public string DailyValidity { get; set; }
             public string DailyValue { get; set; }
             //public string DataCapture { get; set; }
             public string DailyPollutantname { get; set; }
