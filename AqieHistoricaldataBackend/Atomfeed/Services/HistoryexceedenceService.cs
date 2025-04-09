@@ -67,6 +67,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         dailyexceedancesCount = filtereddailyPollutants.FirstOrDefault(p => p.DailyPollutantname == name)?.Count.ToString() ?? (name == "PM10" || name == "Sulphur dioxide" ? "0" : "n/a")
                     }).ToList();
 
+                var dataVerifiedTag = finalhourlypollutantresult
+                                        .Select((pollutant, index) => new { Pollutant = pollutant, Index = index })
+                                        .Where(x => x.Pollutant.Verification == "2")
+                                        .Select(x => x.Index > 0 ? $"Data has been verified until {finalhourlypollutantresult[x.Index - 1].StartTime}" : "Data has not been verified")
+                                        .FirstOrDefault() ?? "Data has been verified";
+
                 var mergedexceedances = hourlyexceedances.Join(dailyexceedances,
                                         h => h.PollutantName,
                                         d => d.PollutantName,
@@ -74,7 +80,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                         {
                                             PollutantName = h.PollutantName,
                                             hourlyCount = h.HourlyexceedancesCount,
-                                            dailyCount = d.dailyexceedancesCount
+                                            dailyCount = d.dailyexceedancesCount,
+                                            dataVerifiedTag = dataVerifiedTag
                                         }).ToList();
 
                 return mergedexceedances;
