@@ -4,7 +4,7 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class HistoryexceedenceService(ILogger<HistoryexceedenceService> logger, IHttpClientFactory httpClientFactory,
-        IAtomHourlyFetchService atomHourlyFetchService) : IHistoryexceedenceService
+        IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService) : IHistoryexceedenceService
     {
         public async Task<dynamic> GetHistoryexceedencedata(querystringdata data)
         {
@@ -13,6 +13,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 string siteId = data.siteId;
                 string year = data.year;
                 string downloadfilter = "All";
+
+                //var builder = WebApplication.CreateEmptyBuilder(new WebApplicationOptions());
+                //var isDev = AqieHistoricaldataBackend.Config.Environment.IsDevMode(builder);
 
                 var finalhourlypollutantresult = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
                 //To get the number of hourly exceedances for a selected year and selected monitoring station
@@ -23,44 +26,26 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                                         .Select(g => new { PollutantName = g.Key, Count = g.Count() })
                                                         .ToList();
 
-                var hourlyexceedances = new List<string> { "PM2.5", "PM10", "Nitrogen dioxide", "Ozone", "Sulphur dioxide" }
+                var customOrder = new List<string> { "PM2.5", "PM10", "Nitrogen dioxide", "Ozone", "Sulphur dioxide" };
+                var distinctpollutant = finalhourlypollutantresult.Select(S => S.Pollutantname).Distinct().OrderBy(m => customOrder.IndexOf(m)).ToList();
+
+                var hourlyexceedances = distinctpollutant
                     .Select(name => new
                     {
                         PollutantName = name,
                         HourlyexceedancesCount = filteredhourlyPollutants.FirstOrDefault(p => p.PollutantName == name)?.Count.ToString() ?? (name == "Nitrogen dioxide" || name == "Sulphur dioxide" ? "0" : "n/a")
                     }).ToList();
 
-                var Daily_Average = finalhourlypollutantresult
-                                                .GroupBy(x => new
-                                                {
-                                                    ReportDate = Convert.ToDateTime(x.StartTime).Date.ToString(),
-                                                    x.Pollutantname,
-                                                    x.Verification
-                                                })
-                                                .Select(x => new
-                                                {
-                                                    x.Key.ReportDate,
-                                                    x.Key.Pollutantname,
-                                                    x.Key.Verification,
-                                                    Values = x.Where(y => y.Value != "-99").Select(y => Convert.ToDecimal(y.Value)).ToList(),
-                                                    Count = x.Count()
-                                                })
-                                                .Select(x => new Finaldata
-                                                {
-                                                    ReportDate = x.ReportDate,
-                                                    DailyPollutantname = x.Pollutantname,
-                                                    DailyVerification = x.Verification,
-                                                    Total = (x.Values.Count() >= 0.75 * x.Count) ? x.Values.Average() : 0
-                                                }).ToList();
-                //To get the number of daily exceedances for a selected year and selected monitoring station
-                var filtereddailyPollutants = Daily_Average.Where(p =>
+                var dailyAverage = await AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
+
+                var filtereddailyPollutants = dailyAverage.Where(p =>
                                                         (p.DailyPollutantname == "PM10" && Convert.ToDouble(p.Total) > 50.5) || //200
                                                         (p.DailyPollutantname == "Sulphur dioxide" && Convert.ToDouble(p.Total) > 125.5))  //350
                                                         .GroupBy(p => p.DailyPollutantname)
                                                         .Select(g => new { DailyPollutantname = g.Key, Count = g.Count() })
                                                         .ToList();
 
-                var dailyexceedances = new List<string> { "PM2.5", "PM10", "Nitrogen dioxide", "Ozone", "Sulphur dioxide" }
+                var dailyexceedances = distinctpollutant
                     .Select(name => new
                     {
                         PollutantName = name,

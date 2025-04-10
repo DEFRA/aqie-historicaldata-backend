@@ -86,6 +86,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IExamplePersistence, ExamplePersistence>();
     builder.Services.AddSingleton<IAtomHistoryService, AtomHistoryService>();
     builder.Services.AddSingleton<IAtomHourlyFetchService, AtomHourlyFetchService>();
+    builder.Services.AddSingleton<IAtomDailyFetchService, AtomDailyFetchService>();
     builder.Services.AddSingleton<IAWSS3BucketService, AWSS3BucketService>();
     builder.Services.AddSingleton<IHourlyAtomFeedExportCSV, HourlyAtomFeedExportCSV>();
     builder.Services.AddSingleton<IDailyAtomFeedExportCSV, DailyAtomFeedExportCSV>();
