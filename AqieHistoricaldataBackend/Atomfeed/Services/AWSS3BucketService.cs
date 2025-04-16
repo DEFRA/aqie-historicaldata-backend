@@ -1,6 +1,7 @@
 using Amazon.S3.Transfer;
 using System;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
@@ -26,7 +27,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     csvbyte = await HourlyAtomFeedExportCSV.hourlyatomfeedexport_csv(Final_list, data);
                 }
                 string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
-                string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
+                //string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
+                string s3BucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME");
+                //test - aqie - historicaldata - backend - 6bf3a
+                //perf - test - aqie - historicaldata - backend - 05244
                 string s3Key = "measurement_data_" + siteId + "_" + year + ".csv";
                 var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
                 logger.LogInformation("S3 bucket region {regionEndpoint}", regionEndpoint);
