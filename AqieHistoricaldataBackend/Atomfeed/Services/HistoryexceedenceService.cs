@@ -16,6 +16,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 //var builder = WebApplication.CreateEmptyBuilder(new WebApplicationOptions());
                 //var isDev = AqieHistoricaldataBackend.Config.Environment.IsDevMode(builder);
+                //var environment = builder.Environment.EnvironmentName;
 
                 var finalhourlypollutantresult = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
                 //To get the number of hourly exceedances for a selected year and selected monitoring station
@@ -55,7 +56,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var dataVerifiedTag = finalhourlypollutantresult
                                         .Select((pollutant, index) => new { Pollutant = pollutant, Index = index })
                                         .Where(x => x.Pollutant.Verification == "2")
-                                        .Select(x => x.Index > 0 ? $"Data has been verified until {Convert.ToDateTime(finalhourlypollutantresult[x.Index - 1].StartTime).ToString("dd MMMM")}" : "Data has not been verified")
+                                        .Select(x => x.Index > 0 ? $"Data has been verified until {Convert.ToDateTime(finalhourlypollutantresult[x.Index - 1].StartTime).ToString("dd MMMM")}" : "Data has not been verifie")
                                         .FirstOrDefault() ?? "Data has been verified";
 
                 var mergedexceedances = hourlyexceedances.Join(dailyexceedances,

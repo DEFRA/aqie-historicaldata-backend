@@ -149,6 +149,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
                 else if (downloadtype == "Annual")
                 {
+                    var dailyAverage = await AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
                     //To get the yearly average 
                     var Annual_Average = finalhourlypollutantresult.GroupBy(x => new 
                                                                     { 
