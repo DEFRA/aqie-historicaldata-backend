@@ -26,12 +26,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     csvbyte = await HourlyAtomFeedExportCSV.hourlyatomfeedexport_csv(Final_list, data);
                 }
+                //string s3Key1 = data.sitename + "_" + data.downloadpollutant + "_" + data.downloadpollutanttype + "_" + year + ".csv";
                 string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
                 //string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
+                logger.LogInformation("S3 bucket name start {s3BucketName}", DateTime.Now);
                 string s3BucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME");
+                logger.LogInformation("S3 bucket name end {s3BucketName}", s3BucketName);
                 //test - aqie - historicaldata - backend - 6bf3a
                 //perf - test - aqie - historicaldata - backend - 05244
-                string s3Key = "measurement_data_" + siteId + "_" + year + ".csv";
+                //string s3Key = "measurement_data_" + siteId + "_" + year + ".csv";
+                string s3Key = data.sitename + "_" + data.downloadpollutant + "_" + data.downloadpollutanttype + "_" + year + ".csv";
                 var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
                 logger.LogInformation("S3 bucket region {regionEndpoint}", regionEndpoint);
 
