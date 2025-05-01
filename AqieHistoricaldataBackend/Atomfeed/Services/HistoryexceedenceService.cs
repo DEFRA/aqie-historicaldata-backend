@@ -56,7 +56,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var dataVerifiedTag = finalhourlypollutantresult
                                         .Select((pollutant, index) => new { Pollutant = pollutant, Index = index })
                                         .Where(x => x.Pollutant.Verification == "2")
-                                        .Select(x => x.Index > 0 ? $"Data has been verified until {Convert.ToDateTime(finalhourlypollutantresult[x.Index - 1].StartTime).ToString("dd MMMM")}" : "Data has not been verifie")
+                                        .Select(x => x.Index > 0 ? $"Data has been verified until {Convert.ToDateTime(finalhourlypollutantresult[x.Index - 1].StartTime).ToString("dd MMMM")}" : "Data has not been verified")
                                         .FirstOrDefault() ?? "Data has been verified";
 
                 var mergedexceedances = hourlyexceedances.Join(dailyexceedances,
