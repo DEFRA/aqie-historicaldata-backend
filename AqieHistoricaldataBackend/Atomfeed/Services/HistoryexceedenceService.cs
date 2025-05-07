@@ -14,10 +14,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 string year = data.year;
                 string downloadfilter = "All";
 
-                //var builder = WebApplication.CreateEmptyBuilder(new WebApplicationOptions());
-                //var isDev = AqieHistoricaldataBackend.Config.Environment.IsDevMode(builder);
-                //var environment = builder.Environment.EnvironmentName;
-
                 var finalhourlypollutantresult = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
                 //To get the number of hourly exceedances for a selected year and selected monitoring station
                 var filteredhourlyPollutants = finalhourlypollutantresult.Where(p =>
@@ -59,16 +55,30 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                         .Select(x => x.Index > 0 ? $"Data has been verified until {Convert.ToDateTime(finalhourlypollutantresult[x.Index - 1].StartTime).ToString("dd MMMM")}" : "Data has not been verified")
                                         .FirstOrDefault() ?? "Data has been verified";
 
-                var mergedexceedances = hourlyexceedances.Join(dailyexceedances,
-                                        h => h.PollutantName,
-                                        d => d.PollutantName,
-                                        (h, d) => new
-                                        {
-                                            PollutantName = h.PollutantName,
-                                            hourlyCount = h.HourlyexceedancesCount,
-                                            dailyCount = d.dailyexceedancesCount,
-                                            dataVerifiedTag = dataVerifiedTag
-                                        }).ToList();
+                // Total possible data points (assuming hourly data collection for one day)
+                int daysinYear = DateTime.IsLeapYear(Convert.ToInt32(year)) ? 366 : 365;
+                int totalPossibleDataPoints = daysinYear * 24;
+
+                var dataCapturePercentages = finalhourlypollutantresult
+                .Where(p => Convert.ToInt32(p.Validity) > 0) // Filter valid data points
+                           .GroupBy(p => p.Pollutantname) // Group by pollutant name
+                           .Select(g => new
+                           {
+                               PollutantName = g.Key,
+                               DataCapturePercentage = ((double)g.Count() / totalPossibleDataPoints) * 100// Calculate Data Capture Percentage
+                           }).ToList();
+
+                var mergedexceedances = (from hourly in hourlyexceedances
+                            join daily in dailyexceedances on hourly.PollutantName equals daily.PollutantName
+                            join Percentage in dataCapturePercentages on daily.PollutantName equals Percentage.PollutantName
+                            select new
+                            {
+                                PollutantName = hourly.PollutantName,
+                                hourlyCount = hourly.HourlyexceedancesCount,
+                                dailyCount = daily.dailyexceedancesCount,
+                                dataVerifiedTag = dataVerifiedTag,
+                                dataCapturePercentage = Math.Round(Percentage.DataCapturePercentage) +"%"
+                            }).ToList();
 
                 return mergedexceedances;
             }

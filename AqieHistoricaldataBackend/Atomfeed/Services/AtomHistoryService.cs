@@ -84,67 +84,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     //To get the daily average 
                     var dailyAverage = await AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
-                    //var Daily_Average1 = finalhourlypollutantresult.GroupBy(x => new
-                    //                                                {
-                    //                                                    ReportDate = Convert.ToDateTime(x.StartTime).Date.ToString(),
-                    //                                                    x.Pollutantname,
-                    //                                                    x.Verification,
-                    //                                                    x.Validity
-                    //                                                })
-                    //                                              .Select(x => new Finaldata
-                    //                                              {
-                    //                                                  ReportDate = x.Key.ReportDate,
-                    //                                                  DailyPollutantname = x.Key.Pollutantname,
-                    //                                                  DailyVerification = x.Key.Verification,
-                    //                                                  Validity = x.Key.Validity,
-                    //                                                  Total = x.Average(y => Convert.ToDecimal(y.Value == "-99" ? "0" : y.Value))
-                    //                                              }).ToList();
-                    //var Daily_Average = finalhourlypollutantresult                                                                    
-                    //                                                .GroupBy(x => new
-                    //                                                {
-                    //                                                    ReportDate = Convert.ToDateTime(x.StartTime).Date.ToString(),
-                    //                                                    x.Pollutantname,
-                    //                                                    x.Verification
-                    //                                                })
-                    //                                                .Select(x => new
-                    //                                                {
-                    //                                                    x.Key.ReportDate,
-                    //                                                    x.Key.Pollutantname,
-                    //                                                    x.Key.Verification,
-                    //                                                    Values = x.Where(y => y.Value != "-99").Select(y => Convert.ToDecimal(y.Value)).ToList(),
-                    //                                                    Count = x.Count()
-                    //                                                })
-                    //                                                .Select(x => new Finaldata
-                    //                                                {
-                    //                                                    ReportDate = x.ReportDate,
-                    //                                                    DailyPollutantname = x.Pollutantname,
-                    //                                                    DailyVerification = x.Verification,
-                    //                                                    Total = (x.Values.Count() >= 0.75 * x.Count) ? x.Values.Average() : 0
-                    //                                                }).ToList();
-                    //var Daily_Average = finalhourlypollutantresult
-                    //                                                    .Where(x => new[] { "1", "2", "3", "4" }.Contains(x.Validity)) // Filter by validation
-                    //                                                    .GroupBy(x => new
-                    //                                                    {
-                    //                                                        ReportDate = Convert.ToDateTime(x.StartTime).Date.ToString(),
-                    //                                                        x.Pollutantname,
-                    //                                                        x.Verification
-                    //                                                    })
-                    //                                                    .Select(x => new
-                    //                                                    {
-                    //                                                        x.Key.ReportDate,
-                    //                                                        x.Key.Pollutantname,
-                    //                                                        x.Key.Verification,
-                    //                                                        Values = x.Select(y => Convert.ToDecimal(y.Value)).ToList(), // Include all values
-                    //                                                        Count = x.Count()
-                    //                                                    })
-                    //                                                    .Select(x => new Finaldata
-                    //                                                    {
-                    //                                                        ReportDate = x.ReportDate,
-                    //                                                        DailyPollutantname = x.Pollutantname,
-                    //                                                        DailyVerification = x.Verification,
-                    //                                                        Total = (x.Values.Count() >= 0.75 * x.Count) ? x.Values.Average() : 0
-                    //                                                    })
-                    //                                                    .ToList();
+
                     PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(dailyAverage, data, downloadtype);                    
                 }
                 else if (downloadtype == "Annual")
