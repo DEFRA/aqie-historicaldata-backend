@@ -59,13 +59,18 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 int daysinYear = DateTime.IsLeapYear(Convert.ToInt32(year)) ? 366 : 365;
                 int totalPossibleDataPoints = daysinYear * 24;
 
+                //var data_pm10 = finalhourlypollutantresult.Where(p => p.Pollutantname == "PM10" && Convert.ToInt32(p.Validity) > 0)
+                //                                          .GroupBy(p => p.Pollutantname)
+                //                                          .Select(g => new { Pollutantname = g.Key, Count = g.Select(p => p.StartTime).Distinct().Count() }).ToList();
+
                 var dataCapturePercentages = finalhourlypollutantresult
                 .Where(p => Convert.ToInt32(p.Validity) > 0) // Filter valid data points
                            .GroupBy(p => p.Pollutantname) // Group by pollutant name
                            .Select(g => new
                            {
                                PollutantName = g.Key,
-                               DataCapturePercentage = ((double)g.Count() / totalPossibleDataPoints) * 100// Calculate Data Capture Percentage
+                               //DataCapturePercentage = ((double)g.Count() / totalPossibleDataPoints) * 100// Calculate Data Capture Percentage
+                               DataCapturePercentage = ((double)g.Select(p => p.StartTime).Distinct().Count() / totalPossibleDataPoints) * 100// Calculate Data Capture Percentage
                            }).ToList();
 
                 var mergedexceedances = (from hourly in hourlyexceedances
