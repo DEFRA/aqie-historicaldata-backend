@@ -123,7 +123,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 using (var client = httpClientFactory.CreateClient("Atomfeed"))
                 {
-                    var response = client.GetAsync("data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml").Result;
+                    var response = client.GetAsync("data/atom-dls/observations/auto/GB_FixedObservations_2024_LOFS.xml").Result;
                     if (response.IsSuccessStatusCode)
                     {
                         var data = response.Content.ReadAsStringAsync();
@@ -134,11 +134,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
                     else
                     {
-                        logger.LogInformation("Data Fetching health check atom feed API failed {response}", response.ToString() + DateTime.Now);
+                        //logger.LogInformation("Data Fetching health check atom feed API failed {response}", response.ToString() + DateTime.Now);
+                        logger.LogError("Error AtomHealthcheck message {response}", response.ToString() + DateTime.Now);
                     }
                 }
             }
-            catch(Exception ex)
+            catch (HttpRequestException httpEx)
+            {
+                Console.WriteLine("HTTP error occurred: " + httpEx.Message);
+            }
+            catch (Exception ex)
             {
                 logger.LogError("Error AtomHealthcheck message {Error}", ex.Message);
                 logger.LogError("Error AtomHealthcheck stacktrace {Error}", ex.StackTrace);
