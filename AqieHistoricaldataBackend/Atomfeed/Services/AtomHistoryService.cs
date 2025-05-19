@@ -123,7 +123,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 using (var client = httpClientFactory.CreateClient("Atomfeed"))
                 {
-                    var response = client.GetAsync("data/atom-dls/observations/auto/GB_FixedObservations_2024_LOFS.xml").Result;
+                    var response = client.GetAsync("data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml").Result;
                     if (response.IsSuccessStatusCode)
                     {
                         var data = response.Content.ReadAsStringAsync();
