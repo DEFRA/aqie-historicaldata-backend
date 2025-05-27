@@ -40,7 +40,7 @@ using static AqieHistoricaldataBackend.Atomfeed.Services.AtomHistoryService;
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AtomHistoryService(ILogger<AtomHistoryService> logger, IHttpClientFactory httpClientFactory, 
-        IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService,
+        IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService, IAtomAnnualFetchService AtomAnnualFetchService,
         IAWSS3BucketService AWSS3BucketService,
         IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService //MongoService<AtomHistoryModel>, 
     {    
@@ -89,20 +89,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
                 else if (downloadtype == "Annual")
                 {
-                    var dailyAverage = await AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
-                    //To get the yearly average 
-                    var Annual_Average = finalhourlypollutantresult.GroupBy(x => new 
-                                                                    { 
-                                                                        ReportDate = Convert.ToDateTime(x.StartTime).Year.ToString(),
-                                                                        x.Pollutantname 
-                                                                     })
-                                                                    .Select(x => new DailyAverage 
-                                                                    { 
-                                                                        ReportDate = x.Key.ReportDate, 
-                                                                        Pollutantname = x.Key.Pollutantname, 
-                                                                        Total = x.Average(y => Convert.ToDecimal(y.Value == "-99" ? "" : y.Value )) 
-                                                                    }).ToList();
-                    PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(finalhourlypollutantresult, data, downloadtype);
+                    var annualAverage = await AtomAnnualFetchService.GetAtomAnnualdatafetch(finalhourlypollutantresult, data);
+
+                    PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(annualAverage, data, downloadtype);
                 }
                 else
                 {

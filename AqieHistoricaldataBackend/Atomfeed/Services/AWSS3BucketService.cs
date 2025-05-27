@@ -6,7 +6,8 @@ using static System.Net.Mime.MediaTypeNames;
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AWSS3BucketService(ILogger<AWSS3BucketService> logger, IHttpClientFactory httpClientFactory
-        , IHourlyAtomFeedExportCSV HourlyAtomFeedExportCSV, IDailyAtomFeedExportCSV DailyAtomFeedExportCSV,
+        , IHourlyAtomFeedExportCSV HourlyAtomFeedExportCSV, IDailyAtomFeedExportCSV DailyAtomFeedExportCSV
+        , IAnnualAtomFeedExportCSV AnnualAtomFeedExportCSV,
         IAWSPreSignedURLService AWSPreSignedURLService) : IAWSS3BucketService
     {
         //public async Task<string> writecsvtoawss3bucket(dynamic Final_list, querystringdata data)
@@ -18,9 +19,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             byte[] csvbyte;
             try
             {
-                if(downloadtype == "Daily" || downloadtype == "Annual")
+                if(downloadtype == "Daily")
                 {
                     csvbyte = await DailyAtomFeedExportCSV.dailyatomfeedexport_csv(Final_list, data);
+                }
+                else if(downloadtype == "Annual")
+                {
+                    csvbyte = await AnnualAtomFeedExportCSV.annualatomfeedexport_csv(Final_list, data);
                 }
                 else
                 {
