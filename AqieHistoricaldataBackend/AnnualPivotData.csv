@@ -1,0 +1,9 @@
+Daily data from Defra on 20/03/2025 06:05:20
+Site Name,London Bloomsbury
+Site Type,Urban Background
+Region,Greater London
+Latitude,51.52229
+Longitude,-0.125889
+Notes:,[1] All Data GMT hour ending;  [2] Some shorthand is used V = Verified P = Provisionally Verified N = Not Verified S = Suspect [3] Unit of measurement (for pollutants) = ugm-3
+Date,Nitrogen dioxide,Status,Ozone,Status,PM10 particulate matter (Hourly measured),Status,PM2.5 particulate matter (Hourly measured),Status,Sulphur dioxide,Status
+01/01/2024 to 31/12/2024,22.451418481578825356716469809,V,51.101587054071963505601949544,V,12.408161875280885928623284435,V,7.3349795763622864649610751758,V,0.7885881986222671943940078394,V
