@@ -4,7 +4,8 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class HistoryexceedenceService(ILogger<HistoryexceedenceService> logger, IHttpClientFactory httpClientFactory,
-        IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService) : IHistoryexceedenceService
+        IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService, 
+        IAtomAnnualFetchService AtomAnnualFetchService) : IHistoryexceedenceService
     {
         public async Task<dynamic> GetHistoryexceedencedata(querystringdata data)
         {
@@ -49,6 +50,23 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         dailyexceedancesCount = filtereddailyPollutants.FirstOrDefault(p => p.DailyPollutantname == name)?.Count.ToString() ?? (name == "PM10" || name == "Sulphur dioxide" ? "0" : "n/a")
                     }).ToList();
 
+                //var annualexceedances = await AtomAnnualFetchService.GetAtomAnnualdatafetch(finalhourlypollutantresult, data);
+                var annualexceedances = dailyAverage.GroupBy(x => new
+                                                {
+                                                    ReportDate = Convert.ToDateTime(x.ReportDate).Year.ToString(),
+                                                    x.DailyPollutantname
+                                                })
+                                             .Select(x =>
+                                             {
+                                                 var validTotals = x.Where(y => Convert.ToDecimal(y.Total) != 0).ToList();
+                                                 return new Finaldata
+                                                 {
+                                                     ReportDate = x.Key.ReportDate,
+                                                     AnnualPollutantname = x.Key.DailyPollutantname,
+                                                     Total = validTotals.Any() ? Math.Round(validTotals.Average(y => Convert.ToDecimal(y.Total))) : '-'
+                                                 };
+                                             }).ToList();
+
                 var dataVerifiedTag = finalhourlypollutantresult
                                         .Select((pollutant, index) => new { Pollutant = pollutant, Index = index })
                                         .Where(x => x.Pollutant.Verification == "2")
@@ -76,11 +94,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var mergedexceedances = (from hourly in hourlyexceedances
                             join daily in dailyexceedances on hourly.PollutantName equals daily.PollutantName
                             join Percentage in dataCapturePercentages on daily.PollutantName equals Percentage.PollutantName
+                            join annual in annualexceedances on Percentage.PollutantName equals annual.AnnualPollutantname
                             select new
                             {
                                 PollutantName = hourly.PollutantName,
                                 hourlyCount = hourly.HourlyexceedancesCount,
                                 dailyCount = daily.dailyexceedancesCount,
+                                annualcount = annual.Total,
                                 dataVerifiedTag = dataVerifiedTag,
                                 dataCapturePercentage = Math.Round(Percentage.DataCapturePercentage) +"%"
                             }).ToList();
