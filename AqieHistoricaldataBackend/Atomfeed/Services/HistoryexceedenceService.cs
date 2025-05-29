@@ -100,7 +100,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                 PollutantName = hourly.PollutantName,
                                 hourlyCount = hourly.HourlyexceedancesCount,
                                 dailyCount = daily.dailyexceedancesCount,
-                                annualcount = annual.Total,
+                                annualcount = annual.Total + " µg/m3",
                                 dataVerifiedTag = dataVerifiedTag,
                                 dataCapturePercentage = Math.Round(Percentage.DataCapturePercentage) +"%"
                             }).ToList();
