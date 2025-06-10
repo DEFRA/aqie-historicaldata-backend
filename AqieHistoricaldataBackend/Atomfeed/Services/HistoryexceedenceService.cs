@@ -72,9 +72,23 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                         .Where(x => x.Pollutant.Verification == "2")
                                         .Select(x => x.Index > 0 ? $"Data has been verified until {Convert.ToDateTime(finalhourlypollutantresult[x.Index - 1].StartTime).ToString("dd MMMM")}" : "Data has not been verified")
                                         .FirstOrDefault() ?? "Data has been verified";
+                // Check if a given year is the current year
+                //int currentYear = DateTime.Now.Year;
+                //bool isCurrentYear = Convert.ToInt32(year) == currentYear;
+                //// Total possible data points (assuming hourly data collection for one day)
+                //int daysinYear = DateTime.IsLeapYear(Convert.ToInt32(year)) ? 366 : 365;
+                //int totalPossibleDataPoints = daysinYear * 24;  
+                //// Calculate number of days in the current year 
+                //int daysInYear = Enumerable.Range(1, 12).Select(month => DateTime.DaysInMonth(currentYear, month)).Sum();
 
+                int currentYear = DateTime.Now.Year;
+                int yearToCheck = Convert.ToInt32(year);
+
+                // Only calculate days in year if it's the current year else check for leap year and update dates
+                int daysinYear = (yearToCheck == currentYear)//check if it's the current year
+                                 ? (DateTime.Now - new DateTime(currentYear, 1, 1)).Days// Calculate days from Jan 1st to yestarday (inclusive)
+                                 : (DateTime.IsLeapYear(yearToCheck) ? 366 : 365);// Use full year days for past or future years
                 // Total possible data points (assuming hourly data collection for one day)
-                int daysinYear = DateTime.IsLeapYear(Convert.ToInt32(year)) ? 366 : 365;
                 int totalPossibleDataPoints = daysinYear * 24;
 
                 //var data_pm10 = finalhourlypollutantresult.Where(p => p.Pollutantname == "PM10" && Convert.ToInt32(p.Validity) > 0)
@@ -100,7 +114,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                 PollutantName = hourly.PollutantName,
                                 hourlyCount = hourly.HourlyexceedancesCount,
                                 dailyCount = daily.dailyexceedancesCount,
-                                annualcount = annual.Total + " µg/m3",
+                                annualcount = Percentage.DataCapturePercentage > 75 ? annual.Total + " µg/m3" : "-",
                                 dataVerifiedTag = dataVerifiedTag,
                                 dataCapturePercentage = Math.Round(Percentage.DataCapturePercentage) +"%"
                             }).ToList();
