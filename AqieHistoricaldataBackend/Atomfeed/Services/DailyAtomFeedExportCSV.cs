@@ -2,9 +2,9 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class DailyAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger, IHttpClientFactory httpClientFactory) : IDailyAtomFeedExportCSV
+    public class DailyAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger) : IDailyAtomFeedExportCSV
     {
-        public async Task<byte[]> dailyatomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
+        public byte[] dailyatomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
         {
             try
             {
@@ -22,7 +22,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                 Subpollutant = y.Select(x => new SubpollutantItem
                                 {
                                     pollutantname = x.DailyPollutantname,
-                                    //pollutantvalue = (x.validation == 1 || x.validation == 2 || x.validation == 3 || x.validation == 4) ? x.Value.ToString() : "no data",
                                     pollutantvalue = x.Total == 0 ? "no data" : x.Total.ToString(),
                                     verification = x.DailyVerification == "1" ? "V" :
                                                    x.DailyVerification == "2" ? "P" :
