@@ -70,7 +70,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
         public async Task<string> GetAtomHourlydata(querystringdata data)
         {
-            //getpollutantcount();
             string siteId = data.siteId;
             string year = data.year;
             string PresignedUrl = string.Empty;
@@ -103,7 +102,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 logger.LogError("Error in Atom feed fetch {Error}", ex.Message);
                 logger.LogError("Error in Atom feed fetch {Error}", ex.StackTrace);
             }
-            return PresignedUrl;//PresignedUrl;//"S3 Bucket loaded Successfully";
+            return PresignedUrl;
         }       
 
         public void CallApi()
@@ -123,7 +122,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
                     else
                     {
-                        //logger.LogInformation("Data Fetching health check atom feed API failed {response}", response.ToString() + DateTime.Now);
                         logger.LogError("Error AtomHealthcheck message {response}", response.ToString() + DateTime.Now);
                     }
                 }
