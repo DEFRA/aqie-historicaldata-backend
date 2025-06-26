@@ -95,13 +95,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Assert.Empty(result);
             // _mockLogger.Verify(x => x.LogError(It.IsAny<string>(), It.IsAny<object[]>()), Times.AtLeastOnce);
             _mockLogger.Verify(
-                          x => x.Log(
-                          LogLevel.Error,
-                          It.IsAny<EventId>(),
-                          It.Is<It.IsAnyType>((v, t) => true),
-                          It.IsAny<Exception>(),
-                          It.IsAny<Func<It.IsAnyType, Exception, string>>()),
-                          Times.AtLeastOnce);
+                                 x => x.Log(
+                                 LogLevel.Error,
+                                 It.IsAny<EventId>(),
+                                 It.Is<It.IsAnyType>((v, t) => true),
+                                 It.IsAny<Exception>(),
+                                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                                 Times.AtLeastOnce);
         }
     }
 }
