@@ -9,23 +9,25 @@ using AqieHistoricaldataBackend.Atomfeed.Models;
 using System;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
-public class AnnualAtomFeedExportCSVTests
+namespace AqieHistoricaldataBackend.Test.Atomfeed
 {
-    private readonly Mock<ILogger<HourlyAtomFeedExportCSV>> _loggerMock;
-    private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
-    private readonly AnnualAtomFeedExportCSV _service;
-
-    public AnnualAtomFeedExportCSVTests()
+    public class AnnualAtomFeedExportCSVTests
     {
-        _loggerMock = new Mock<ILogger<HourlyAtomFeedExportCSV>>();
-        _httpClientFactoryMock = new Mock<IHttpClientFactory>();
-        _service = new AnnualAtomFeedExportCSV(_loggerMock.Object, _httpClientFactoryMock.Object);
-    }
+        private readonly Mock<ILogger<HourlyAtomFeedExportCSV>> _loggerMock;
+        private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
+        private readonly AnnualAtomFeedExportCSV _service;
 
-    [Fact]
-    public async Task ExportCSV_WithValidData_ReturnsByteArray()
-    {
-        var finalList = new List<Finaldata>
+        public AnnualAtomFeedExportCSVTests()
+        {
+            _loggerMock = new Mock<ILogger<HourlyAtomFeedExportCSV>>();
+            _httpClientFactoryMock = new Mock<IHttpClientFactory>();
+            _service = new AnnualAtomFeedExportCSV(_loggerMock.Object, _httpClientFactoryMock.Object);
+        }
+
+        [Fact]
+        public async Task ExportCSV_WithValidData_ReturnsByteArray()
+        {
+            var finalList = new List<Finaldata>
         {
             new Finaldata
             {
@@ -36,43 +38,43 @@ public class AnnualAtomFeedExportCSVTests
             }
         };
 
-        var query = new querystringdata
+            var query = new querystringdata
+            {
+                stationreaddate = DateTime.Now.ToString(),
+                region = "RegionX",
+                siteType = "Urban",
+                sitename = "SiteA",
+                latitude = "51.5074",
+                longitude = "-0.1278"
+            };
+
+            var result = await _service.annualatomfeedexport_csv(finalList, query);
+
+            Assert.NotNull(result);
+            Assert.True(result.Length > 0);
+        }
+
+        [Fact]
+        public async Task ExportCSV_WithEmptyFinalList_ReturnsHeaderOnly()
         {
-            stationreaddate = DateTime.Now.ToString(),
-            region = "RegionX",
-            siteType = "Urban",
-            sitename = "SiteA",
-            latitude = "51.5074",
-            longitude = "-0.1278"
-        };
+            var result = await _service.annualatomfeedexport_csv(new List<Finaldata>(), new querystringdata
+            {
+                stationreaddate = DateTime.Now.ToString(),
+                region = "RegionX",
+                siteType = "Urban",
+                sitename = "SiteA",
+                latitude = "51.5074",
+                longitude = "-0.1278"
+            });
 
-        var result = await _service.annualatomfeedexport_csv(finalList, query);
+            Assert.NotNull(result);
+            Assert.Contains("Annual Average data from Defra", System.Text.Encoding.UTF8.GetString(result));
+        }
 
-        Assert.NotNull(result);
-        Assert.True(result.Length > 0);
-    }
-
-    [Fact]
-    public async Task ExportCSV_WithEmptyFinalList_ReturnsHeaderOnly()
-    {
-        var result = await _service.annualatomfeedexport_csv(new List<Finaldata>(), new querystringdata
+        [Fact]
+        public async Task ExportCSV_WithUnknownVerificationCode_ReturnsOthers()
         {
-            stationreaddate = DateTime.Now.ToString(),
-            region = "RegionX",
-            siteType = "Urban",
-            sitename = "SiteA",
-            latitude = "51.5074",
-            longitude = "-0.1278"
-        });
-
-        Assert.NotNull(result);
-        Assert.Contains("Annual Average data from Defra", System.Text.Encoding.UTF8.GetString(result));
-    }
-
-    [Fact]
-    public async Task ExportCSV_WithUnknownVerificationCode_ReturnsOthers()
-    {
-        var finalList = new List<Finaldata>
+            var finalList = new List<Finaldata>
         {
             new Finaldata
             {
@@ -83,24 +85,24 @@ public class AnnualAtomFeedExportCSVTests
             }
         };
 
-        var result = await _service.annualatomfeedexport_csv(finalList, new querystringdata
+            var result = await _service.annualatomfeedexport_csv(finalList, new querystringdata
+            {
+                stationreaddate = "2023-01-01",
+                region = "RegionX",
+                siteType = "Urban",
+                sitename = "SiteA",
+                latitude = "51.5074",
+                longitude = "-0.1278"
+            });
+
+            var csv = System.Text.Encoding.UTF8.GetString(result);
+            Assert.Contains("others", csv);
+        }
+
+        [Fact]
+        public async Task ExportCSV_WithZeroTotal_ReturnsNoData()
         {
-            stationreaddate = "2023-01-01",
-            region = "RegionX",
-            siteType = "Urban",
-            sitename = "SiteA",
-            latitude = "51.5074",
-            longitude = "-0.1278"
-        });
-
-        var csv = System.Text.Encoding.UTF8.GetString(result);
-        Assert.Contains("others", csv);
-    }
-
-    [Fact]
-    public async Task ExportCSV_WithZeroTotal_ReturnsNoData()
-    {
-        var finalList = new List<Finaldata>
+            var finalList = new List<Finaldata>
         {
             new Finaldata
             {
@@ -111,43 +113,44 @@ public class AnnualAtomFeedExportCSVTests
             }
         };
 
-        var result = await _service.annualatomfeedexport_csv(finalList, new querystringdata
+            var result = await _service.annualatomfeedexport_csv(finalList, new querystringdata
+            {
+                stationreaddate = "2023-01-01",
+                region = "RegionX",
+                siteType = "Urban",
+                sitename = "SiteA",
+                latitude = "51.5074",
+                longitude = "-0.1278"
+            });
+
+            var csv = System.Text.Encoding.UTF8.GetString(result);
+            Assert.Contains("no data", csv);
+        }
+
+        [Fact]
+        public async Task ExportCSV_WithInvalidDate_LogsErrorAndReturnsFallback()
         {
-            stationreaddate = "2023-01-01",
-            region = "RegionX",
-            siteType = "Urban",
-            sitename = "SiteA",
-            latitude = "51.5074",
-            longitude = "-0.1278"
-        });
+            var result = await _service.annualatomfeedexport_csv(new List<Finaldata>(), new querystringdata
+            {
+                stationreaddate = "invalid-date",
+                region = "RegionX",
+                siteType = "Urban",
+                sitename = "SiteA",
+                latitude = "51.5074",
+                longitude = "-0.1278"
+            });
 
-        var csv = System.Text.Encoding.UTF8.GetString(result);
-        Assert.Contains("no data", csv);
-    }
+            Assert.Equal(new byte[] { 0x20 }, result);
 
-    [Fact]
-    public async Task ExportCSV_WithInvalidDate_LogsErrorAndReturnsFallback()
-    {
-        var result = await _service.annualatomfeedexport_csv(new List<Finaldata>(), new querystringdata
-        {
-            stationreaddate = "invalid-date",
-            region = "RegionX",
-            siteType = "Urban",
-            sitename = "SiteA",
-            latitude = "51.5074",
-            longitude = "-0.1278"
-        });
+            _loggerMock.Verify(
+             x => x.Log(
+             LogLevel.Error,
+             It.IsAny<EventId>(),
+             It.Is<It.IsAnyType>((v, t) => true),
+             It.IsAny<Exception>(),
+             It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+             Times.AtLeastOnce);
 
-        Assert.Equal(new byte[] { 0x20 }, result);
-
-        _loggerMock.Verify(
-         x => x.Log(
-         LogLevel.Error,
-         It.IsAny<EventId>(),
-         It.Is<It.IsAnyType>((v, t) => true),
-         It.IsAny<Exception>(),
-         It.IsAny<Func<It.IsAnyType, Exception, string>>()),
-         Times.AtLeastOnce);
-
+        }
     }
 }
