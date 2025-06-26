@@ -10,11 +10,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             var pollutant_url = new List<pollutantdetails>
                             {
-                                new pollutantdetails { polluntantname = "Nitrogen dioxide",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/8" },
-                                new pollutantdetails { polluntantname = "PM10",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5"  },
-                                new pollutantdetails { polluntantname = "PM2.5",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/6001"  },
-                                new pollutantdetails { polluntantname = "Ozone",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/7"  },
-                                new pollutantdetails { polluntantname = "Sulphur dioxide",pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/1"  }
+                                new pollutantdetails { polluntantname = "Nitrogen dioxide",pollutant_master_url = "https://dd.eionet.europa.eu/vocabulary/aq/pollutant/8" },
+                                new pollutantdetails { polluntantname = "PM10",pollutant_master_url = "https://dd.eionet.europa.eu/vocabulary/aq/pollutant/5"  },
+                                new pollutantdetails { polluntantname = "PM2.5",pollutant_master_url = "https://dd.eionet.europa.eu/vocabulary/aq/pollutant/6001"  },
+                                new pollutantdetails { polluntantname = "Ozone",pollutant_master_url = "https://dd.eionet.europa.eu/vocabulary/aq/pollutant/7"  },
+                                new pollutantdetails { polluntantname = "Sulphur dioxide",pollutant_master_url = "https://dd.eionet.europa.eu/vocabulary/aq/pollutant/1"  }
                             };
             var filterpollutant = pollutant_url.Where(P => P.polluntantname == downloadfilter);
 
@@ -89,7 +89,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 logger.LogError("Error in Atom feed fetch {Error}", ex.Message);
                 logger.LogError("Error in Atom feed fetch {Error}", ex.StackTrace);
             }
-            return Final_list;//"sucess";
+            return Final_list;
         }
        
     }
