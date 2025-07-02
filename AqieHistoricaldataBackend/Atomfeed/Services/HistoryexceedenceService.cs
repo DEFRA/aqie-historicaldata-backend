@@ -3,9 +3,8 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class HistoryexceedenceService(ILogger<HistoryexceedenceService> logger, IHttpClientFactory httpClientFactory,
-        IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService, 
-        IAtomAnnualFetchService AtomAnnualFetchService) : IHistoryexceedenceService
+    public class HistoryexceedenceService(ILogger<HistoryexceedenceService> logger, 
+        IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService) : IHistoryexceedenceService
     {
         public async Task<dynamic> GetHistoryexceedencedata(querystringdata data)
         {
@@ -34,7 +33,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         HourlyexceedancesCount = filteredhourlyPollutants.FirstOrDefault(p => p.PollutantName == name)?.Count.ToString() ?? (name == "Nitrogen dioxide" || name == "Sulphur dioxide" ? "0" : "n/a")
                     }).ToList();
 
-                var dailyAverage = await AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
+                var dailyAverage =  AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
 
                 var filtereddailyPollutants = dailyAverage.Where(p =>
                                                         (p.DailyPollutantname == "PM10" && Convert.ToDouble(p.Total) > 50.5) || //200
@@ -50,7 +49,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         dailyexceedancesCount = filtereddailyPollutants.FirstOrDefault(p => p.DailyPollutantname == name)?.Count.ToString() ?? (name == "PM10" || name == "Sulphur dioxide" ? "0" : "n/a")
                     }).ToList();
 
-                //var annualexceedances = await AtomAnnualFetchService.GetAtomAnnualdatafetch(finalhourlypollutantresult, data);
                 var annualexceedances = dailyAverage.GroupBy(x => new
                                                 {
                                                     ReportDate = Convert.ToDateTime(x.ReportDate).Year.ToString(),
@@ -72,14 +70,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                         .Where(x => x.Pollutant.Verification == "2")
                                         .Select(x => x.Index > 0 ? $"Data has been verified until {Convert.ToDateTime(finalhourlypollutantresult[x.Index - 1].StartTime).ToString("dd MMMM")}" : "Data has not been verified")
                                         .FirstOrDefault() ?? "Data has been verified";
-                // Check if a given year is the current year
-                //int currentYear = DateTime.Now.Year;
-                //bool isCurrentYear = Convert.ToInt32(year) == currentYear;
-                //// Total possible data points (assuming hourly data collection for one day)
-                //int daysinYear = DateTime.IsLeapYear(Convert.ToInt32(year)) ? 366 : 365;
-                //int totalPossibleDataPoints = daysinYear * 24;  
-                //// Calculate number of days in the current year 
-                //int daysInYear = Enumerable.Range(1, 12).Select(month => DateTime.DaysInMonth(currentYear, month)).Sum();
 
                 int currentYear = DateTime.Now.Year;
                 int yearToCheck = Convert.ToInt32(year);
@@ -90,10 +80,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                  : (DateTime.IsLeapYear(yearToCheck) ? 366 : 365);// Use full year days for past or future years
                 // Total possible data points (assuming hourly data collection for one day)
                 int totalPossibleDataPoints = daysinYear * 24;
-
-                //var data_pm10 = finalhourlypollutantresult.Where(p => p.Pollutantname == "PM10" && Convert.ToInt32(p.Validity) > 0)
-                //                                          .GroupBy(p => p.Pollutantname)
-                //                                          .Select(g => new { Pollutantname = g.Key, Count = g.Select(p => p.StartTime).Distinct().Count() }).ToList();
 
                 var dataCapturePercentages = finalhourlypollutantresult
                 .Where(p => Convert.ToInt32(p.Validity) > 0) // Filter valid data points

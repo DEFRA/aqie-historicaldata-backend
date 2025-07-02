@@ -31,13 +31,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 var distinctpollutant = Final_list.Select(s => s.DailyPollutantname).Distinct().OrderBy(m => m).ToList();
                 // Write to MemoryStream
-                using (var memoryStream = new MemoryStream())
-                {
-                    using (var writer = new StreamWriter(memoryStream))
-                    {
-                        //To check the csv writing to the local folder
-                //        using (var writer = new StreamWriter("DailyPivotData.csv"))
+                //using (var memoryStream = new MemoryStream())
                 //{
+                //    using (var writer = new StreamWriter(memoryStream))
+                //    {
+                //To check the csv writing to the local folder
+                using (var writer = new StreamWriter("DailyPivotData.csv"))
+                {
                     writer.WriteLine(string.Format("Daily data from Defra on " + stationfetchdate + ""));
                     writer.WriteLine(string.Format("Site Name,{0}", sitename));
                     writer.WriteLine(string.Format("Site Type,{0}", siteType));
@@ -80,14 +80,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     writer.Flush(); // Ensure all data is written to the MemoryStream
 
                         // Convert MemoryStream to byte array
-                        byte[] byteArray = memoryStream.ToArray();
-                        //byte[] byteArray = [];
+                        //byte[] byteArray = memoryStream.ToArray();
+                        byte[] byteArray = [];
 
                         // Output the byte array (for demonstration purposes)
                         //Console.WriteLine(BitConverter.ToString(byteArray));
                         return byteArray;
                 }
-                }
+                //}
             }
             catch (Exception ex)
             {

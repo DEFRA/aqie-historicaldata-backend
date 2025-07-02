@@ -21,7 +21,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             _loggerMock = new Mock<ILogger<HourlyAtomFeedExportCSV>>();
             _httpClientFactoryMock = new Mock<IHttpClientFactory>();
-            _service = new AnnualAtomFeedExportCSV(_loggerMock.Object, _httpClientFactoryMock.Object);
+            _service = new AnnualAtomFeedExportCSV(_loggerMock.Object);
         }
 
         [Fact]
@@ -48,7 +48,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 longitude = "-0.1278"
             };
 
-            var result = await _service.annualatomfeedexport_csv(finalList, query);
+            var result =  _service.annualatomfeedexport_csv(finalList, query);
 
             Assert.NotNull(result);
             Assert.True(result.Length > 0);
@@ -57,7 +57,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task ExportCSV_WithEmptyFinalList_ReturnsHeaderOnly()
         {
-            var result = await _service.annualatomfeedexport_csv(new List<Finaldata>(), new querystringdata
+            var result =  _service.annualatomfeedexport_csv(new List<Finaldata>(), new querystringdata
             {
                 stationreaddate = DateTime.Now.ToString(),
                 region = "RegionX",
@@ -85,7 +85,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             }
         };
 
-            var result = await _service.annualatomfeedexport_csv(finalList, new querystringdata
+            var result =  _service.annualatomfeedexport_csv(finalList, new querystringdata
             {
                 stationreaddate = "2023-01-01",
                 region = "RegionX",
@@ -113,7 +113,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             }
         };
 
-            var result = await _service.annualatomfeedexport_csv(finalList, new querystringdata
+            var result =  _service.annualatomfeedexport_csv(finalList, new querystringdata
             {
                 stationreaddate = "2023-01-01",
                 region = "RegionX",
@@ -130,7 +130,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task ExportCSV_WithInvalidDate_LogsErrorAndReturnsFallback()
         {
-            var result = await _service.annualatomfeedexport_csv(new List<Finaldata>(), new querystringdata
+            var result =  _service.annualatomfeedexport_csv(new List<Finaldata>(), new querystringdata
             {
                 stationreaddate = "invalid-date",
                 region = "RegionX",

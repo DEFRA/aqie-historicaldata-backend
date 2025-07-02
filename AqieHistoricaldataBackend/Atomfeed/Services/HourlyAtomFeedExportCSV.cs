@@ -2,15 +2,14 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class HourlyAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger, IHttpClientFactory httpClientFactory) : IHourlyAtomFeedExportCSV
+    public class HourlyAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger) : IHourlyAtomFeedExportCSV
     {
-        public async Task<byte[]> hourlyatomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
+        public byte[] hourlyatomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
         {
             try
             {
                 string pollutantnameheaderchange = string.Empty;
                 string stationfetchdate = Convert.ToDateTime(data.stationreaddate).ToString(); //2025-03-20T06:05:20.893Z//
-                //string stationfetchdate = DateTime.ParseExact(data.stationreaddate, "dd/MM/yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture).ToString();
                 string region = data.region;
                 string siteType = data.siteType;
                 string sitename = data.sitename;
@@ -34,14 +33,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 var distinctpollutant = Final_list.Select(s => s.Pollutantname).Distinct().OrderBy(m => m).ToList();
                 // Write to MemoryStream
-                using (var memoryStream = new MemoryStream())
+                //using (var memoryStream = new MemoryStream())
+                //{
+                //    using (var writer = new StreamWriter(memoryStream))
+                //    {
+                //To check the csv writing to the local folder
+                using (var writer = new StreamWriter("HourlyPivotData.csv"))
                 {
-                    using (var writer = new StreamWriter(memoryStream))
-                    {
-                        //To check the csv writing to the local folder
-                        //using (var writer = new StreamWriter("HourlyPivotData.csv"))
-                        //{
-                        writer.WriteLine(string.Format("Hourly data from Defra on "+ stationfetchdate + ""));
+                    writer.WriteLine(string.Format("Hourly data from Defra on "+ stationfetchdate + ""));
                     writer.WriteLine(string.Format("Site Name,{0}", sitename));
                     writer.WriteLine(string.Format("Site Type,{0}", siteType));
                     writer.WriteLine(string.Format("Region,{0}", region));
@@ -84,15 +83,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     writer.Flush(); // Ensure all data is written to the MemoryStream
 
                         // Convert MemoryStream to byte array
-                        byte[] byteArray = memoryStream.ToArray();
+                        //byte[] byteArray = memoryStream.ToArray();
                         //Comment the below line before deploying the code
-                        //byte[] byteArray = [];
+                        byte[] byteArray = [];
 
                         // Output the byte array (for demonstration purposes)
                         //Console.WriteLine(BitConverter.ToString(byteArray));
                         return byteArray;
                 }
-                }
+                //}
             }
             catch (Exception ex)
             {

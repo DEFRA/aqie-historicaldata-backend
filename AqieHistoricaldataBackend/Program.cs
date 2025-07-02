@@ -14,6 +14,7 @@ using Microsoft.Net.Http.Headers;
 using Amazon.S3;
 using Hangfire;
 using Hangfire.MemoryStorage;
+using Elastic.CommonSchema;
 
 var app = CreateWebApplication(args);
 await app.RunAsync();
@@ -58,7 +59,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     
     }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>(); ;
     
-    
+   
 
     // Propagate trace header.
     builder.Services.AddHeaderPropagation(options =>
