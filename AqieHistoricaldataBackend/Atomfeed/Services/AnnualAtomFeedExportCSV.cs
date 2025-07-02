@@ -14,12 +14,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 using var memoryStream = new MemoryStream();
                 using var writer = new StreamWriter(memoryStream);
 
+                //using var writer = new StreamWriter("AnnualPivotData.csv");
+
                 WriteCsvHeader(writer, data);
                 WritePollutantHeaders(writer, distinctPollutants);
                 WriteGroupedData(writer, groupedData, distinctPollutants);
 
                 writer.Flush();
                 return memoryStream.ToArray();
+                // Uncomment for local csv write
+                // byte[] byteArray = [];
+                // return byteArray;
             }
             catch (Exception ex)
             {
