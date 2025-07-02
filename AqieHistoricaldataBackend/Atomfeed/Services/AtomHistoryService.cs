@@ -84,18 +84,18 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     //To get the daily average 
                     var dailyAverage =  AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
 
-                    PresignedUrl =  AWSS3BucketService.writecsvtoawss3bucket(dailyAverage, data, downloadtype);                    
+                    PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(dailyAverage, data, downloadtype);                    
                 }
                 else if (downloadtype == "Annual")
                 {
                     var annualAverage = await AtomAnnualFetchService.GetAtomAnnualdatafetch(finalhourlypollutantresult, data);
 
-                    PresignedUrl =  AWSS3BucketService.writecsvtoawss3bucket(annualAverage, data, downloadtype);
+                    PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(annualAverage, data, downloadtype);
                 }
                 else
                 {
                     //To get the Hourly data
-                    PresignedUrl =  AWSS3BucketService.writecsvtoawss3bucket(finalhourlypollutantresult, data, downloadtype);
+                    PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(finalhourlypollutantresult, data, downloadtype);
                 }
             }
                 catch (Exception ex) {
