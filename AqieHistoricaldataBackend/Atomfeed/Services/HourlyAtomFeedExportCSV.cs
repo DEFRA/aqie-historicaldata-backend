@@ -4,7 +4,7 @@ using System.Collections;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class HourlyAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger, IHttpClientFactory httpClientFactory) : IHourlyAtomFeedExportCSV
+    public class HourlyAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger) : IHourlyAtomFeedExportCSV
     {
         public async Task<byte[]> hourlyatomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
         {
