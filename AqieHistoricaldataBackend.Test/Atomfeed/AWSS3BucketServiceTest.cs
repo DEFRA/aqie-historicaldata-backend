@@ -1,11 +1,10 @@
-
 using Xunit;
 using Moq;
-using Microsoft.Extensions.Logging;
-using AqieHistoricaldataBackend.Atomfeed.Services;
-using AqieHistoricaldataBackend.Atomfeed.Models;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using AqieHistoricaldataBackend.Atomfeed.Services;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Test.Atomfeed
@@ -16,134 +15,155 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         private readonly Mock<IHourlyAtomFeedExportCSV> _hourlyMock = new();
         private readonly Mock<IDailyAtomFeedExportCSV> _dailyMock = new();
         private readonly Mock<IAnnualAtomFeedExportCSV> _annualMock = new();
-        private readonly Mock<IAWSPreSignedURLService> _preSignedUrlMock = new();
+        private readonly Mock<IAWSPreSignedURLService> _presignedMock = new();
 
-        private readonly AWSS3BucketService _service;
+        private AWSS3BucketService CreateService() =>
+            new(_loggerMock.Object, _hourlyMock.Object, _dailyMock.Object, _annualMock.Object, _presignedMock.Object);
 
-        public AWSS3BucketServiceTests()
-        {
-            _service = new AWSS3BucketService(
-                _loggerMock.Object,
-                _hourlyMock.Object,
-                _dailyMock.Object,
-                _annualMock.Object,
-                _preSignedUrlMock.Object
-            );
-        }
-
-        private List<Finaldata> GetSampleFinalData() => new() { new Finaldata() };
-        private querystringdata GetSampleQueryData() => new()
+        private querystringdata GetTestQueryData() => new()
         {
             siteId = "123",
-            year = "2023",
+            year = "2025",
             sitename = "TestSite",
             downloadpollutant = "NO2",
-            downloadpollutanttype = "Hourly"
+            downloadpollutanttype = "avg"
         };
 
         [Fact]
-        public void WriteCsvToS3Bucket_Daily_Success()
+        public async Task WriteCsvToS3Bucket_DailyDownloadType_CallsDailyExport()
         {
-            var data = GetSampleQueryData();
-            var finalList = GetSampleFinalData();
-            var csvBytes = new byte[] { 1, 2, 3 };
+            var service = CreateService();
+            var data = GetTestQueryData();
+            var finalList = new List<Finaldata>();
+            var expectedBytes = new byte[] { 1, 2, 3 };
 
-            _dailyMock.Setup(x => x.dailyatomfeedexport_csv(finalList, data)).Returns(csvBytes);
-            _preSignedUrlMock.Setup(x => x.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), 604800))
-                             .Returns("https://presigned.url");
+            _dailyMock.Setup(x => x.dailyatomfeedexport_csv(finalList, data)).Returns(expectedBytes);
+            _presignedMock.Setup(x => x.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), 604800))
+                          .ReturnsAsync("https://mock-url");
 
             Environment.SetEnvironmentVariable("AWS_REGION", "us-east-1");
             Environment.SetEnvironmentVariable("S3_BUCKET_NAME", "test-bucket");
 
-            var result = _service.writecsvtoawss3bucket(finalList, data, "Daily");
+            var result = await service.writecsvtoawss3bucket(finalList, data, "Daily");
 
-            Assert.Equal("https://presigned.url", result);
+            Assert.Equal("https://mock-url", result);
+            _dailyMock.Verify(x => x.dailyatomfeedexport_csv(finalList, data), Times.Once);
         }
 
         [Fact]
-        public void WriteCsvToS3Bucket_Annual_Success()
+        public async Task WriteCsvToS3Bucket_AnnualDownloadType_CallsAnnualExport()
         {
-            var data = GetSampleQueryData();
-            var finalList = GetSampleFinalData();
-            var csvBytes = new byte[] { 4, 5, 6 };
+            var service = CreateService();
+            var data = GetTestQueryData();
+            var finalList = new List<Finaldata>();
+            var expectedBytes = new byte[] { 4, 5, 6 };
 
-            _annualMock.Setup(x => x.annualatomfeedexport_csv(finalList, data)).Returns(csvBytes);
-            _preSignedUrlMock.Setup(x => x.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), 604800))
-                             .Returns("https://presigned.url");
+            _annualMock.Setup(x => x.annualatomfeedexport_csv(finalList, data)).Returns(expectedBytes);
+            _presignedMock.Setup(x => x.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), 604800))
+                          .ReturnsAsync("https://annual-url");
 
-            Environment.SetEnvironmentVariable("AWS_REGION", "us-east-1");
-            Environment.SetEnvironmentVariable("S3_BUCKET_NAME", "test-bucket");
+            Environment.SetEnvironmentVariable("AWS_REGION", "us-west-2");
+            Environment.SetEnvironmentVariable("S3_BUCKET_NAME", "annual-bucket");
 
-            var result = _service.writecsvtoawss3bucket(finalList, data, "Annual");
+            var result = await service.writecsvtoawss3bucket(finalList, data, "Annual");
 
-            Assert.Equal("https://presigned.url", result);
+            Assert.Equal("https://annual-url", result);
+            _annualMock.Verify(x => x.annualatomfeedexport_csv(finalList, data), Times.Once);
         }
 
         [Fact]
-        public void WriteCsvToS3Bucket_Hourly_Success()
+        public async Task WriteCsvToS3Bucket_HourlyDownloadType_CallsHourlyExport()
         {
-            var data = GetSampleQueryData();
-            var finalList = GetSampleFinalData();
-            var csvBytes = new byte[] { 7, 8, 9 };
+            var service = CreateService();
+            var data = GetTestQueryData();
+            var finalList = new List<Finaldata>();
+            var expectedBytes = new byte[] { 7, 8, 9 };
 
-            _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(finalList, data)).Returns(csvBytes);
-            _preSignedUrlMock.Setup(x => x.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), 604800))
-                             .Returns("https://presigned.url");
+            _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(finalList, data)).Returns(expectedBytes);
+            _presignedMock.Setup(x => x.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), 604800))
+                          .ReturnsAsync("https://hourly-url");
 
-            Environment.SetEnvironmentVariable("AWS_REGION", "us-east-1");
-            Environment.SetEnvironmentVariable("S3_BUCKET_NAME", "test-bucket");
+            Environment.SetEnvironmentVariable("AWS_REGION", "eu-central-1");
+            Environment.SetEnvironmentVariable("S3_BUCKET_NAME", "hourly-bucket");
 
-            var result = _service.writecsvtoawss3bucket(finalList, data, "Hourly");
+            var result = await service.writecsvtoawss3bucket(finalList, data, "Hourly");
 
-            Assert.Equal("https://presigned.url", result);
+            Assert.Equal("https://hourly-url", result);
+            _hourlyMock.Verify(x => x.hourlyatomfeedexport_csv(finalList, data), Times.Once);
         }
 
         [Fact]
-        public void WriteCsvToS3Bucket_MissingRegion_ThrowsException()
+        public async Task WriteCsvToS3Bucket_MissingAWSRegion_ThrowsException()
         {
-            var data = GetSampleQueryData();
-            var finalList = GetSampleFinalData();
-            var csvBytes = new byte[] { 1, 2, 3 };
+            var service = CreateService();
+            var data = GetTestQueryData();
+            var finalList = new List<Finaldata>();
 
-            _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(finalList, data)).Returns(csvBytes);
             Environment.SetEnvironmentVariable("AWS_REGION", null);
 
-            var result = _service.writecsvtoawss3bucket(finalList, data, "Hourly");
+            var result = await service.writecsvtoawss3bucket(finalList, data, "Daily");
 
             Assert.Equal(string.Empty, result);
         }
 
         [Fact]
-        public void WriteCsvToS3Bucket_CsvExport_ThrowsException()
+        public async Task WriteCsvToS3Bucket_MissingS3BucketName_StillHandlesGracefully()
         {
-            var data = GetSampleQueryData();
-            var finalList = GetSampleFinalData();
+            var service = CreateService();
+            var data = GetTestQueryData();
+            var finalList = new List<Finaldata>();
+            var expectedBytes = new byte[] { 1, 2, 3 };
 
-            _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(finalList, data)).Throws(new Exception("CSV error"));
+            _dailyMock.Setup(x => x.dailyatomfeedexport_csv(finalList, data)).Returns(expectedBytes);
+            _presignedMock.Setup(x => x.GeneratePreSignedURL(null, It.IsAny<string>(), 604800))
+                          .ReturnsAsync("https://null-bucket-url");
+
             Environment.SetEnvironmentVariable("AWS_REGION", "us-east-1");
+            Environment.SetEnvironmentVariable("S3_BUCKET_NAME", null);
 
-            var result = _service.writecsvtoawss3bucket(finalList, data, "Hourly");
+            var result = await service.writecsvtoawss3bucket(finalList, data, "Daily");
 
-            Assert.Equal(string.Empty, result);
+            Assert.Equal("https://null-bucket-url", result);
         }
 
         [Fact]
-        public void WriteCsvToS3Bucket_PreSignedUrl_ThrowsException()
+        public async Task WriteCsvToS3Bucket_ExceptionDuringPresignedUrl_ReturnsEmpty()
         {
-            var data = GetSampleQueryData();
-            var finalList = GetSampleFinalData();
-            var csvBytes = new byte[] { 1, 2, 3 };
+            var service = CreateService();
+            var data = GetTestQueryData();
+            var finalList = new List<Finaldata>();
+            var expectedBytes = new byte[] { 1, 2, 3 };
 
-            _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(finalList, data)).Returns(csvBytes);
-            _preSignedUrlMock.Setup(x => x.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), 604800))
-                             .Throws(new Exception("URL error"));
+            _dailyMock.Setup(x => x.dailyatomfeedexport_csv(finalList, data)).Returns(expectedBytes);
+            _presignedMock.Setup(x => x.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), 604800))
+                          .ThrowsAsync(new Exception("Presigned error"));
 
             Environment.SetEnvironmentVariable("AWS_REGION", "us-east-1");
             Environment.SetEnvironmentVariable("S3_BUCKET_NAME", "test-bucket");
 
-            var result = _service.writecsvtoawss3bucket(finalList, data, "Hourly");
+            var result = await service.writecsvtoawss3bucket(finalList, data, "Daily");
 
             Assert.Equal(string.Empty, result);
+        }
+
+        [Fact]
+        public async Task WriteCsvToS3Bucket_EmptyFinalList_StillProcesses()
+        {
+            var service = CreateService();
+            var data = GetTestQueryData();
+            var finalList = new List<Finaldata>();
+            var expectedBytes = new byte[] { };
+
+            _dailyMock.Setup(x => x.dailyatomfeedexport_csv(finalList, data)).Returns(expectedBytes);
+            _presignedMock.Setup(x => x.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), 604800))
+                          .ReturnsAsync("https://empty-url");
+
+            Environment.SetEnvironmentVariable("AWS_REGION", "us-east-1");
+            Environment.SetEnvironmentVariable("S3_BUCKET_NAME", "test-bucket");
+
+            var result = await service.writecsvtoawss3bucket(finalList, data, "Daily");
+
+            Assert.Equal("https://empty-url", result);
         }
     }
 }

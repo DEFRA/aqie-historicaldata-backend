@@ -3,9 +3,9 @@ using Amazon.S3;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AWSPreSignedURLService(ILogger<HourlyAtomFeedExportCSV> logger) : IAWSPreSignedURLService
+    public class AWSPreSignedURLService(ILogger<HourlyAtomFeedExportCSV> logger, IHttpClientFactory httpClientFactory) : IAWSPreSignedURLService
     {
-        public string GeneratePreSignedURL(string bucketName, string keyName, double duration)
+        public async Task<string> GeneratePreSignedURL(string bucketName, string keyName, double duration)
         {
             try
             {

@@ -1,5 +1,6 @@
 using Amazon.S3.Transfer;
 using System;
+using System.Threading.Tasks;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 using static System.Net.Mime.MediaTypeNames;
 
@@ -11,7 +12,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         IAWSPreSignedURLService AWSPreSignedURLService) : IAWSS3BucketService
     {
         //public async Task<string> writecsvtoawss3bucket(dynamic Final_list, querystringdata data)
-        public string writecsvtoawss3bucket(List<Finaldata> Final_list, querystringdata data, string downloadtype)
+        public async Task<string> writecsvtoawss3bucket(List<Finaldata> Final_list, querystringdata data, string downloadtype)
         {
             string siteId = data.siteId;
             string year = data.year;
@@ -52,7 +53,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
                 }
                 logger.LogInformation("S3 bucket PresignedUrl start {Datetime}", DateTime.Now);
-                PresignedUrl =  AWSPreSignedURLService.GeneratePreSignedURL(s3BucketName, s3Key, 604800);
+                PresignedUrl = await  AWSPreSignedURLService.GeneratePreSignedURL(s3BucketName, s3Key, 604800);
                 logger.LogInformation("S3 bucket PresignedUrl final URL {PresignedUrl}", PresignedUrl);
             }
             catch (Exception ex)
