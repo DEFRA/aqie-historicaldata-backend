@@ -2,15 +2,14 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class HourlyAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger, IHttpClientFactory httpClientFactory) : IHourlyAtomFeedExportCSV
+    public class HourlyAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger) : IHourlyAtomFeedExportCSV
     {
-        public async Task<byte[]> hourlyatomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
+        public byte[] hourlyatomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
         {
             try
             {
                 string pollutantnameheaderchange = string.Empty;
                 string stationfetchdate = Convert.ToDateTime(data.stationreaddate).ToString(); //2025-03-20T06:05:20.893Z//
-                //string stationfetchdate = DateTime.ParseExact(data.stationreaddate, "dd/MM/yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture).ToString();
                 string region = data.region;
                 string siteType = data.siteType;
                 string sitename = data.sitename;
@@ -39,9 +38,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     using (var writer = new StreamWriter(memoryStream))
                     {
                         //To check the csv writing to the local folder
-                        //using (var writer = new StreamWriter("HourlyPivotData.csv"))
-                        //{
-                        writer.WriteLine(string.Format("Hourly data from Defra on "+ stationfetchdate + ""));
+                //        using (var writer = new StreamWriter("HourlyPivotData.csv"))
+                //{
+                    writer.WriteLine(string.Format("Hourly data from Defra on "+ stationfetchdate + ""));
                     writer.WriteLine(string.Format("Site Name,{0}", sitename));
                     writer.WriteLine(string.Format("Site Type,{0}", siteType));
                     writer.WriteLine(string.Format("Region,{0}", region));

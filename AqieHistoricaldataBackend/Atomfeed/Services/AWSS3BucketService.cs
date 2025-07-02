@@ -11,7 +11,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         IAWSPreSignedURLService AWSPreSignedURLService) : IAWSS3BucketService
     {
         //public async Task<string> writecsvtoawss3bucket(dynamic Final_list, querystringdata data)
-        public async Task<string> writecsvtoawss3bucket(List<Finaldata> Final_list, querystringdata data, string downloadtype)
+        public string writecsvtoawss3bucket(List<Finaldata> Final_list, querystringdata data, string downloadtype)
         {
             string siteId = data.siteId;
             string year = data.year;
@@ -25,11 +25,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
                 else if(downloadtype == "Annual")
                 {
-                    csvbyte = await AnnualAtomFeedExportCSV.annualatomfeedexport_csv(Final_list, data);
+                    csvbyte = AnnualAtomFeedExportCSV.annualatomfeedexport_csv(Final_list, data);
                 }
                 else
                 {
-                    csvbyte = await HourlyAtomFeedExportCSV.hourlyatomfeedexport_csv(Final_list, data);
+                    csvbyte = HourlyAtomFeedExportCSV.hourlyatomfeedexport_csv(Final_list, data);
                 }
                 string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
                 logger.LogInformation("S3 bucket name start {s3BucketName}", DateTime.Now);
@@ -46,13 +46,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         using (var stream = new MemoryStream(csvbyte))
                         {
                             logger.LogInformation("S3 bucket upload start {Starttime}", DateTime.Now);
-                            await transferUtility.UploadAsync(stream, s3BucketName, s3Key);
+                             transferUtility.UploadAsync(stream, s3BucketName, s3Key);
                             logger.LogInformation("S3 bucket upload end {Endtime}", DateTime.Now);
                         }
                     }
                 }
                 logger.LogInformation("S3 bucket PresignedUrl start {Datetime}", DateTime.Now);
-                PresignedUrl = await AWSPreSignedURLService.GeneratePreSignedURL(s3BucketName, s3Key, 604800);
+                PresignedUrl =  AWSPreSignedURLService.GeneratePreSignedURL(s3BucketName, s3Key, 604800);
                 logger.LogInformation("S3 bucket PresignedUrl final URL {PresignedUrl}", PresignedUrl);
             }
             catch (Exception ex)

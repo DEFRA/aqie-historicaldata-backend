@@ -89,7 +89,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 logger.LogError("Error in Atom feed fetch {Error}", ex.Message);
                 logger.LogError("Error in Atom feed fetch {Error}", ex.StackTrace);
             }
-            return Final_list;//"sucess";
+            return Final_list;
         }
        
     }
