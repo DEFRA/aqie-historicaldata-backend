@@ -3,9 +3,8 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class HistoryexceedenceService(ILogger<HistoryexceedenceService> logger, IHttpClientFactory httpClientFactory,
-        IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService,
-        IAtomAnnualFetchService AtomAnnualFetchService) : IHistoryexceedenceService
+    public class HistoryexceedenceService(ILogger<HistoryexceedenceService> Logger,
+        IAtomHourlyFetchService AtomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService) : IHistoryexceedenceService
     {
         public async Task<dynamic> GetHistoryexceedencedata(querystringdata data)
         {
@@ -15,119 +14,150 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 string year = data.year;
                 string downloadfilter = "All";
 
-                var finalhourlypollutantresult = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
-                //To get the number of hourly exceedances for a selected year and selected monitoring station
-                var filteredhourlyPollutants = finalhourlypollutantresult.Where(p =>
-                                                        (p.Pollutantname == "Nitrogen dioxide" && Convert.ToDouble(p.Value) > 200.5) || //200
-                                                        (p.Pollutantname == "Sulphur dioxide" && Convert.ToDouble(p.Value) > 350.5))  //350
-                                                        .GroupBy(p => p.Pollutantname)
-                                                        .Select(g => new { PollutantName = g.Key, Count = g.Count() })
-                                                        .ToList();
+                var hourlyData = await AtomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
+                var distinctPollutants = GetOrderedDistinctPollutants(hourlyData);
+                var filteredHourly = GetFilteredHourlyPollutants(hourlyData);
+                var hourlyExceedances = GetHourlyExceedances(distinctPollutants, filteredHourly);
 
-                var customOrder = new List<string> { "PM2.5", "PM10", "Nitrogen dioxide", "Ozone", "Sulphur dioxide" };
-                var distinctpollutant = finalhourlypollutantresult.Select(S => S.Pollutantname).Distinct().OrderBy(m => customOrder.IndexOf(m)).ToList();
+                var dailyData = await AtomDailyFetchService.GetAtomDailydatafetch(hourlyData, data);
+                var filteredDaily = GetFilteredDailyPollutants(dailyData);
+                var dailyExceedances = GetDailyExceedances(distinctPollutants, filteredDaily);
 
-                var hourlyexceedances = distinctpollutant
-                    .Select(name => new
-                    {
-                        PollutantName = name,
-                        HourlyexceedancesCount = filteredhourlyPollutants.FirstOrDefault(p => p.PollutantName == name)?.Count.ToString() ?? (name == "Nitrogen dioxide" || name == "Sulphur dioxide" ? "0" : "n/a")
-                    }).ToList();
+                var annualExceedances = GetAnnualExceedances(dailyData);
+                var dataVerifiedTag = GetDataVerifiedTag(hourlyData);
+                var dataCapturePercentages = GetDataCapturePercentages(hourlyData, year);
 
-                var dailyAverage = await AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
+                var mergedExceedances = MergeExceedanceData(
+                    hourlyExceedances,
+                    dailyExceedances,
+                    annualExceedances,
+                    dataCapturePercentages,
+                    dataVerifiedTag);
 
-                var filtereddailyPollutants = dailyAverage.Where(p =>
-                                                        (p.DailyPollutantname == "PM10" && Convert.ToDouble(p.Total) > 50.5) || //200
-                                                        (p.DailyPollutantname == "Sulphur dioxide" && Convert.ToDouble(p.Total) > 125.5))  //350
-                                                        .GroupBy(p => p.DailyPollutantname)
-                                                        .Select(g => new { DailyPollutantname = g.Key, Count = g.Count() })
-                                                        .ToList();
-
-                var dailyexceedances = distinctpollutant
-                    .Select(name => new
-                    {
-                        PollutantName = name,
-                        dailyexceedancesCount = filtereddailyPollutants.FirstOrDefault(p => p.DailyPollutantname == name)?.Count.ToString() ?? (name == "PM10" || name == "Sulphur dioxide" ? "0" : "n/a")
-                    }).ToList();
-
-                //var annualexceedances = await AtomAnnualFetchService.GetAtomAnnualdatafetch(finalhourlypollutantresult, data);
-                var annualexceedances = dailyAverage.GroupBy(x => new
-                {
-                    ReportDate = Convert.ToDateTime(x.ReportDate).Year.ToString(),
-                    x.DailyPollutantname
-                })
-                                             .Select(x =>
-                                             {
-                                                 var validTotals = x.Where(y => Convert.ToDecimal(y.Total) != 0).ToList();
-                                                 return new Finaldata
-                                                 {
-                                                     ReportDate = x.Key.ReportDate,
-                                                     AnnualPollutantname = x.Key.DailyPollutantname,
-                                                     Total = validTotals.Any() ? Math.Round(validTotals.Average(y => Convert.ToDecimal(y.Total))) : '-'
-                                                 };
-                                             }).ToList();
-
-                var dataVerifiedTag = finalhourlypollutantresult
-                                        .Select((pollutant, index) => new { Pollutant = pollutant, Index = index })
-                                        .Where(x => x.Pollutant.Verification == "2")
-                                        .Select(x => x.Index > 0 ? $"Data has been verified until {Convert.ToDateTime(finalhourlypollutantresult[x.Index - 1].StartTime).ToString("dd MMMM")}" : "Data has not been verified")
-                                        .FirstOrDefault() ?? "Data has been verified";
-                // Check if a given year is the current year
-                //int currentYear = DateTime.Now.Year;
-                //bool isCurrentYear = Convert.ToInt32(year) == currentYear;
-                //// Total possible data points (assuming hourly data collection for one day)
-                //int daysinYear = DateTime.IsLeapYear(Convert.ToInt32(year)) ? 366 : 365;
-                //int totalPossibleDataPoints = daysinYear * 24;  
-                //// Calculate number of days in the current year 
-                //int daysInYear = Enumerable.Range(1, 12).Select(month => DateTime.DaysInMonth(currentYear, month)).Sum();
-
-                int currentYear = DateTime.Now.Year;
-                int yearToCheck = Convert.ToInt32(year);
-
-                // Only calculate days in year if it's the current year else check for leap year and update dates
-                int daysinYear = (yearToCheck == currentYear)//check if it's the current year
-                                 ? (DateTime.Now - new DateTime(currentYear, 1, 1)).Days// Calculate days from Jan 1st to yestarday (inclusive)
-                                 : (DateTime.IsLeapYear(yearToCheck) ? 366 : 365);// Use full year days for past or future years
-                // Total possible data points (assuming hourly data collection for one day)
-                int totalPossibleDataPoints = daysinYear * 24;
-
-                //var data_pm10 = finalhourlypollutantresult.Where(p => p.Pollutantname == "PM10" && Convert.ToInt32(p.Validity) > 0)
-                //                                          .GroupBy(p => p.Pollutantname)
-                //                                          .Select(g => new { Pollutantname = g.Key, Count = g.Select(p => p.StartTime).Distinct().Count() }).ToList();
-
-                var dataCapturePercentages = finalhourlypollutantresult
-                .Where(p => Convert.ToInt32(p.Validity) > 0) // Filter valid data points
-                           .GroupBy(p => p.Pollutantname) // Group by pollutant name
-                           .Select(g => new
-                           {
-                               PollutantName = g.Key,
-                               //DataCapturePercentage = ((double)g.Count() / totalPossibleDataPoints) * 100// Calculate Data Capture Percentage
-                               DataCapturePercentage = ((double)g.Select(p => p.StartTime).Distinct().Count() / totalPossibleDataPoints) * 100// Calculate Data Capture Percentage
-                           }).ToList();
-
-                var mergedexceedances = (from hourly in hourlyexceedances
-                                         join daily in dailyexceedances on hourly.PollutantName equals daily.PollutantName
-                                         join Percentage in dataCapturePercentages on daily.PollutantName equals Percentage.PollutantName
-                                         join annual in annualexceedances on Percentage.PollutantName equals annual.AnnualPollutantname
-                                         select new
-                                         {
-                                             PollutantName = hourly.PollutantName,
-                                             hourlyCount = hourly.HourlyexceedancesCount,
-                                             dailyCount = daily.dailyexceedancesCount,
-                                             annualcount = Percentage.DataCapturePercentage > 74 ? annual.Total + " µg/m3" : "-",
-                                             dataVerifiedTag = dataVerifiedTag,
-                                             dataCapturePercentage = Math.Round(Percentage.DataCapturePercentage) + "%"
-                                         }).ToList();
-
-                return mergedexceedances;
+                return mergedExceedances;
             }
             catch (Exception ex)
             {
-                logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.Message);
-                logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.StackTrace);
+                Logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.Message);
+                Logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.StackTrace);
                 return "Failure";
             }
+        }
 
+        private List<string> GetOrderedDistinctPollutants(List<Finaldata> data)
+        {
+            var customOrder = new List<string> { "PM2.5", "PM10", "Nitrogen dioxide", "Ozone", "Sulphur dioxide" };
+            return data.Select(s => s.Pollutantname).Distinct().OrderBy(m => customOrder.IndexOf(m)).ToList();
+        }
+
+        private List<dynamic> GetFilteredHourlyPollutants(List<Finaldata> data)
+        {
+            return data.Where(p =>
+                    (p.Pollutantname == "Nitrogen dioxide" && Convert.ToDouble(p.Value) > 200.5) ||
+                    (p.Pollutantname == "Sulphur dioxide" && Convert.ToDouble(p.Value) > 350.5))
+                .GroupBy(p => p.Pollutantname)
+                .Select(g => new { PollutantName = g.Key, Count = g.Count() })
+                .ToList<dynamic>();
+        }
+
+        private List<dynamic> GetHourlyExceedances(List<string> pollutants, List<dynamic> filtered)
+        {
+            return pollutants.Select(name => new
+            {
+                PollutantName = name,
+                HourlyexceedancesCount = filtered.FirstOrDefault(p => p.PollutantName == name)?.Count.ToString()
+                    ?? (name == "Nitrogen dioxide" || name == "Sulphur dioxide" ? "0" : "n/a")
+            }).ToList<dynamic>();
+        }
+
+        private List<dynamic> GetFilteredDailyPollutants(List<Finaldata> data)
+        {
+            return data.Where(p =>
+                    (p.DailyPollutantname == "PM10" && Convert.ToDouble(p.Total) > 50.5) ||
+                    (p.DailyPollutantname == "Sulphur dioxide" && Convert.ToDouble(p.Total) > 125.5))
+                .GroupBy(p => p.DailyPollutantname)
+                .Select(g => new { DailyPollutantname = g.Key, Count = g.Count() })
+                .ToList<dynamic>();
+        }
+
+        private List<dynamic> GetDailyExceedances(List<string> pollutants, List<dynamic> filtered)
+        {
+            return pollutants.Select(name => new
+            {
+                PollutantName = name,
+                dailyexceedancesCount = filtered.FirstOrDefault(p => p.DailyPollutantname == name)?.Count.ToString()
+                    ?? (name == "PM10" || name == "Sulphur dioxide" ? "0" : "n/a")
+            }).ToList<dynamic>();
+        }
+
+        private List<Finaldata> GetAnnualExceedances(List<Finaldata> data)
+        {
+            return data.GroupBy(x => new
+            {
+                ReportDate = Convert.ToDateTime(x.ReportDate).Year.ToString(),
+                x.DailyPollutantname
+            })
+            .Select(x =>
+            {
+                var validTotals = x.Where(y => Convert.ToDecimal(y.Total) != 0).ToList();
+                return new Finaldata
+                {
+                    ReportDate = x.Key.ReportDate,
+                    AnnualPollutantname = x.Key.DailyPollutantname,
+                    Total = validTotals.Any() ? Math.Round(validTotals.Average(y => Convert.ToDecimal(y.Total))) : '-'
+                };
+            }).ToList();
+        }
+
+        private string GetDataVerifiedTag(List<Finaldata> data)
+        {
+            return data.Select((pollutant, index) => new { Pollutant = pollutant, Index = index })
+                .Where(x => x.Pollutant.Verification == "2")
+                .Select(x => x.Index > 0
+                    ? $"Data has been verified until {Convert.ToDateTime(data[x.Index - 1].StartTime):dd MMMM}"
+                    : "Data has not been verified")
+                .FirstOrDefault() ?? "Data has been verified";
+        }
+
+        private List<dynamic> GetDataCapturePercentages(List<Finaldata> data, string year)
+        {
+            int currentYear = DateTime.Now.Year;
+            int yearToCheck = Convert.ToInt32(year);
+            int daysInYear = (yearToCheck == currentYear)
+                ? (DateTime.Now - new DateTime(currentYear, 1, 1)).Days
+                : (DateTime.IsLeapYear(yearToCheck) ? 366 : 365);
+            int totalPossibleDataPoints = daysInYear * 24;
+
+            return data.Where(p => Convert.ToInt32(p.Validity) > 0)
+                .GroupBy(p => p.Pollutantname)
+                .Select(g => new
+                {
+                    PollutantName = g.Key,
+                    DataCapturePercentage = ((double)g.Select(p => p.StartTime).Distinct().Count() / totalPossibleDataPoints) * 100
+                }).ToList<dynamic>();
+        }
+
+        private List<dynamic> MergeExceedanceData(
+            List<dynamic> hourly,
+            List<dynamic> daily,
+            List<Finaldata> annual,
+            List<dynamic> percentages,
+            string verifiedTag)
+        {
+            return (from h in hourly
+                    join d in daily on h.PollutantName equals d.PollutantName
+                    join p in percentages on d.PollutantName equals p.PollutantName
+                    join a in annual on p.PollutantName equals a.AnnualPollutantname
+                    select new
+                    {
+                        PollutantName = h.PollutantName,
+                        hourlyCount = h.HourlyexceedancesCount,
+                        dailyCount = d.dailyexceedancesCount,
+                        annualcount = p.DataCapturePercentage > 74 ? a.Total + " µg/m3" : "-",
+                        dataVerifiedTag = verifiedTag,
+                        dataCapturePercentage = Math.Round(p.DataCapturePercentage) + "%"
+                    }).ToList<dynamic>();
         }
     }
+
 }
