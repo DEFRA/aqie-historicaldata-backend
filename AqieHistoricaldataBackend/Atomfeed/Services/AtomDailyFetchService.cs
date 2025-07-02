@@ -3,9 +3,9 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AtomDailyFetchService(ILogger<AtomDailyFetchService> logger) : IAtomDailyFetchService
+    public class AtomDailyFetchService(ILogger<AtomDailyFetchService> logger, IHttpClientFactory httpClientFactory) : IAtomDailyFetchService
     {
-        public List<Finaldata> GetAtomDailydatafetch(List<Finaldata> finalhourlypollutantresult, querystringdata data)
+        public async Task<List<Finaldata>> GetAtomDailydatafetch(List<Finaldata> finalhourlypollutantresult, querystringdata data)
         {
             try
             {
@@ -31,7 +31,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                                     DailyVerification = x.Verification,
                                                     Total = (x.Values.Count() >= 0.75 * x.Count) ? x.Values.Average() : 0
                                                 }).ToList();
-                return Daily_Average;
+                return Daily_Average;//"sucess";
             }
             catch (Exception ex)
             {
@@ -40,6 +40,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 List<Finaldata> Final_list = new List<Finaldata>();
                 return Final_list;
             }
+            //return Daily_Average;//"sucess";
         }
     }
 }

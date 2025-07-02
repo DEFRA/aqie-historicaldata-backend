@@ -2,21 +2,21 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AtomAnnualFetchService(ILogger<AtomAnnualFetchService> logger
+    public class AtomAnnualFetchService(ILogger<AtomAnnualFetchService> logger, IHttpClientFactory httpClientFactory
         , IAtomDailyFetchService AtomDailyFetchService) : IAtomAnnualFetchService
     {
         public async Task<List<Finaldata>> GetAtomAnnualdatafetch(List<Finaldata> finalhourlypollutantresult, querystringdata data)
         {
             try
             {
-                var dailyAverage = AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
+                var dailyAverage = await AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
                 //To get the daily average
                 var annualAverage = dailyAverage.GroupBy(x => new
-                                    {
-                                        ReportDate = Convert.ToDateTime(x.ReportDate).Year.ToString(),
-                                        x.DailyPollutantname,
-                                        x.DailyVerification
-                                    })
+                {
+                    ReportDate = Convert.ToDateTime(x.ReportDate).Year.ToString(),
+                    x.DailyPollutantname,
+                    x.DailyVerification
+                })
                                     .Select(x =>
                                     {
                                         var validTotals = x.Where(y => Convert.ToDecimal(y.Total) != 0).ToList();
@@ -29,7 +29,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                             Total = validTotals.Any() ? validTotals.Average(y => Convert.ToDecimal(y.Total)) : 0
                                         };
                                     }).ToList();
-                return annualAverage;
+                return annualAverage;//"sucess";                                                             
 
             }
             catch (Exception ex)
@@ -39,6 +39,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 List<Finaldata> Final_list = new List<Finaldata>();
                 return Final_list;
             }
+            //return Daily_Average;//"sucess";
         }
     }
 }

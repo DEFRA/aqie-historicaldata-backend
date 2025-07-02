@@ -39,11 +39,11 @@ using static AqieHistoricaldataBackend.Atomfeed.Services.AtomHistoryService;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AtomHistoryService(ILogger<AtomHistoryService> logger, IHttpClientFactory httpClientFactory, 
+    public class AtomHistoryService(ILogger<AtomHistoryService> logger, IHttpClientFactory httpClientFactory,
         IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService, IAtomAnnualFetchService AtomAnnualFetchService,
         IAWSS3BucketService AWSS3BucketService,
         IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService //MongoService<AtomHistoryModel>, 
-    {    
+    {
         public async Task<string> AtomHealthcheck()
         {
             try
@@ -77,14 +77,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             string downloadtype = data.downloadpollutanttype;
             try
             {
-                var finalhourlypollutantresult = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);         
+                var finalhourlypollutantresult = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
 
                 if (downloadtype == "Daily")
                 {
                     //To get the daily average 
-                    var dailyAverage =  AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
+                    var dailyAverage = await AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
 
-                    PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(dailyAverage, data, downloadtype);                    
+                    PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(dailyAverage, data, downloadtype);
                 }
                 else if (downloadtype == "Annual")
                 {
@@ -98,12 +98,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(finalhourlypollutantresult, data, downloadtype);
                 }
             }
-                catch (Exception ex) {
+            catch (Exception ex)
+            {
                 logger.LogError("Error in Atom feed fetch {Error}", ex.Message);
                 logger.LogError("Error in Atom feed fetch {Error}", ex.StackTrace);
             }
             return PresignedUrl;
-        }       
+        }
 
         public void CallApi()
         {
@@ -115,9 +116,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     if (response.IsSuccessStatusCode)
                     {
                         var data = response.Content.ReadAsStringAsync();
-                        if(data is not null)
+                        if (data is not null)
                         {
-                            logger.LogInformation("Data Fetching health check atom feed API successful {response}", response.ToString() + DateTime.Now);                        
+                            logger.LogInformation("Data Fetching health check atom feed API successful {response}", response.ToString() + DateTime.Now);
                         }
                     }
                     else
@@ -137,7 +138,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
 
         }
-      
+
         public async Task<dynamic> GetHistoryexceedencedata(querystringdata data)
         {
             try
@@ -145,13 +146,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var exceedancesresult = await HistoryexceedenceService.GetHistoryexceedencedata(data);
                 return exceedancesresult;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.Message);
                 logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.StackTrace);
                 return "Failure";
-            }            
+            }
         }
-        }
+    }
 }
 
