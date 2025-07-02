@@ -82,15 +82,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         logger.LogError("Error in atom hourly feed data processing {Error}", ex.Message);
                         logger.LogError("Error in atom hourly feed data processing {Error}", ex.StackTrace);
                     }
-                }                
+                }
             }
             catch (Exception ex)
             {
                 logger.LogError("Error in Atom feed fetch {Error}", ex.Message);
                 logger.LogError("Error in Atom feed fetch {Error}", ex.StackTrace);
             }
-            return Final_list;
+            return Final_list;//"sucess";
         }
-       
+
     }
 }
