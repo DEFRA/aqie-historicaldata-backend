@@ -2,8 +2,8 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AtomAnnualFetchService(ILogger<AtomAnnualFetchService> logger, IHttpClientFactory httpClientFactory
-        , IAtomDailyFetchService AtomDailyFetchService) : IAtomAnnualFetchService
+    public class AtomAnnualFetchService(ILogger<AtomAnnualFetchService> logger,
+         IAtomDailyFetchService AtomDailyFetchService) : IAtomAnnualFetchService
     {
         public async Task<List<Finaldata>> GetAtomAnnualdatafetch(List<Finaldata> finalhourlypollutantresult, querystringdata data)
         {
