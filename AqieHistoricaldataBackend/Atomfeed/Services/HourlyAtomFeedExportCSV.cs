@@ -26,8 +26,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 writer.Flush();
                 return memoryStream.ToArray();
                 // Uncomment for local csv write
-                // byte[] byteArray = [];
-                // return byteArray;
+                //byte[] byteArray = [];
+                //return byteArray;
             }
             catch (Exception ex)
             {
