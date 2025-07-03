@@ -31,7 +31,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                                     DailyVerification = x.Verification,
                                                     Total = (x.Values.Count() >= 0.75 * x.Count) ? x.Values.Average() : 0
                                                 }).ToList();
-                return Daily_Average;//"sucess";
+                return Daily_Average;
             }
             catch (Exception ex)
             {
@@ -40,7 +40,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 List<Finaldata> Final_list = new List<Finaldata>();
                 return Final_list;
             }
-            //return Daily_Average;//"sucess";
         }
     }
 }
