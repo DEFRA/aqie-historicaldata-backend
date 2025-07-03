@@ -74,7 +74,6 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     // Add Hangfire services.
     builder.Services.AddHangfire(config => config.UseMemoryStorage());
     builder.Services.AddHangfireServer();
-    
 
     // Set up the MongoDB client. Config and credentials are injected automatically at runtime.
     builder.Services.Configure<MongoConfig>(builder.Configuration.GetSection("Mongo"));

@@ -3,7 +3,7 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AtomDailyFetchService(ILogger<AtomDailyFetchService> logger, IHttpClientFactory httpClientFactory) : IAtomDailyFetchService
+    public class AtomDailyFetchService(ILogger<AtomDailyFetchService> logger) : IAtomDailyFetchService
     {
         public async Task<List<Finaldata>> GetAtomDailydatafetch(List<Finaldata> finalhourlypollutantresult, querystringdata data)
         {
