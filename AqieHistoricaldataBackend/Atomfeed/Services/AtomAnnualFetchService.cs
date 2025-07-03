@@ -29,7 +29,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                             Total = validTotals.Any() ? validTotals.Average(y => Convert.ToDecimal(y.Total)) : 0
                                         };
                                     }).ToList();
-                return annualAverage;//"sucess";                                                             
+                return annualAverage;
 
             }
             catch (Exception ex)
@@ -39,7 +39,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 List<Finaldata> Final_list = new List<Finaldata>();
                 return Final_list;
             }
-            //return Daily_Average;//"sucess";
         }
     }
 }
