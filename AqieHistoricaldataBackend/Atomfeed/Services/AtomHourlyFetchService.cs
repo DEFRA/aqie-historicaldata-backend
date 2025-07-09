@@ -1,6 +1,8 @@
 using Newtonsoft.Json.Linq;
 using System.Xml;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
+using System.Text.RegularExpressions;
+
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
@@ -18,11 +20,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             var allPollutants = new List<pollutantdetails>
             {
-                new pollutantdetails { polluntantname = "Nitrogen dioxide", pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/8" },
-                new pollutantdetails { polluntantname = "PM10", pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5" },
-                new pollutantdetails { polluntantname = "PM2.5", pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/6001" },
-                new pollutantdetails { polluntantname = "Ozone", pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/7" },
-                new pollutantdetails { polluntantname = "Sulphur dioxide", pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/1" }
+                new pollutantdetails { polluntantname = "Nitrogen dioxide", pollutant_master_url = "dd.eionet.europa.eu/vocabulary/aq/pollutant/8" },
+                new pollutantdetails { polluntantname = "PM10", pollutant_master_url = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" },
+                new pollutantdetails { polluntantname = "PM2.5", pollutant_master_url = "dd.eionet.europa.eu/vocabulary/aq/pollutant/6001" },
+                new pollutantdetails { polluntantname = "Ozone", pollutant_master_url = "dd.eionet.europa.eu/vocabulary/aq/pollutant/7" },
+                new pollutantdetails { polluntantname = "Sulphur dioxide", pollutant_master_url = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1" }
             };
 
             var filtered = allPollutants.Where(p => p.polluntantname == filter);
@@ -61,9 +63,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     var feature = features[i];
                     var href = feature["om:OM_Observation"]?["om:observedProperty"]?["@xlink:href"]?.ToString();
+                    string cleanedUrl = Regex.Replace(href ?? "", @"^https?://", "");
                     if (string.IsNullOrEmpty(href)) continue;
 
-                    var match = pollutants.FirstOrDefault(p => p.pollutant_master_url == href);
+                    var match = pollutants.FirstOrDefault(p => p.pollutant_master_url == cleanedUrl);
                     if (match != null)
                     {
                         var values = feature["om:OM_Observation"]?["om:result"]?["swe:DataArray"]?["swe:values"]?.ToString();
