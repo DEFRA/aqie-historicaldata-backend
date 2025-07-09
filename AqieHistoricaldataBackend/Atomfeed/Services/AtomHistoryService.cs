@@ -57,9 +57,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 RecurringJob.AddOrUpdate(
                     "call-api-job",
                     () => CallApi(),
-                    Cron.Minutely); // Schedule to run daily
+                    Cron.Minutely); // Schedule to run every minute
 
-                return Atomresponse.ToString();
+                return data;
             }
             catch (Exception ex)
             {
@@ -68,6 +68,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return "Error";
             }
         }
+
+
         public async Task<string> GetAtomHourlydata(querystringdata data)
         {
             string siteId = data.siteId;
@@ -110,33 +112,22 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                using (var client = httpClientFactory.CreateClient("Atomfeed"))
+                var client = httpClientFactory.CreateClient("Atomfeed");
+                var response = client.GetAsync("some-endpoint").Result;
+
+                if (!response.IsSuccessStatusCode)
                 {
-                    var response = client.GetAsync("data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml").Result;
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var data = response.Content.ReadAsStringAsync();
-                        if (data is not null)
-                        {
-                            logger.LogInformation("Data Fetching health check atom feed API successful {response}", response.ToString() + DateTime.Now);
-                        }
-                    }
-                    else
-                    {
-                        logger.LogError("Error AtomHealthcheck message {response}", response.ToString() + DateTime.Now);
-                    }
+                    logger.LogError("API call failed with status code: {StatusCode}", response.StatusCode);
                 }
             }
-            catch (HttpRequestException httpEx)
+            catch (HttpRequestException ex)
             {
-                Console.WriteLine("HTTP error occurred: " + httpEx.Message);
+                logger.LogError(ex, "HttpRequestException occurred while calling API.");
             }
             catch (Exception ex)
             {
-                logger.LogError("Error AtomHealthcheck message {Error}", ex.Message);
-                logger.LogError("Error AtomHealthcheck stacktrace {Error}", ex.StackTrace);
+                logger.LogError(ex, "An unexpected error occurred while calling API.");
             }
-
         }
 
         public async Task<dynamic> GetHistoryexceedencedata(querystringdata data)
