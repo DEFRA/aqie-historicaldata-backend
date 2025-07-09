@@ -44,29 +44,6 @@ public class AtomHistoryServiceTests
     }
 
     [Fact]
-    public async Task AtomHealthcheck_ReturnsResponse_WhenSuccessful()
-    {
-        var mockFactory = new Mock<IHttpClientFactory>();
-        var mockClient = new Mock<HttpMessageHandler>();
-
-        mockClient
-         .Protected()
-         .Setup<Task<HttpResponseMessage>>(
-         "SendAsync",
-         ItExpr.IsAny<HttpRequestMessage>(),
-         ItExpr.IsAny<CancellationToken>())
-         .ReturnsAsync(new HttpResponseMessage
-         {
-             StatusCode = HttpStatusCode.OK,
-             Content = new StringContent("<xml>Success</xml>")
-         });
-
-        var client = new HttpClient(mockClient.Object);
-        mockFactory.Setup(_ => _.CreateClient("Atomfeed")).Returns(client);
-
-    }
-
-    [Fact]
     public async Task AtomHealthcheck_ReturnsError_WhenExceptionThrown()
     {
         _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Throws(new Exception("fail"));
@@ -204,7 +181,17 @@ public class AtomHistoryServiceTests
         var service = CreateService();
 
         service.CallApi();
+
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => true),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
     }
+
 
     [Fact]
     public void CallApi_HandlesGeneralException()
@@ -213,7 +200,17 @@ public class AtomHistoryServiceTests
         var service = CreateService();
 
         service.CallApi();
+
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => true),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
     }
+
 
     [Fact]
     public async Task GetHistoryexceedencedata_ReturnsData_WhenSuccessful()
