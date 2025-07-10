@@ -4,6 +4,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public interface IHistoryexceedenceService
     {
-        Task<dynamic> GetHistoryexceedencedata(querystringdata data);
+        Task<dynamic> GetHistoryexceedencedata(QueryStringData data);
     }
 }

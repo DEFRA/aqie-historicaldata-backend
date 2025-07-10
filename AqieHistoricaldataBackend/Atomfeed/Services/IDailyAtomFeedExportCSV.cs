@@ -4,6 +4,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public interface IDailyAtomFeedExportCSV
     {
-        byte[] dailyatomfeedexport_csv(List<Finaldata> Final_list, querystringdata data);
+        byte[] dailyatomfeedexport_csv(List<FinalData> Final_list, QueryStringData data);
     }
 }

@@ -57,8 +57,8 @@ public class AtomHistoryServiceTests
     [Fact]
     public async Task GetAtomHourlydata_ReturnsHourlyUrl()
     {
-        var data = new AtomModel.querystringdata { siteId = "site", year = "2023", downloadpollutant = "NO2", downloadpollutanttype = "Hourly" };
-        var finalData = new List<AtomHistoryModel.Finaldata> { new AtomHistoryModel.Finaldata() };
+        var data = new AtomModel.QueryStringData { SiteId = "site", Year = "2023", DownloadPollutant = "NO2", DownloadPollutantType = "Hourly" };
+        var finalData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
 
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(finalData);
         _s3ServiceMock.Setup(s => s.writecsvtoawss3bucket(finalData, data, "Hourly")).ReturnsAsync("url");
@@ -72,9 +72,9 @@ public class AtomHistoryServiceTests
     [Fact]
     public async Task GetAtomHourlydata_ReturnsDailyUrl()
     {
-        var data = new AtomModel.querystringdata { siteId = "site", year = "2023", downloadpollutant = "NO2", downloadpollutanttype = "Daily" };
-        var hourlyData = new List<AtomHistoryModel.Finaldata> { new AtomHistoryModel.Finaldata() };
-        var dailyData = new List<AtomHistoryModel.Finaldata> { new AtomHistoryModel.Finaldata() };
+        var data = new AtomModel.QueryStringData { SiteId = "site", Year = "2023", DownloadPollutant = "NO2", DownloadPollutantType = "Daily" };
+        var hourlyData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
+        var dailyData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
 
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(hourlyData);
         _dailyServiceMock.Setup(s => s.GetAtomDailydatafetch(hourlyData, data)).ReturnsAsync(dailyData);
@@ -89,9 +89,9 @@ public class AtomHistoryServiceTests
     [Fact]
     public async Task GetAtomHourlydata_ReturnsAnnualUrl()
     {
-        var data = new AtomModel.querystringdata { siteId = "site", year = "2023", downloadpollutant = "NO2", downloadpollutanttype = "Annual" };
-        var hourlyData = new List<AtomHistoryModel.Finaldata> { new AtomHistoryModel.Finaldata() };
-        var annualData = new List<AtomHistoryModel.Finaldata> { new AtomHistoryModel.Finaldata() };
+        var data = new AtomModel.QueryStringData { SiteId = "site", Year = "2023", DownloadPollutant = "NO2", DownloadPollutantType = "Annual" };
+        var hourlyData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
+        var annualData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
 
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(hourlyData);
         _annualServiceMock.Setup(s => s.GetAtomAnnualdatafetch(hourlyData, data)).ReturnsAsync(annualData);
@@ -106,7 +106,7 @@ public class AtomHistoryServiceTests
     [Fact]
     public async Task GetAtomHourlydata_ReturnsEmpty_WhenExceptionThrown()
     {
-        var data = new AtomModel.querystringdata { siteId = "site", year = "2023", downloadpollutant = "NO2", downloadpollutanttype = "Hourly" };
+        var data = new AtomModel.QueryStringData { SiteId = "site", Year = "2023", DownloadPollutant = "NO2", DownloadPollutantType = "Hourly" };
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ThrowsAsync(new Exception("fail"));
 
@@ -215,7 +215,7 @@ public class AtomHistoryServiceTests
     [Fact]
     public async Task GetHistoryexceedencedata_ReturnsData_WhenSuccessful()
     {
-        var data = new AtomModel.querystringdata();
+        var data = new AtomModel.QueryStringData();
         _exceedenceServiceMock.Setup(s => s.GetHistoryexceedencedata(data)).ReturnsAsync("result");
 
         var service = CreateService();
@@ -227,7 +227,7 @@ public class AtomHistoryServiceTests
     [Fact]
     public async Task GetHistoryexceedencedata_ReturnsFailure_WhenExceptionThrown()
     {
-        var data = new AtomModel.querystringdata();
+        var data = new AtomModel.QueryStringData();
         _exceedenceServiceMock.Setup(s => s.GetHistoryexceedencedata(data)).ThrowsAsync(new Exception("fail"));
 
         var service = CreateService();

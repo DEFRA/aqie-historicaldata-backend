@@ -4,6 +4,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public interface IAtomAnnualFetchService
     {
-        Task<List<Finaldata>> GetAtomAnnualdatafetch(List<Finaldata> finalhourlypollutantresult, querystringdata data);
+        Task<List<FinalData>> GetAtomAnnualdatafetch(List<FinalData> finalhourlypollutantresult, QueryStringData data);
     }
 }

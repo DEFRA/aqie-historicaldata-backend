@@ -4,13 +4,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class DailyAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger) : IDailyAtomFeedExportCSV
     {
-        public byte[] dailyatomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
+        public byte[] dailyatomfeedexport_csv(List<FinalData> Final_list, QueryStringData data)
         {
             try
             {
                 var groupedData = GroupDataByDate(Final_list);
                 var distinctPollutants = Final_list
-                    .Select(s => s.DailyPollutantname)
+                    .Select(s => s.DailyPollutantName)
                     .Distinct()
                     .OrderBy(m => m)
                     .ToList();
@@ -38,18 +38,18 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        private List<pivotpollutant> GroupDataByDate(List<Finaldata> finalList)
+        private List<PivotPollutant> GroupDataByDate(List<FinalData> finalList)
         {
             return finalList
                 .GroupBy(x => Convert.ToDateTime(x.ReportDate).Date)
-                .Select(y => new pivotpollutant
+                .Select(y => new PivotPollutant
                 {
-                    date = y.Key.ToString("yyyy-MM-dd"),
-                    Subpollutant = y.Select(x => new SubpollutantItem
+                    Date = y.Key.ToString("yyyy-MM-dd"),
+                    SubPollutant = y.Select(x => new SubPollutantItem
                     {
-                        pollutantname = x.DailyPollutantname,
-                        pollutantvalue = x.Total == 0 ? "no data" : x.Total.ToString(),
-                        verification = x.DailyVerification switch
+                        PollutantName = x.DailyPollutantName,
+                        PollutantValue = x.Total == 0 ? "no data" : x.Total.ToString(),
+                        Verification = x.DailyVerification switch
                         {
                             "1" => "V",
                             "2" => "P",
@@ -60,15 +60,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }).ToList();
         }
 
-        private void WriteMetadata(StreamWriter writer, querystringdata data)
+        private void WriteMetadata(StreamWriter writer, QueryStringData data)
         {
-            string stationDate = Convert.ToDateTime(data.stationreaddate).ToString();
+            string stationDate = Convert.ToDateTime(data.StationReadDate).ToString();
             writer.WriteLine($"Daily data from Defra on {stationDate}");
-            writer.WriteLine($"Site Name,{data.sitename}");
-            writer.WriteLine($"Site Type,{data.siteType}");
-            writer.WriteLine($"Region,{data.region}");
-            writer.WriteLine($"Latitude,{data.latitude}");
-            writer.WriteLine($"Longitude,{data.longitude}");
+            writer.WriteLine($"Site Name,{data.SiteName}");
+            writer.WriteLine($"Site Type,{data.SiteType}");
+            writer.WriteLine($"Region,{data.Region}");
+            writer.WriteLine($"Latitude,{data.Latitude}");
+            writer.WriteLine($"Longitude,{data.Longitude}");
             writer.WriteLine("Notes:,[1] All Data GMT hour ending;  [2] Some shorthand is used V = Verified P = Provisionally Verified N = Not Verified S = Suspect [3] Unit of measurement (for pollutants) = ugm-3");
         }
 
@@ -88,15 +88,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             writer.WriteLine();
         }
 
-        private void WriteData(StreamWriter writer, List<pivotpollutant> groupedData, List<string> distinctPollutants)
+        private void WriteData(StreamWriter writer, List<PivotPollutant> groupedData, List<string> distinctPollutants)
         {
             foreach (var item in groupedData)
             {
-                writer.Write(item.date);
+                writer.Write(item.Date);
                 foreach (var pollutant in distinctPollutants)
                 {
-                    var sub = item.Subpollutant.FirstOrDefault(s => s.pollutantname == pollutant);
-                    writer.Write($",{sub?.pollutantvalue ?? ""},{sub?.verification ?? ""}");
+                    var sub = item.SubPollutant.FirstOrDefault(s => s.PollutantName == pollutant);
+                    writer.Write($",{sub?.PollutantValue ?? ""},{sub?.Verification ?? ""}");
                 }
                 writer.WriteLine();
             }

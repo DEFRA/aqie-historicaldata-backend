@@ -32,7 +32,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             }
         }
 
-        private static async Task<IResult> GetHistorydataById([FromBody] querystringdata data,IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
+        private static async Task<IResult> GetHistorydataById([FromBody] QueryStringData data,IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {
             try
             {
@@ -55,7 +55,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             }
         }
 
-        private static async Task<IResult> GetHistoryexceedence([FromBody] querystringdata data, IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
+        private static async Task<IResult> GetHistoryexceedence([FromBody] QueryStringData data, IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {
             try
             {
