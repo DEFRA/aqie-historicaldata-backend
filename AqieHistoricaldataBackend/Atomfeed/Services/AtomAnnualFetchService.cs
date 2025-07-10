@@ -5,7 +5,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomAnnualFetchService(ILogger<AtomAnnualFetchService> logger,
          IAtomDailyFetchService AtomDailyFetchService) : IAtomAnnualFetchService
     {
-        public async Task<List<Finaldata>> GetAtomAnnualdatafetch(List<Finaldata> finalhourlypollutantresult, querystringdata data)
+        public async Task<List<FinalData>> GetAtomAnnualdatafetch(List<FinalData> finalhourlypollutantresult, QueryStringData data)
         {
             try
             {
@@ -14,17 +14,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var annualAverage = dailyAverage.GroupBy(x => new
                 {
                     ReportDate = Convert.ToDateTime(x.ReportDate).Year.ToString(),
-                    x.DailyPollutantname,
+                    x.DailyPollutantName,
                     x.DailyVerification
                 })
                                     .Select(x =>
                                     {
                                         var validTotals = x.Where(y => Convert.ToDecimal(y.Total) != 0).ToList();
                                         decimal averageTotal = validTotals.Any() ? validTotals.Average(y => Convert.ToDecimal(y.Total)) : 0;
-                                        return new Finaldata
+                                        return new FinalData
                                         {
                                             ReportDate = x.Key.ReportDate,
-                                            AnnualPollutantname = x.Key.DailyPollutantname,
+                                            AnnualPollutantName = x.Key.DailyPollutantName,
                                             AnnualVerification = x.Key.DailyVerification,
                                             Total = validTotals.Any() ? validTotals.Average(y => Convert.ToDecimal(y.Total)) : 0
                                         };
@@ -36,7 +36,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 logger.LogError("Error in Atom Annual feed fetch {Error}", ex.Message);
                 logger.LogError("Error in Atom Annual feed fetch {Error}", ex.StackTrace);
-                List<Finaldata> Final_list = new List<Finaldata>();
+                List<FinalData> Final_list = new List<FinalData>();
                 return Final_list;
             }
         }

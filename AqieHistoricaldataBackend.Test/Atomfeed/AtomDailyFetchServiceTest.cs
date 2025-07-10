@@ -22,15 +22,15 @@ public class AtomDailyFetchServiceTests
     [Fact]
     public async Task GetAtomDailydatafetch_ReturnsAverage_WhenValidData()
     {
-        var input = new List<AtomModel.Finaldata>
+        var input = new List<AtomModel.FinalData>
         {
-            new AtomModel.Finaldata { StartTime = "2025-07-01T01:00:00", Pollutantname = "NO2", Verification = "Verified", Value = "10" },
-            new AtomModel.Finaldata { StartTime = "2025-07-01T02:00:00", Pollutantname = "NO2", Verification = "Verified", Value = "20" },
-            new AtomModel.Finaldata { StartTime = "2025-07-01T03:00:00", Pollutantname = "NO2", Verification = "Verified", Value = "-99" },
-            new AtomModel.Finaldata { StartTime = "2025-07-01T04:00:00", Pollutantname = "NO2", Verification = "Verified", Value = "30" }
+            new AtomModel.FinalData { StartTime = "2025-07-01T01:00:00", PollutantName = "NO2", Verification = "Verified", Value = "10" },
+            new AtomModel.FinalData { StartTime = "2025-07-01T02:00:00", PollutantName = "NO2", Verification = "Verified", Value = "20" },
+            new AtomModel.FinalData { StartTime = "2025-07-01T03:00:00", PollutantName = "NO2", Verification = "Verified", Value = "-99" },
+            new AtomModel.FinalData { StartTime = "2025-07-01T04:00:00", PollutantName = "NO2", Verification = "Verified", Value = "30" }
         };
 
-        var result = await _service.GetAtomDailydatafetch(input, new AtomModel.querystringdata());
+        var result = await _service.GetAtomDailydatafetch(input, new AtomModel.QueryStringData());
 
         Assert.Single(result);
         Assert.Equal(20, result[0].Total);
@@ -39,13 +39,13 @@ public class AtomDailyFetchServiceTests
     [Fact]
     public async Task GetAtomDailydatafetch_ReturnsZero_WhenInsufficientValidData()
     {
-        var input = new List<AtomModel.Finaldata>
+        var input = new List<AtomModel.FinalData>
         {
-            new AtomModel.Finaldata { StartTime = "2025-07-01T01:00:00", Pollutantname = "NO2", Verification = "Verified", Value = "-99" },
-            new AtomModel.Finaldata { StartTime = "2025-07-01T02:00:00", Pollutantname = "NO2", Verification = "Verified", Value = "20" }
+            new AtomModel.FinalData { StartTime = "2025-07-01T01:00:00", PollutantName = "NO2", Verification = "Verified", Value = "-99" },
+            new AtomModel.FinalData { StartTime = "2025-07-01T02:00:00", PollutantName = "NO2", Verification = "Verified", Value = "20" }
         };
 
-        var result = await _service.GetAtomDailydatafetch(input, new AtomModel.querystringdata());
+        var result = await _service.GetAtomDailydatafetch(input, new AtomModel.QueryStringData());
 
         Assert.Single(result);
         Assert.Equal(0, result[0].Total);
@@ -54,13 +54,13 @@ public class AtomDailyFetchServiceTests
     [Fact]
     public async Task GetAtomDailydatafetch_ReturnsZero_WhenAllInvalidValues()
     {
-        var input = new List<AtomModel.Finaldata>
+        var input = new List<AtomModel.FinalData>
         {
-            new AtomModel.Finaldata { StartTime = "2025-07-01T01:00:00", Pollutantname = "NO2", Verification = "Verified", Value = "-99" },
-            new AtomModel.Finaldata { StartTime = "2025-07-01T02:00:00", Pollutantname = "NO2", Verification = "Verified", Value = "-99" }
+            new AtomModel.FinalData { StartTime = "2025-07-01T01:00:00", PollutantName = "NO2", Verification = "Verified", Value = "-99" },
+            new AtomModel.FinalData { StartTime = "2025-07-01T02:00:00", PollutantName = "NO2", Verification = "Verified", Value = "-99" }
         };
 
-        var result = await _service.GetAtomDailydatafetch(input, new AtomModel.querystringdata());
+        var result = await _service.GetAtomDailydatafetch(input, new AtomModel.QueryStringData());
 
         Assert.Single(result);
         Assert.Equal(0, result[0].Total);
@@ -69,7 +69,7 @@ public class AtomDailyFetchServiceTests
     [Fact]
     public async Task GetAtomDailydatafetch_ReturnsEmpty_WhenInputIsEmpty()
     {
-        var result = await _service.GetAtomDailydatafetch(new List<AtomModel.Finaldata>(), new AtomModel.querystringdata());
+        var result = await _service.GetAtomDailydatafetch(new List<AtomModel.FinalData>(), new AtomModel.QueryStringData());
 
         Assert.Empty(result);
     }
@@ -77,12 +77,12 @@ public class AtomDailyFetchServiceTests
     [Fact]
     public async Task GetAtomDailydatafetch_HandlesException_Gracefully()
     {
-        var input = new List<AtomModel.Finaldata>
+        var input = new List<AtomModel.FinalData>
         {
-            new AtomModel.Finaldata { StartTime = "invalid-date", Pollutantname = "NO2", Verification = "Verified", Value = "10" }
+            new AtomModel.FinalData { StartTime = "invalid-date", PollutantName = "NO2", Verification = "Verified", Value = "10" }
         };
 
-        var result = await _service.GetAtomDailydatafetch(input, new AtomModel.querystringdata());
+        var result = await _service.GetAtomDailydatafetch(input, new AtomModel.QueryStringData());
 
         Assert.Empty(result);
         _loggerMock.Verify(

@@ -28,13 +28,13 @@ public class HistoryexceedenceServiceTests
     [Fact]
     public async Task GetHistoryexceedencedata_ReturnsMergedData_WhenValid()
     {
-        var query = new AtomModel.querystringdata { siteId = "site1", year = "2024" };
-        var hourlyData = new List<AtomModel.Finaldata> {
-            new AtomModel.Finaldata { Pollutantname = "Nitrogen dioxide", Value = "201", StartTime = DateTime.Now.ToString(), Verification = "2", Validity = "1" },
-            new AtomModel.Finaldata { Pollutantname = "Sulphur dioxide", Value = "351", StartTime = DateTime.Now.ToString(), Verification = "1", Validity = "1" }
+        var query = new AtomModel.QueryStringData { SiteId = "site1", Year = "2024" };
+        var hourlyData = new List<AtomModel.FinalData> {
+            new AtomModel.FinalData { PollutantName = "Nitrogen dioxide", Value = "201", StartTime = DateTime.Now.ToString(), Verification = "2", Validity = "1" },
+            new AtomModel.FinalData { PollutantName = "Sulphur dioxide", Value = "351", StartTime = DateTime.Now.ToString(), Verification = "1", Validity = "1" }
         };
-        var dailyData = new List<AtomModel.Finaldata> {
-            new AtomModel.Finaldata { DailyPollutantname = "PM10", Total = 51, ReportDate = DateTime.Now.ToString() }
+        var dailyData = new List<AtomModel.FinalData> {
+            new AtomModel.FinalData { DailyPollutantName = "PM10", Total = 51, ReportDate = DateTime.Now.ToString() }
         };
 
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site1", "2024", "All")).ReturnsAsync(hourlyData);
@@ -48,11 +48,11 @@ public class HistoryexceedenceServiceTests
     [Fact]
     public async Task GetHistoryexceedencedata_ReturnsEmpty_WhenNoData()
     {
-        var query = new AtomModel.querystringdata { siteId = "site1", year = "2024" };
+        var query = new AtomModel.QueryStringData { SiteId = "site1", Year = "2024" };
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-            .ReturnsAsync(new List<AtomModel.Finaldata>());
-        _dailyServiceMock.Setup(s => s.GetAtomDailydatafetch(It.IsAny<List<AtomModel.Finaldata>>(), It.IsAny<AtomModel.querystringdata>()))
-            .ReturnsAsync(new List<AtomModel.Finaldata>());
+            .ReturnsAsync(new List<AtomModel.FinalData>());
+        _dailyServiceMock.Setup(s => s.GetAtomDailydatafetch(It.IsAny<List<AtomModel.FinalData>>(), It.IsAny<AtomModel.QueryStringData>()))
+            .ReturnsAsync(new List<AtomModel.FinalData>());
 
         var result = await _service.GetHistoryexceedencedata(query);
 
@@ -62,15 +62,15 @@ public class HistoryexceedenceServiceTests
     [Fact]
     public async Task GetHistoryexceedencedata_HandlesInvalidNumericValues()
     {
-        var query = new AtomModel.querystringdata { siteId = "site1", year = "2024" };
-        var hourlyData = new List<AtomModel.Finaldata> {
-            new AtomModel.Finaldata { Pollutantname = "Nitrogen dioxide", Value = "invalid", StartTime = DateTime.Now.ToString(), Verification = "2", Validity = "1" }
+        var query = new AtomModel.QueryStringData { SiteId = "site1", Year = "2024" };
+        var hourlyData = new List<AtomModel.FinalData> {
+            new AtomModel.FinalData { PollutantName = "Nitrogen dioxide", Value = "invalid", StartTime = DateTime.Now.ToString(), Verification = "2", Validity = "1" }
         };
 
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(hourlyData);
-        _dailyServiceMock.Setup(s => s.GetAtomDailydatafetch(It.IsAny<List<AtomModel.Finaldata>>(), It.IsAny<AtomModel.querystringdata>()))
-            .ReturnsAsync(new List<AtomModel.Finaldata>());
+        _dailyServiceMock.Setup(s => s.GetAtomDailydatafetch(It.IsAny<List<AtomModel.FinalData>>(), It.IsAny<AtomModel.QueryStringData>()))
+            .ReturnsAsync(new List<AtomModel.FinalData>());
 
         var result = await _service.GetHistoryexceedencedata(query);
 
@@ -80,7 +80,7 @@ public class HistoryexceedenceServiceTests
     [Fact]
     public async Task GetHistoryexceedencedata_ReturnsFailure_WhenHourlyServiceThrows()
     {
-        var query = new AtomModel.querystringdata { siteId = "site1", year = "2024" };
+        var query = new AtomModel.QueryStringData { SiteId = "site1", Year = "2024" };
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ThrowsAsync(new Exception("Service error"));
 
@@ -92,8 +92,8 @@ public class HistoryexceedenceServiceTests
     [Fact]
     public void GetDataCapturePercentages_HandlesLeapYear()
     {
-        var hourlyData = new List<AtomModel.Finaldata> {
-            new AtomModel.Finaldata { Pollutantname = "PM10", StartTime = new DateTime(2020, 1, 1).ToString(), Validity = "1" }
+        var hourlyData = new List<AtomModel.FinalData> {
+            new AtomModel.FinalData { PollutantName = "PM10", StartTime = new DateTime(2020, 1, 1).ToString(), Validity = "1" }
         };
 
         var method = typeof(HistoryexceedenceService).GetMethod("GetDataCapturePercentages", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -105,9 +105,9 @@ public class HistoryexceedenceServiceTests
     [Fact]
     public void GetDataVerifiedTag_ReturnsCorrectTag()
     {
-        var data = new List<AtomModel.Finaldata> {
-            new AtomModel.Finaldata { StartTime = DateTime.Now.AddDays(-1).ToString(), Verification = "1" },
-            new AtomModel.Finaldata { StartTime = DateTime.Now.ToString(), Verification = "2" }
+        var data = new List<AtomModel.FinalData> {
+            new AtomModel.FinalData { StartTime = DateTime.Now.AddDays(-1).ToString(), Verification = "1" },
+            new AtomModel.FinalData { StartTime = DateTime.Now.ToString(), Verification = "2" }
         };
 
         var method = typeof(HistoryexceedenceService).GetMethod("GetDataVerifiedTag", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);

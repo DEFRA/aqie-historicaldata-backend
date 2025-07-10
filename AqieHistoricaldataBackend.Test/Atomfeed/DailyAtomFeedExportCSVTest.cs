@@ -16,24 +16,24 @@ public class DailyAtomFeedExportCSVTests
         _service = new DailyAtomFeedExportCSV(_mockLogger.Object);
     }
 
-    private querystringdata GetSampleQueryData() => new()
+    private QueryStringData GetSampleQueryData() => new()
     {
-        stationreaddate = DateTime.UtcNow.ToString(),
-        sitename = "Test Site",
-        siteType = "Urban",
-        region = "London",
-        latitude = "51.5074",
-        longitude = "-0.1278"
+        StationReadDate = DateTime.UtcNow.ToString(),
+        SiteName = "Test Site",
+        SiteType = "Urban",
+        Region = "London",
+        Latitude = "51.5074",
+        Longitude = "-0.1278"
     };
 
     [Fact]
     public void ExportCSV_ReturnsValidCSV_ForValidInput()
     {
         var data = GetSampleQueryData();
-        var finalList = new List<Finaldata>
+        var finalList = new List<FinalData>
         {
-            new() { ReportDate = DateTime.UtcNow.ToString(), DailyPollutantname = "PM10", Total = 10, DailyVerification = "1" },
-            new() { ReportDate = DateTime.UtcNow.ToString(), DailyPollutantname = "NO2", Total = 20, DailyVerification = "2" }
+            new() { ReportDate = DateTime.UtcNow.ToString(), DailyPollutantName = "PM10", Total = 10, DailyVerification = "1" },
+            new() { ReportDate = DateTime.UtcNow.ToString(), DailyPollutantName = "NO2", Total = 20, DailyVerification = "2" }
         };
 
         var result = _service.dailyatomfeedexport_csv(finalList, data);
@@ -49,7 +49,7 @@ public class DailyAtomFeedExportCSVTests
     public void ExportCSV_HandlesEmptyFinalList()
     {
         var data = GetSampleQueryData();
-        var result = _service.dailyatomfeedexport_csv(new List<Finaldata>(), data);
+        var result = _service.dailyatomfeedexport_csv(new List<FinalData>(), data);
         var csv = Encoding.UTF8.GetString(result);
 
         Assert.Contains("Daily data from Defra", csv);
@@ -60,9 +60,9 @@ public class DailyAtomFeedExportCSVTests
     public void ExportCSV_HandlesTotalZero_AsNoData()
     {
         var data = GetSampleQueryData();
-        var finalList = new List<Finaldata>
+        var finalList = new List<FinalData>
         {
-            new() { ReportDate = DateTime.UtcNow.ToString(), DailyPollutantname = "O3", Total = 0, DailyVerification = "3" }
+            new() { ReportDate = DateTime.UtcNow.ToString(), DailyPollutantName = "O3", Total = 0, DailyVerification = "3" }
         };
 
         var result = _service.dailyatomfeedexport_csv(finalList, data);
@@ -76,9 +76,9 @@ public class DailyAtomFeedExportCSVTests
     public void ExportCSV_HandlesUnknownVerification()
     {
         var data = GetSampleQueryData();
-        var finalList = new List<Finaldata>
+        var finalList = new List<FinalData>
         {
-            new() { ReportDate = DateTime.UtcNow.ToString(), DailyPollutantname = "CO", Total = 5, DailyVerification = "X" }
+            new() { ReportDate = DateTime.UtcNow.ToString(), DailyPollutantName = "CO", Total = 5, DailyVerification = "X" }
         };
 
         var result = _service.dailyatomfeedexport_csv(finalList, data);

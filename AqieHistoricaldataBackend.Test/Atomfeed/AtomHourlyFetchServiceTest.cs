@@ -23,10 +23,10 @@ public class AtomHourlyFetchServiceTests
     {
         var result = _service.GetType()
             .GetMethod("GetPollutantsToDisplay", BindingFlags.NonPublic | BindingFlags.Instance)
-            .Invoke(_service, new object[] { "PM10" }) as List<pollutantdetails>;
+            .Invoke(_service, new object[] { "PM10" }) as List<PollutantDetails>;
 
         Assert.Single(result);
-        Assert.Equal("PM10", result[0].polluntantname);
+        Assert.Equal("PM10", result[0].PollutantName);
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public class AtomHourlyFetchServiceTests
     {
         var result = _service.GetType()
             .GetMethod("GetPollutantsToDisplay", BindingFlags.NonPublic | BindingFlags.Instance)
-            .Invoke(_service, new object[] { "Invalid" }) as List<pollutantdetails>;
+            .Invoke(_service, new object[] { "Invalid" }) as List<PollutantDetails>;
 
         Assert.Equal(5, result.Count);
     }
@@ -67,7 +67,7 @@ public class AtomHourlyFetchServiceTests
         string values = "2024-01-01T00:00,2024-01-01T01:00,Verified,Valid,42@@2024-01-01T01:00,2024-01-01T02:00,Verified,Valid,43";
         var result = _service.GetType()
             .GetMethod("ExtractFinalData", BindingFlags.NonPublic | BindingFlags.Instance)
-            .Invoke(_service, new object[] { values, "PM10" }) as List<Finaldata>;
+            .Invoke(_service, new object[] { values, "PM10" }) as List<FinalData>;
 
         Assert.Equal(2, result.Count);
         Assert.Equal("42", result[0].Value);
@@ -79,7 +79,7 @@ public class AtomHourlyFetchServiceTests
         string values = "invalid@@2024-01-01T01:00,2024-01-01T02:00,Verified,Valid,43";
         var result = _service.GetType()
             .GetMethod("ExtractFinalData", BindingFlags.NonPublic | BindingFlags.Instance)
-            .Invoke(_service, new object[] { values, "PM10" }) as List<Finaldata>;
+            .Invoke(_service, new object[] { values, "PM10" }) as List<FinalData>;
 
         Assert.Single(result);
     }
@@ -87,9 +87,9 @@ public class AtomHourlyFetchServiceTests
     [Fact]
     public void ProcessAtomData_HandlesMissingHref_Gracefully()
     {
-        var pollutants = new List<pollutantdetails>
+        var pollutants = new List<PollutantDetails>
         {
-            new pollutantdetails { polluntantname = "PM10", pollutant_master_url = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5" }
+            new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5" }
         };
 
         var feature = new JObject
@@ -103,7 +103,7 @@ public class AtomHourlyFetchServiceTests
         var features = new JArray { new JObject(), feature };
         var result = _service.GetType()
             .GetMethod("ProcessAtomData", BindingFlags.NonPublic | BindingFlags.Instance)
-            .Invoke(_service, new object[] { features, pollutants }) as List<Finaldata>;
+            .Invoke(_service, new object[] { features, pollutants }) as List<FinalData>;
 
         Assert.Empty(result);
     }

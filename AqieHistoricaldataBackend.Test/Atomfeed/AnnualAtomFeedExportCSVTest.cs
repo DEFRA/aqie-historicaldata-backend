@@ -12,7 +12,7 @@ using AqieHistoricaldataBackend.Atomfeed.Services;
 // Mocked model classes
 namespace AqieHistoricaldataBackend.Atomfeed.Models
 {
-    public class Finaldata
+    public class FinalData
     {
         public string ReportDate { get; set; }
         public string AnnualPollutantname { get; set; }
@@ -61,23 +61,23 @@ namespace AqieHistoricaldataBackend.Tests
             _service = new AnnualAtomFeedExportCSV(_mockLogger.Object);
         }
 
-        private querystringdata GetSampleQueryData() => new()
+        private QueryStringData GetSampleQueryData() => new()
         {
-            stationreaddate = "2024-01-01",
-            sitename = "Test Site",
-            siteType = "Urban",
-            region = "London",
-            latitude = "51.5074",
-            longitude = "-0.1278"
+            StationReadDate = "2024-01-01",
+            SiteName = "Test Site",
+            SiteType = "Urban",
+            Region = "London",
+            Latitude = "51.5074",
+            Longitude = "-0.1278"
         };
 
         [Fact]
         public async Task ExportCsv_WithValidData_ReturnsNonEmptyByteArray()
         {
-            var finalList = new List<Finaldata>
+            var finalList = new List<FinalData>
             {
-                new Finaldata { ReportDate = "2023", AnnualPollutantname = "PM10", Total = 10, AnnualVerification = "1" },
-                new Finaldata { ReportDate = "2023", AnnualPollutantname = "PM2.5", Total = 20, AnnualVerification = "2" }
+                new FinalData { ReportDate = "2023", AnnualPollutantName = "PM10", Total = 10, AnnualVerification = "1" },
+                new FinalData { ReportDate = "2023", AnnualPollutantName = "PM2.5", Total = 20, AnnualVerification = "2" }
             };
 
             var result = await _service.annualatomfeedexport_csv(finalList, GetSampleQueryData());
@@ -93,7 +93,7 @@ namespace AqieHistoricaldataBackend.Tests
         [Fact]
         public async Task ExportCsv_WithEmptyFinalList_ReturnsHeaderOnly()
         {
-            var result = await _service.annualatomfeedexport_csv(new List<Finaldata>(), GetSampleQueryData());
+            var result = await _service.annualatomfeedexport_csv(new List<FinalData>(), GetSampleQueryData());
             var csv = Encoding.UTF8.GetString(result);
             Assert.Contains("Annual Average data from Defra", csv);
             Assert.Contains("Date", csv);
@@ -102,9 +102,9 @@ namespace AqieHistoricaldataBackend.Tests
         [Fact]
         public async Task ExportCsv_WithUnknownPollutant_UsesRawName()
         {
-            var finalList = new List<Finaldata>
+            var finalList = new List<FinalData>
             {
-                new Finaldata { ReportDate = "2023", AnnualPollutantname = "O3", Total = 15, AnnualVerification = "1" }
+                new FinalData { ReportDate = "2023", AnnualPollutantName = "O3", Total = 15, AnnualVerification = "1" }
             };
 
             var result = await _service.annualatomfeedexport_csv(finalList, GetSampleQueryData());
@@ -115,9 +115,9 @@ namespace AqieHistoricaldataBackend.Tests
         [Fact]
         public async Task ExportCsv_WithUnknownVerificationCode_UsesOthers()
         {
-            var finalList = new List<Finaldata>
+            var finalList = new List<FinalData>
             {
-                new Finaldata { ReportDate = "2023", AnnualPollutantname = "PM10", Total = 10, AnnualVerification = "9" }
+                new FinalData { ReportDate = "2023", AnnualPollutantName = "PM10", Total = 10, AnnualVerification = "9" }
             };
 
             var result = await _service.annualatomfeedexport_csv(finalList, GetSampleQueryData());
@@ -128,9 +128,9 @@ namespace AqieHistoricaldataBackend.Tests
         [Fact]
         public async Task ExportCsv_WithZeroTotal_ReturnsNoData()
         {
-            var finalList = new List<Finaldata>
+            var finalList = new List<FinalData>
             {
-                new Finaldata { ReportDate = "2023", AnnualPollutantname = "PM10", Total = 0, AnnualVerification = "1" }
+                new FinalData { ReportDate = "2023", AnnualPollutantName = "PM10", Total = 0, AnnualVerification = "1" }
             };
 
             var result = await _service.annualatomfeedexport_csv(finalList, GetSampleQueryData());
@@ -142,9 +142,9 @@ namespace AqieHistoricaldataBackend.Tests
         public async Task ExportCsv_WithCurrentYear_UsesTodayAsEndDate()
         {
             var currentYear = DateTime.Now.Year.ToString();
-            var finalList = new List<Finaldata>
+            var finalList = new List<FinalData>
             {
-                new Finaldata { ReportDate = currentYear, AnnualPollutantname = "PM10", Total = 10, AnnualVerification = "1" }
+                new FinalData { ReportDate = currentYear, AnnualPollutantName = "PM10", Total = 10, AnnualVerification = "1" }
             };
 
             var result = await _service.annualatomfeedexport_csv(finalList, GetSampleQueryData());
@@ -156,9 +156,9 @@ namespace AqieHistoricaldataBackend.Tests
         public async Task ExportCsv_WithInvalidDate_LogsErrorAndReturnsFallback()
         {
             var data = GetSampleQueryData();
-            data.stationreaddate = "invalid-date";
+            data.StationReadDate = "invalid-date";
 
-            var result = await _service.annualatomfeedexport_csv(new List<Finaldata>(), data);
+            var result = await _service.annualatomfeedexport_csv(new List<FinalData>(), data);
 
             Assert.Equal(new byte[] { 0x20 }, result);
             _mockLogger.Verify(
@@ -174,9 +174,9 @@ namespace AqieHistoricaldataBackend.Tests
         [Fact]
         public async Task ExportCsv_WithNullFieldsInFinalData_HandlesGracefully()
         {
-            var finalList = new List<Finaldata>
+            var finalList = new List<FinalData>
         {
-            new Finaldata { ReportDate = "2023", AnnualPollutantname = null, Total = 0, AnnualVerification = null }
+            new FinalData { ReportDate = "2023", AnnualPollutantName = null, Total = 0, AnnualVerification = null }
         };
 
             var result = await _service.annualatomfeedexport_csv(finalList, GetSampleQueryData());
@@ -189,17 +189,17 @@ namespace AqieHistoricaldataBackend.Tests
         [Fact]
         public async Task ExportCsv_WithNullQueryFields_StillGeneratesCsv()
         {
-            var data = new querystringdata
+            var data = new QueryStringData
             {
-                stationreaddate = DateTime.Now.ToString(),
-                sitename = null,
-                siteType = null,
-                region = null,
-                latitude = null,
-                longitude = null
+                StationReadDate = DateTime.Now.ToString(),
+                SiteName = null,
+                SiteType = null,
+                Region = null,
+                Latitude = null,
+                Longitude = null
             };
 
-            var result = await _service.annualatomfeedexport_csv(new List<Finaldata>(), data);
+            var result = await _service.annualatomfeedexport_csv(new List<FinalData>(), data);
             var csv = Encoding.UTF8.GetString(result);
             Assert.Contains("Site Name,", csv);
             Assert.Contains("Site Type,", csv);
@@ -208,10 +208,10 @@ namespace AqieHistoricaldataBackend.Tests
         [Fact]
         public async Task ExportCsv_WithMultipleYears_GroupsByYear()
         {
-            var finalList = new List<Finaldata>
+            var finalList = new List<FinalData>
             {
-                new Finaldata { ReportDate = "2022", AnnualPollutantname = "PM10", Total = 10, AnnualVerification = "1" },
-                new Finaldata { ReportDate = "2023", AnnualPollutantname = "PM10", Total = 20, AnnualVerification = "2" }
+                new FinalData { ReportDate = "2022", AnnualPollutantName = "PM10", Total = 10, AnnualVerification = "1" },
+                new FinalData { ReportDate = "2023", AnnualPollutantName = "PM10", Total = 20, AnnualVerification = "2" }
             };
 
             var result = await _service.annualatomfeedexport_csv(finalList, GetSampleQueryData());
@@ -223,10 +223,10 @@ namespace AqieHistoricaldataBackend.Tests
         [Fact]
         public async Task ExportCsv_WithDuplicatePollutants_UsesDistinctHeaders()
         {
-            var finalList = new List<Finaldata>
+            var finalList = new List<FinalData>
             {
-                new Finaldata { ReportDate = "2023", AnnualPollutantname = "PM10", Total = 10, AnnualVerification = "1" },
-                new Finaldata { ReportDate = "2023", AnnualPollutantname = "PM10", Total = 15, AnnualVerification = "2" }
+                new FinalData { ReportDate = "2023", AnnualPollutantName = "PM10", Total = 10, AnnualVerification = "1" },
+                new FinalData { ReportDate = "2023", AnnualPollutantName = "PM10", Total = 15, AnnualVerification = "2" }
             };
 
             var result = await _service.annualatomfeedexport_csv(finalList, GetSampleQueryData());
@@ -237,9 +237,9 @@ namespace AqieHistoricaldataBackend.Tests
         [Fact]
         public async Task ExportCsv_WithSpecialCharacterPollutant_EncodesCorrectly()
         {
-            var finalList = new List<Finaldata>
+            var finalList = new List<FinalData>
             {
-                new Finaldata { ReportDate = "2023", AnnualPollutantname = "NO₂", Total = 25, AnnualVerification = "1" }
+                new FinalData { ReportDate = "2023", AnnualPollutantName = "NO₂", Total = 25, AnnualVerification = "1" }
             };
 
             var result = await _service.annualatomfeedexport_csv(finalList, GetSampleQueryData());
@@ -250,13 +250,13 @@ namespace AqieHistoricaldataBackend.Tests
         [Fact]
         public async Task ExportCsv_WithLargeDataset_ContainsExpectedPollutants()
         {
-            var finalList = new List<Finaldata>();
+            var finalList = new List<FinalData>();
             for (int i = 0; i < 1000; i++)
             {
-                finalList.Add(new Finaldata
+                finalList.Add(new FinalData
                 {
                     ReportDate = "2023",
-                    AnnualPollutantname = $"Pollutant{i % 10}",
+                    AnnualPollutantName = $"Pollutant{i % 10}",
                     Total = i,
                     AnnualVerification = (i % 3 + 1).ToString()
                 });

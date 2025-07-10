@@ -22,23 +22,23 @@ public class HourlyAtomFeedExportCSVTests
         _service = new HourlyAtomFeedExportCSV(_mockLogger.Object);
     }
 
-    private AtomModel.querystringdata GetSampleQueryData() => new()
+    private AtomModel.QueryStringData GetSampleQueryData() => new()
     {
-        sitename = "Test Site",
-        siteType = "Urban",
-        region = "London",
-        latitude = "51.5074",
-        longitude = "-0.1278",
-        stationreaddate = DateTime.UtcNow.ToString()
+        SiteName = "Test Site",
+        SiteType = "Urban",
+        Region = "London",
+        Latitude = "51.5074",
+        Longitude = "-0.1278",
+        StationReadDate = DateTime.UtcNow.ToString()
     };
 
     [Fact]
     public async Task ExportCsv_ReturnsValidCsv_ForValidInput()
     {
-        var finalList = new List<AtomModel.Finaldata>
+        var finalList = new List<AtomModel.FinalData>
         {
-            new AtomModel.Finaldata { StartTime = DateTime.UtcNow.ToString(), Pollutantname = "PM10", Value = "12", Verification = "1" },
-            new AtomModel.Finaldata { StartTime = DateTime.UtcNow.ToString(), Pollutantname = "NO2", Value = "20", Verification = "2" }
+            new AtomModel.FinalData { StartTime = DateTime.UtcNow.ToString(), PollutantName = "PM10", Value = "12", Verification = "1" },
+            new AtomModel.FinalData { StartTime = DateTime.UtcNow.ToString(), PollutantName = "NO2", Value = "20", Verification = "2" }
         };
 
         var result = await _service.hourlyatomfeedexport_csv(finalList, GetSampleQueryData());
@@ -53,7 +53,7 @@ public class HourlyAtomFeedExportCSVTests
     [Fact]
     public async Task ExportCsv_HandlesEmptyFinalList()
     {
-        var result = await _service.hourlyatomfeedexport_csv(new List<AtomModel.Finaldata>(), GetSampleQueryData());
+        var result = await _service.hourlyatomfeedexport_csv(new List<AtomModel.FinalData>(), GetSampleQueryData());
 
         var csv = Encoding.UTF8.GetString(result);
         Assert.Contains("Hourly data from Defra", csv);
@@ -64,9 +64,9 @@ public class HourlyAtomFeedExportCSVTests
     public async Task ExportCsv_HandlesInvalidStationReadDate()
     {
         var data = GetSampleQueryData();
-        data.stationreaddate = "invalid-date";
+        data.StationReadDate = "invalid-date";
 
-        var result = await _service.hourlyatomfeedexport_csv(new List<AtomModel.Finaldata>(), data);
+        var result = await _service.hourlyatomfeedexport_csv(new List<AtomModel.FinalData>(), data);
 
         Assert.Equal(new byte[] { 0x20 }, result);
         _mockLogger.Verify(
@@ -82,9 +82,9 @@ public class HourlyAtomFeedExportCSVTests
     [Fact]
     public async Task ExportCsv_ReplacesMinus99WithNoData()
     {
-        var finalList = new List<AtomModel.Finaldata>
+        var finalList = new List<AtomModel.FinalData>
         {
-            new AtomModel.Finaldata { StartTime = DateTime.UtcNow.ToString(), Pollutantname = "O3", Value = "-99", Verification = "1" }
+            new AtomModel.FinalData { StartTime = DateTime.UtcNow.ToString(), PollutantName = "O3", Value = "-99", Verification = "1" }
         };
 
         var result = await _service.hourlyatomfeedexport_csv(finalList, GetSampleQueryData());
@@ -96,9 +96,9 @@ public class HourlyAtomFeedExportCSVTests
     [Fact]
     public async Task ExportCsv_HandlesUnknownVerificationCode()
     {
-        var finalList = new List<AtomModel.Finaldata>
+        var finalList = new List<AtomModel.FinalData>
         {
-            new AtomModel.Finaldata { StartTime = DateTime.UtcNow.ToString(), Pollutantname = "CO", Value = "5", Verification = "9" }
+            new AtomModel.FinalData { StartTime = DateTime.UtcNow.ToString(), PollutantName = "CO", Value = "5", Verification = "9" }
         };
 
         var result = await _service.hourlyatomfeedexport_csv(finalList, GetSampleQueryData());
@@ -111,9 +111,9 @@ public class HourlyAtomFeedExportCSVTests
     public async Task ExportCsv_ReturnsFallbackByteArray_OnException()
     {
         var data = GetSampleQueryData();
-        data.stationreaddate = "not-a-date"; // Force FormatException
+        data.StationReadDate = "not-a-date"; // Force FormatException
 
-        var result = await _service.hourlyatomfeedexport_csv(new List<AtomModel.Finaldata>(), data);
+        var result = await _service.hourlyatomfeedexport_csv(new List<AtomModel.FinalData>(), data);
 
         Assert.Equal(new byte[] { 0x20 }, result);
         _mockLogger.Verify(

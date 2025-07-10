@@ -4,12 +4,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AnnualAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger) : IAnnualAtomFeedExportCSV
     {
-        public async Task<byte[]> annualatomfeedexport_csv(List<Finaldata> Final_list, querystringdata data)
+        public async Task<byte[]> annualatomfeedexport_csv(List<FinalData> Final_list, QueryStringData data)
         {
             try
             {
                 var groupedData = GroupFinalData(Final_list);
-                var distinctPollutants = Final_list.Select(s => s.AnnualPollutantname).Distinct().OrderBy(m => m).ToList();
+                var distinctPollutants = Final_list.Select(s => s.AnnualPollutantName).Distinct().OrderBy(m => m).ToList();
 
                 using var memoryStream = new MemoryStream();
                 using var writer = new StreamWriter(memoryStream);
@@ -34,15 +34,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        private void WriteCsvHeader(StreamWriter writer, querystringdata data)
+        private void WriteCsvHeader(StreamWriter writer, QueryStringData data)
         {
-            string stationfetchdate = Convert.ToDateTime(data.stationreaddate).ToString();
+            string stationfetchdate = Convert.ToDateTime(data.StationReadDate).ToString();
             writer.WriteLine($"Annual Average data from Defra on {stationfetchdate}");
-            writer.WriteLine($"Site Name,{data.sitename}");
-            writer.WriteLine($"Site Type,{data.siteType}");
-            writer.WriteLine($"Region,{data.region}");
-            writer.WriteLine($"Latitude,{data.latitude}");
-            writer.WriteLine($"Longitude,{data.longitude}");
+            writer.WriteLine($"Site Name,{data.SiteName}");
+            writer.WriteLine($"Site Type,{data.SiteType}");
+            writer.WriteLine($"Region,{data.Region}");
+            writer.WriteLine($"Latitude,{data.Latitude}");
+            writer.WriteLine($"Longitude,{data.Longitude}");
             writer.WriteLine("Notes:,[1] All Data GMT hour ending;  [2] Some shorthand is used V = Verified P = Provisionally Verified N = Not Verified S = Suspect [3] Unit of measurement (for pollutants) = ugm-3");
         }
 
@@ -57,11 +57,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             writer.WriteLine();
         }
 
-        private void WriteGroupedData(StreamWriter writer, List<pivotpollutant> groupedData, List<string> pollutants)
+        private void WriteGroupedData(StreamWriter writer, List<PivotPollutant> groupedData, List<string> pollutants)
         {
             foreach (var item in groupedData)
             {
-                int year = Convert.ToInt32(item.date);
+                int year = Convert.ToInt32(item.Date);
                 DateTime startDate = new DateTime(year, 1, 1);
                 DateTime endDate = (year == DateTime.Now.Year) ? DateTime.Now.Date : new DateTime(year, 12, 31);
                 string dateRange = $"{startDate:dd/MM/yyyy} to {endDate:dd/MM/yyyy}";
@@ -70,8 +70,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 foreach (var pollutant in pollutants)
                 {
-                    var sub = item.Subpollutant.FirstOrDefault(s => s.pollutantname == pollutant);
-                    writer.Write($",{sub?.pollutantvalue ?? ""},{sub?.verification ?? ""}");
+                    var sub = item.SubPollutant.FirstOrDefault(s => s.PollutantName == pollutant);
+                    writer.Write($",{sub?.PollutantValue ?? ""},{sub?.Verification ?? ""}");
                 }
                 writer.WriteLine();
             }
@@ -84,17 +84,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             _ => pollutant
         };
 
-        private List<pivotpollutant> GroupFinalData(List<Finaldata> finalList)
+        private List<PivotPollutant> GroupFinalData(List<FinalData> finalList)
         {
             return finalList.GroupBy(x => x.ReportDate)
-                .Select(y => new pivotpollutant
+                .Select(y => new PivotPollutant
                 {
-                    date = y.Key,
-                    Subpollutant = y.Select(x => new SubpollutantItem
+                    Date = y.Key,
+                    SubPollutant = y.Select(x => new SubPollutantItem
                     {
-                        pollutantname = x.AnnualPollutantname,
-                        pollutantvalue = x.Total == 0 ? "no data" : x.Total.ToString(),
-                        verification = MapVerification(x.AnnualVerification)
+                        PollutantName = x.AnnualPollutantName,
+                        PollutantValue = x.Total == 0 ? "no data" : x.Total.ToString(),
+                        Verification = MapVerification(x.AnnualVerification)
                     }).ToList()
                 }).ToList();
         }

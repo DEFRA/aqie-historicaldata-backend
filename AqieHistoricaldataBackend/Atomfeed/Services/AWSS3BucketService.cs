@@ -12,7 +12,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         IDailyAtomFeedExportCSV dailyAtomFeedExportCSV,IAnnualAtomFeedExportCSV annualAtomFeedExportCSV,
         IAWSPreSignedURLService awsPreSignedURLService) : IAWSS3BucketService
     {
-        public async Task<string> writecsvtoawss3bucket(List<Finaldata> Final_list, querystringdata data, string downloadtype)
+        public async Task<string> writecsvtoawss3bucket(List<FinalData> Final_list, QueryStringData data, string downloadtype)
         {
             try
             {
@@ -32,7 +32,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        private async Task<byte[]> GetCsvBytesAsync(List<Finaldata> finalList, querystringdata data, string downloadType)
+        private async Task<byte[]> GetCsvBytesAsync(List<FinalData> finalList, QueryStringData data, string downloadType)
         {
             return downloadType switch
             {
@@ -58,9 +58,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return bucketName;
         }
 
-        private string GenerateS3Key(querystringdata data)
+        private string GenerateS3Key(QueryStringData data)
         {
-            return $"{data.sitename}_{data.downloadpollutant}_{data.downloadpollutanttype}_{data.year}.csv";
+            return $"{data.SiteName}_{data.DownloadPollutant}_{data.DownloadPollutantType}_{data.Year}.csv";
         }
 
         private async Task UploadToS3Async(byte[] csvBytes, string bucketName, string key)
