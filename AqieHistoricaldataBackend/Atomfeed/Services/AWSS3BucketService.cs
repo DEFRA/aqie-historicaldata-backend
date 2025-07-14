@@ -8,10 +8,27 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AWSS3BucketService(ILogger<AWSS3BucketService> logger,IHourlyAtomFeedExportCSV hourlyAtomFeedExportCSV,
-        IDailyAtomFeedExportCSV dailyAtomFeedExportCSV,IAnnualAtomFeedExportCSV annualAtomFeedExportCSV,
-        IAWSPreSignedURLService awsPreSignedURLService) : IAWSS3BucketService
+    public interface IS3TransferUtility
     {
+        Task UploadAsync(Stream stream, string bucketName, string key);
+    }
+
+    public class S3TransferUtility : IS3TransferUtility
+    {
+        public async Task UploadAsync(Stream stream, string bucketName, string key)
+        {
+            using var s3Client = new Amazon.S3.AmazonS3Client();
+            using var transferUtility = new TransferUtility(s3Client);
+            await transferUtility.UploadAsync(stream, bucketName, key);
+        }
+    }
+
+    public class AWSS3BucketService(ILogger<AWSS3BucketService> logger, IHourlyAtomFeedExportCSV hourlyAtomFeedExportCSV,
+        IDailyAtomFeedExportCSV dailyAtomFeedExportCSV, IAnnualAtomFeedExportCSV annualAtomFeedExportCSV,
+        IAWSPreSignedURLService awsPreSignedURLService, IS3TransferUtility s3TransferUtility) : IAWSS3BucketService
+    {
+        private readonly IS3TransferUtility s3TransferUtility = s3TransferUtility;
+
         public async Task<string> writecsvtoawss3bucket(List<FinalData> Final_list, QueryStringData data, string downloadtype)
         {
             try
@@ -66,10 +83,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         private async Task UploadToS3Async(byte[] csvBytes, string bucketName, string key)
         {
             logger.LogInformation("S3 bucket upload start {Starttime}", DateTime.Now);
-            using var s3Client = new Amazon.S3.AmazonS3Client();
-            using var transferUtility = new TransferUtility(s3Client);
             using var stream = new MemoryStream(csvBytes);
-            await transferUtility.UploadAsync(stream, bucketName, key);
+            await s3TransferUtility.UploadAsync(stream, bucketName, key);
             logger.LogInformation("S3 bucket upload end {Endtime}", DateTime.Now);
         }
 

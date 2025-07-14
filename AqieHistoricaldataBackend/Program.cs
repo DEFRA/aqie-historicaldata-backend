@@ -74,6 +74,9 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     // Add Hangfire services.
     builder.Services.AddHangfire(config => config.UseMemoryStorage());
     builder.Services.AddHangfireServer();
+    // Register AWS SDK services
+    builder.Services.AddAWSService<IAmazonS3>();
+
 
     // Set up the MongoDB client. Config and credentials are injected automatically at runtime.
     builder.Services.Configure<MongoConfig>(builder.Configuration.GetSection("Mongo"));
@@ -89,6 +92,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAtomDailyFetchService, AtomDailyFetchService>();
     builder.Services.AddSingleton<IAtomAnnualFetchService, AtomAnnualFetchService>();
     builder.Services.AddSingleton<IAWSS3BucketService, AWSS3BucketService>();
+    builder.Services.AddSingleton<IS3TransferUtility, S3TransferUtility>();    
     builder.Services.AddSingleton<IHourlyAtomFeedExportCSV, HourlyAtomFeedExportCSV>();
     builder.Services.AddSingleton<IDailyAtomFeedExportCSV, DailyAtomFeedExportCSV>();
     builder.Services.AddSingleton<IAnnualAtomFeedExportCSV, AnnualAtomFeedExportCSV>();
