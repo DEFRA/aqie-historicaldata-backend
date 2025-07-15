@@ -33,7 +33,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return new byte[] { 0x20 };
             }
         }
-
         private void WriteCsvHeader(StreamWriter writer, QueryStringData data)
         {
             string stationfetchdate = Convert.ToDateTime(data.StationReadDate).ToString();
@@ -45,7 +44,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             writer.WriteLine($"Longitude,{data.Longitude}");
             writer.WriteLine("Notes:,[1] All Data GMT hour ending;  [2] Some shorthand is used V = Verified P = Provisionally Verified N = Not Verified S = Suspect [3] Unit of measurement (for pollutants) = ugm-3");
         }
-
         private void WritePollutantHeaders(StreamWriter writer, List<string> pollutants)
         {
             writer.Write("Date");
@@ -56,7 +54,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             writer.WriteLine();
         }
-
         private void WriteGroupedData(StreamWriter writer, List<PivotPollutant> groupedData, List<string> pollutants)
         {
             foreach (var item in groupedData)
@@ -76,14 +73,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 writer.WriteLine();
             }
         }
-
         private string GetPollutantHeader(string pollutant) => pollutant switch
         {
             "PM10" => "PM10 particulate matter (Hourly measured)",
             "PM2.5" => "PM2.5 particulate matter (Hourly measured)",
             _ => pollutant
         };
-
         private List<PivotPollutant> GroupFinalData(List<FinalData> finalList)
         {
             return finalList.GroupBy(x => x.ReportDate)
@@ -98,7 +93,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }).ToList()
                 }).ToList();
         }
-
         private string MapVerification(string code) => code switch
         {
             "1" => "V",

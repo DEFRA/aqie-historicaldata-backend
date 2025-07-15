@@ -42,7 +42,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomHistoryService(ILogger<AtomHistoryService> logger, IHttpClientFactory httpClientFactory,
         IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService, IAtomAnnualFetchService AtomAnnualFetchService,
         IAWSS3BucketService AWSS3BucketService,
-        IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService //MongoService<AtomHistoryModel>, 
+        IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService 
     {
         public async Task<string> AtomHealthcheck()
         {
