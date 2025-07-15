@@ -64,7 +64,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     var feature = features[i];
                     var href = feature["om:OM_Observation"]?["om:observedProperty"]?["@xlink:href"]?.ToString();
-                    //string cleanedUrl = Regex.Replace(href ?? "", @"^https?://", "");
                     string cleanedUrl = href?.Replace("http://", "");
                     if (string.IsNullOrEmpty(href)) continue;
 
