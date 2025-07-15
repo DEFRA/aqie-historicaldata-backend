@@ -192,7 +192,6 @@ public class AtomHistoryServiceTests
             Times.AtLeastOnce);
     }
 
-
     [Fact]
     public void CallApi_HandlesGeneralException()
     {
@@ -207,10 +206,9 @@ public class AtomHistoryServiceTests
                 It.IsAny<EventId>(),
                 It.Is<It.IsAnyType>((v, t) => true),
                 It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()), 
             Times.AtLeastOnce);
     }
-
 
     [Fact]
     public async Task GetHistoryexceedencedata_ReturnsData_WhenSuccessful()
@@ -234,5 +232,27 @@ public class AtomHistoryServiceTests
         var result = await service.GetHistoryexceedencedata(data);
 
         Assert.Equal("Failure", result);
+    }
+    
+    [Fact]
+    public async Task AtomHealthcheck_ReturnsErrorAndLogs_WhenHttpFails()
+    {
+        // Arrange
+        _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Throws(new Exception("fail"));
+        var service = CreateService();
+
+        // Act
+        var result = await service.AtomHealthcheck();
+
+        // Assert
+        Assert.Equal("Error", result);
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => true),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
     }
 }
