@@ -59,7 +59,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     () => CallApi(),
                     Cron.Minutely); // Schedule to run every minute
 
-                return data;
+                return Atomresponse.StatusCode.ToString();
             }
             catch (Exception ex)
             {
