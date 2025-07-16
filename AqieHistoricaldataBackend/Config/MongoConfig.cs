@@ -1,5 +1,7 @@
-namespace AqieHistoricaldataBackend.Config;
+using System.Diagnostics.CodeAnalysis;
 
+namespace AqieHistoricaldataBackend.Config;
+[ExcludeFromCodeCoverage]
 public class MongoConfig
 {
     public string DatabaseUri { get; init; } = default!;
