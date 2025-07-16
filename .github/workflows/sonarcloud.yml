@@ -66,7 +66,7 @@ jobs:
         run: |
           ./.sonar/scanner/dotnet-sonarscanner begin /k:"DEFRA_aqie-historicaldata-backend" /o:"defra" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.opencover.reportsPaths="coverage.xml"
           dotnet build --no-incremental
-          ./.sonar/coverage/dotnet-coverage collect --output-format cobertura -o "coverage.xml" -- dotnet test
+          dotnet test --collect:"XPlat Code Coverage" -o coverage.xml
           ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
       - name: debug
         run: |
