@@ -16,6 +16,7 @@ using Hangfire;
 using Hangfire.MemoryStorage;
 using Elastic.CommonSchema;
 
+
 var app = CreateWebApplication(args);
 await app.RunAsync();
 return;
