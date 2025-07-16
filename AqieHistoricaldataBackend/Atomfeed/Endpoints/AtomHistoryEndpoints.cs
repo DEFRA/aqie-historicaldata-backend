@@ -15,7 +15,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             app.MapPost("AtomHistoryHourlydata", GetHistorydataById);
             app.MapPost("AtomHistoryexceedence", GetHistoryexceedence);
         }
-
         private static async Task<IResult> GetHealthcheckdata(IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {
             try
@@ -31,7 +30,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
 
             }
         }
-
         private static async Task<IResult> GetHistorydataById([FromBody] QueryStringData data,IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {
             try
@@ -54,7 +52,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
 
             }
         }
-
         private static async Task<IResult> GetHistoryexceedence([FromBody] QueryStringData data, IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {
             try
@@ -77,6 +74,5 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
 
             }
         }
-
     }
 }

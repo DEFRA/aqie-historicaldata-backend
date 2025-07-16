@@ -30,7 +30,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                         };
                                     }).ToList();
                 return annualAverage;
-
             }
             catch (Exception ex)
             {
