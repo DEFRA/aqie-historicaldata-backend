@@ -68,7 +68,8 @@ jobs:
           dotnet build --no-incremental
           ./.sonar/coverage/dotnet-coverage collect --output-format cobertura -o "coverage.xml" -- dotnet test
           ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
-      name: debug
-      run: |
-        cat ./coverage.xml
-        ls -la
+      - name: debug
+        run: |
+          cat ./coverage.xml
+          ls -la
+
