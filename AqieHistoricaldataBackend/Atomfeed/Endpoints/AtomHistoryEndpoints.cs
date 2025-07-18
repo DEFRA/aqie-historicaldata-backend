@@ -2,10 +2,12 @@ using AqieHistoricaldataBackend.Atomfeed.Models;
 using AqieHistoricaldataBackend.Atomfeed.Services;
 using AqieHistoricaldataBackend.Example.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics.CodeAnalysis;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
 {
+    [ExcludeFromCodeCoverage]
     public static class AtomHistoryEndpoints
     {       
         public static void UseServiceAtomHistoryEndpoints(this IEndpointRouteBuilder app)

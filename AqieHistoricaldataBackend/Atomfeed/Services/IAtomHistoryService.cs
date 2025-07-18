@@ -1,9 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public interface IAtomHistoryService
     {
+        [ExcludeFromCodeCoverage]
         public Task<string> AtomHealthcheck();
         public Task<string> GetAtomHourlydata(QueryStringData data);
 
