@@ -1,20 +1,22 @@
+using Amazon.Extensions.NETCore.Setup;
+using Amazon.S3;
+using AqieHistoricaldataBackend.Atomfeed.Endpoints;
+using AqieHistoricaldataBackend.Atomfeed.Services;
+using AqieHistoricaldataBackend.Config;
 using AqieHistoricaldataBackend.Example.Endpoints;
 using AqieHistoricaldataBackend.Example.Services;
 using AqieHistoricaldataBackend.Utils;
 using AqieHistoricaldataBackend.Utils.Http;
-using AqieHistoricaldataBackend.Utils.Mongo;
-using FluentValidation;
-using System.Diagnostics.CodeAnalysis;
-using AqieHistoricaldataBackend.Config;
 using AqieHistoricaldataBackend.Utils.Logging;
-using Serilog;
-using AqieHistoricaldataBackend.Atomfeed.Endpoints;
-using AqieHistoricaldataBackend.Atomfeed.Services;
-using Microsoft.Net.Http.Headers;
-using Amazon.S3;
+using AqieHistoricaldataBackend.Utils.Mongo;
+using Elastic.CommonSchema;
+using FluentValidation;
 using Hangfire;
 using Hangfire.MemoryStorage;
-using Elastic.CommonSchema;
+using Microsoft.Net.Http.Headers;
+using Serilog;
+using System.Diagnostics.CodeAnalysis;
+
 
 var app = CreateWebApplication(args);
 await app.RunAsync();
@@ -76,7 +78,10 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddHangfireServer();
     // Register AWS SDK services
     builder.Services.AddAWSService<IAmazonS3>();
-
+    if(builder.Environment.IsDevelopment())
+    {
+        builder.Services.AddDefaultAWSOptions(new AWSOptions { Region = Amazon.RegionEndpoint.EUWest2 });
+    }
 
     // Set up the MongoDB client. Config and credentials are injected automatically at runtime.
     builder.Services.Configure<MongoConfig>(builder.Configuration.GetSection("Mongo"));
