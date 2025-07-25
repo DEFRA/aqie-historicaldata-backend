@@ -77,7 +77,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddHangfire(config => config.UseMemoryStorage());
     builder.Services.AddHangfireServer();
     // Register AWS SDK services
-    builder.Services.AddAWSService<IAmazonS3>();//.AddDefaultAWSOptions(new AWSOptions { Region = Amazon.RegionEndpoint.USEast1 });
+    builder.Services.AddAWSService<IAmazonS3>();
     if(builder.Environment.IsDevelopment())
     {
         builder.Services.AddDefaultAWSOptions(new AWSOptions { Region = Amazon.RegionEndpoint.EUWest2 });
