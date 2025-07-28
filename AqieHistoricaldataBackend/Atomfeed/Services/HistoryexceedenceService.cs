@@ -155,7 +155,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         dailyCount = d.dailyexceedancesCount,
                         annualcount = p.DataCapturePercentage > 74 ? a.Total + " µg/m3" : "-",
                         dataVerifiedTag = verifiedTag,
-                        dataCapturePercentage = Math.Round(p.DataCapturePercentage) + "%"
+                        dataCapturePercentage = Math.Round(p.DataCapturePercentage) // + "%"
                     }).ToList<dynamic>();
         }
     }
