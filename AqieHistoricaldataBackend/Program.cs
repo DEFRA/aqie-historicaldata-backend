@@ -103,6 +103,12 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAnnualAtomFeedExportCSV, AnnualAtomFeedExportCSV>();
     builder.Services.AddSingleton<IAWSPreSignedURLService, AWSPreSignedURLService>();
     builder.Services.AddSingleton<IHistoryexceedenceService, HistoryexceedenceService>();
+    builder.Services.AddSingleton<IAtomDataSelectionService, AtomDataSelectionService>();
+    builder.Services.AddSingleton<IAtomDataSelectionStationService, AtomDataSelectionStationService>();
+    builder.Services.AddSingleton<IAtomDataSelectionStationBoundryService, AtomDataSelectionStationBoundryService>();
+    builder.Services.AddSingleton<IAtomDataSelectionHourlyFetchService, AtomDataSelectionHourlyFetchService>();
+    builder.Services.AddSingleton<IDataSelectionHourlyAtomFeedExportCSV, DataSelectionHourlyAtomFeedExportCSV>();
+
 }
 
 [ExcludeFromCodeCoverage]
