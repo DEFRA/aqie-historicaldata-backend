@@ -41,7 +41,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AtomHistoryService(ILogger<AtomHistoryService> logger, IHttpClientFactory httpClientFactory,
         IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService, IAtomAnnualFetchService AtomAnnualFetchService,
-        IAWSS3BucketService AWSS3BucketService,
+        IAWSS3BucketService AWSS3BucketService, IAtomDataSelectionService AtomDataSelectionService,
         IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService 
     {
         public async Task<string> AtomHealthcheck()
@@ -135,6 +135,21 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 var exceedancesresult = await HistoryexceedenceService.GetHistoryexceedencedata(data);
+                return exceedancesresult;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.Message);
+                logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.StackTrace);
+                return "Failure";
+            }
+        }
+
+        public async Task<dynamic> GetatomDataSelectiondata(QueryStringData data)
+        {
+            try
+            {
+                var exceedancesresult = await AtomDataSelectionService.GetatomDataSelectiondata(data);
                 return exceedancesresult;
             }
             catch (Exception ex)

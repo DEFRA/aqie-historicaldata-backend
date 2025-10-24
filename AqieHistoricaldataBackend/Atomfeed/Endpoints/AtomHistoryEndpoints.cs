@@ -16,6 +16,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             app.MapGet("AtomHistoryHourlydata", GetHistorydataById);
             app.MapPost("AtomHistoryHourlydata", GetHistorydataById);
             app.MapPost("AtomHistoryexceedence", GetHistoryexceedence);
+            app.MapPost("AtomDataSelection", GetAtomDataSelection);
         }
         private static async Task<IResult> GetHealthcheckdata(IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {
@@ -70,8 +71,30 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             }
             catch (Exception ex)
             {
-                logger.LogError("Error GetHistorydataById endpoints Info message {Error}", ex.Message);
-                logger.LogError("Error GetHistorydataById endpoints Info stacktrace {Error}", ex.StackTrace);
+                logger.LogError("Error GetHistoryexceedence endpoints Info message {Error}", ex.Message);
+                logger.LogError("Error GetHistoryexceedence endpoints Info stacktrace {Error}", ex.StackTrace);
+                return Results.NotFound();
+
+            }
+        }
+        private static async Task<IResult> GetAtomDataSelection([FromBody] QueryStringData data, IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
+        {
+            try
+            {
+                if (data is not null)
+                {
+                    var atomDataSelectionresult = await Persistence.GetatomDataSelectiondata(data);
+                    return atomDataSelectionresult is not null ? Results.Ok(atomDataSelectionresult) : Results.NotFound();
+                }
+                else
+                {
+                    return Results.NotFound();
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError("Error GetAtomDataSelection endpoints Info message {Error}", ex.Message);
+                logger.LogError("Error GetAtomDataSelection endpoints Info stacktrace {Error}", ex.StackTrace);
                 return Results.NotFound();
 
             }

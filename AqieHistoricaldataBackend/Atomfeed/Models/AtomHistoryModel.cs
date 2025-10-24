@@ -6,6 +6,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
         {
             public required string PollutantName { get; set; }
             public required string PollutantMasterUrl { get; set; }
+            public string stationCode { get; set; }
+            public string polygon { get; set; }
+            public string year { get; set; }
         }
 
         public class FinalData
@@ -38,6 +41,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? Year { get; set; }
             public string? DownloadPollutant { get; set; }
             public string? DownloadPollutantType { get; set; }
+
+            public string?dataSource { get; set; }
+            public string?pollutantName { get; set; }
+            public string? dataselectorfiltertype { get; set; }
         }
 
         public class PivotPollutant

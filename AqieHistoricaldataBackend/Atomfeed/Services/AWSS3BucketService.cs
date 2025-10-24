@@ -1,3 +1,4 @@
+using Amazon.S3;
 using Amazon.S3.Transfer;
 using Microsoft.Extensions.Logging;
 using System;
@@ -25,7 +26,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
     public class AWSS3BucketService(ILogger<AWSS3BucketService> logger, IHourlyAtomFeedExportCSV hourlyAtomFeedExportCSV,
         IDailyAtomFeedExportCSV dailyAtomFeedExportCSV, IAnnualAtomFeedExportCSV annualAtomFeedExportCSV,
-        IAWSPreSignedURLService awsPreSignedURLService, IS3TransferUtility s3TransferUtility) : IAWSS3BucketService
+        IAWSPreSignedURLService awsPreSignedURLService, IS3TransferUtility s3TransferUtility,
+        IDataSelectionHourlyAtomFeedExportCSV DataSelectionHourlyAtomFeedExportCSV) : IAWSS3BucketService
     {
         private readonly IS3TransferUtility s3TransferUtility = s3TransferUtility;
 
@@ -33,13 +35,24 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                var csvBytes = await GetCsvBytesAsync(Final_list, data, downloadtype);
-                var region = GetAwsRegion();
-                var bucketName = GetBucketName();
-                var key = GenerateS3Key(data);
+                if(downloadtype == "DataHourly")
+                {
+                    var csvBytes = await GetDataselectorCsvBytesAsync(Final_list, data, downloadtype);
+                    var key = dataselectorGenerateS3Key(data); var region = GetAwsRegion();
+                    var bucketName = GetBucketName();
+                    await UploadToS3Async(csvBytes, bucketName, key);
+                    return await GeneratePresignedUrlAsync(bucketName, key);
+                }
+                else
+                {
+                    var csvBytes = await GetCsvBytesAsync(Final_list, data, downloadtype);
+                    var key = GenerateS3Key(data); var region = GetAwsRegion();
+                    var bucketName = GetBucketName();
+                    await UploadToS3Async(csvBytes, bucketName, key);
+                    return await GeneratePresignedUrlAsync(bucketName, key);
+                }
 
-                await UploadToS3Async(csvBytes, bucketName, key);
-                return await GeneratePresignedUrlAsync(bucketName, key);
+
             }
             catch (Exception ex)
             {
@@ -56,6 +69,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 "Daily" => dailyAtomFeedExportCSV.dailyatomfeedexport_csv(finalList, data),
                 "Annual" => await annualAtomFeedExportCSV.annualatomfeedexport_csv(finalList, data),
                 _ => await hourlyAtomFeedExportCSV.hourlyatomfeedexport_csv(finalList, data)
+            };
+        }
+
+        private async Task<byte[]> GetDataselectorCsvBytesAsync(List<FinalData> finalList, QueryStringData data, string downloadType)
+        {
+            return downloadType switch
+            {
+                "Daily" => dailyAtomFeedExportCSV.dailyatomfeedexport_csv(finalList, data),
+                "Annual" => await annualAtomFeedExportCSV.annualatomfeedexport_csv(finalList, data),
+                _ => await DataSelectionHourlyAtomFeedExportCSV.dataSelectionHourlyAtomFeedExportCSV(finalList, data)
             };
         }
 
@@ -79,7 +102,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             return $"{data.SiteName}_{data.DownloadPollutant}_{data.DownloadPollutantType}_{data.Year}.csv";
         }
-
+        private string dataselectorGenerateS3Key(QueryStringData data)
+        {
+            //return $"{data.SiteName}_{data.DownloadPollutant}_{data.DownloadPollutantType}_{data.Year}.csv";
+            return $"{data.dataSource}_{data.pollutantName}_{data.Region}_{data.Year}.csv";
+        }
         private async Task UploadToS3Async(byte[] csvBytes, string bucketName, string key)
         {
             logger.LogInformation("S3 bucket upload start {Starttime}", DateTime.Now);
