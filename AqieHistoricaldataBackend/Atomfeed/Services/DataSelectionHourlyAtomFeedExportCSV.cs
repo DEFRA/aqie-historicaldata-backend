@@ -34,23 +34,24 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     Region = item.Region,
                     Country = item.Country
                 }).ToList();
-
-                using (var writer = new StreamWriter("file1.csv"))
-                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
-                {
-                    csv.WriteRecords(finalListCsv);
-                }
-                byte[] byteArray = [];
-                return byteArray;
-                //using (var memoryStream = new MemoryStream())
-                //using (var writer = new StreamWriter(memoryStream))
+                //For local csv write
+                //using (var writer = new StreamWriter("file1.csv"))
                 //using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
                 //{
-
-                //    await csv.WriteRecordsAsync(Final_list);
-                //    await writer.FlushAsync();
-                //    return memoryStream.ToArray();
+                //    csv.WriteRecords(finalListCsv);
                 //}
+                //byte[] byteArray = [];
+                //return byteArray;
+                //For build to CDP
+                using (var memoryStream = new MemoryStream())
+                using (var writer = new StreamWriter(memoryStream))
+                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+                {
+
+                    await csv.WriteRecordsAsync(Final_list);
+                    await writer.FlushAsync();
+                    return memoryStream.ToArray();
+                }
             }
             catch (Exception ex)
             {
