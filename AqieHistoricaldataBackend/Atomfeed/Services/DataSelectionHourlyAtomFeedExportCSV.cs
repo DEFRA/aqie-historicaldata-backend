@@ -1,31 +1,56 @@
 using CsvHelper;
 using System.Globalization;
+using System.Text;
+using System.Text.Json;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
+
     public class DataSelectionHourlyAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger) : IDataSelectionHourlyAtomFeedExportCSV
     {
         public async Task<byte[]> dataSelectionHourlyAtomFeedExportCSV(List<FinalData> Final_list, QueryStringData data)
         {
             try
             {
-                //using (var writer = new StreamWriter("file.csv"))
-                //using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
-                //{
-                //    csv.WriteRecords(Final_list);
-                //}
-                //byte[] byteArray = [];
-                //return byteArray;
-                using (var memoryStream = new MemoryStream())
-                using (var writer = new StreamWriter(memoryStream))
+                var finalListCsv = Final_list.Select(item => new FinalDataCsv
+                {
+                    //StartTime = DateTime.TryParse(item.StartTime, out var startDate)? startDate.ToString("yyyy-MM-dd"): null,
+                    //EndTime = DateTime.TryParse(item.EndTime, out var endDate) ? startDate.ToString("yyyy-MM-dd") : null,
+                    StartTime = item.StartTime,
+                    EndTime = item.EndTime,
+                    Status = item.Verification switch
+                    {
+                        "1" => "V",
+                        "2" => "P",
+                        "3" => "N",
+                        _ => "others"
+                    },
+                    Unit = "ugm-3",
+                    Value = item.Value,
+                    PollutantName = item.PollutantName,
+                    SiteName = item.SiteName,
+                    SiteType = item.SiteType,
+                    Region = item.Region,
+                    Country = item.Country
+                }).ToList();
+
+                using (var writer = new StreamWriter("file1.csv"))
                 using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
                 {
-
-                    await csv.WriteRecordsAsync(Final_list);
-                    await writer.FlushAsync();
-                    return memoryStream.ToArray();
+                    csv.WriteRecords(finalListCsv);
                 }
+                byte[] byteArray = [];
+                return byteArray;
+                //using (var memoryStream = new MemoryStream())
+                //using (var writer = new StreamWriter(memoryStream))
+                //using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+                //{
+
+                //    await csv.WriteRecordsAsync(Final_list);
+                //    await writer.FlushAsync();
+                //    return memoryStream.ToArray();
+                //}
             }
             catch (Exception ex)
             {

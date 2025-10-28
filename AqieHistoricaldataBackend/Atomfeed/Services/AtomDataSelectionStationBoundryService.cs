@@ -7,7 +7,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionStationBoundryService(ILogger<HistoryexceedenceService> Logger,
     IHttpClientFactory httpClientFactory) : IAtomDataSelectionStationBoundryService
     {
-        public async Task<List<PollutantDetails>> GetAtomDataSelectionStationBoundryService(List<PollutantDetails> filtered_station_pollutant)
+        public async Task<List<SiteInfo>> GetAtomDataSelectionStationBoundryService(List<SiteInfo> filtered_station_pollutant)
         {
             try
             {
@@ -58,14 +58,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                     //.ToList();
                                     .Where(p =>
                                     {
-                                        if (string.IsNullOrEmpty(p.polygon))
+                                        if (string.IsNullOrEmpty(p.Latitude) || string.IsNullOrEmpty(p.Longitude))
                                             return false;
 
-                                        var coords = p.polygon.Split(',');
-                                        if (coords.Length != 2)
-                                            return false;
-
-                                        if (double.TryParse(coords[0], out double lat) && double.TryParse(coords[1], out double lon))
+                                        if (double.TryParse(p.Latitude, out double lat) && double.TryParse(p.Longitude, out double lon))
                                         {
                                             var coordinate = new Coordinate(lon, lat); // Note: Coordinate(x, y) => (longitude, latitude)
                                             return englandEnvelope.Contains(coordinate);
@@ -78,7 +74,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 Logger.LogError("Error in Atom GetAtomDataSelectionStationBoundryService {Error}", ex.Message);
                 Logger.LogError("Error in Atom GetAtomDataSelectionStationBoundryService {Error}", ex.StackTrace);
-                List<PollutantDetails> Final_list = new List<PollutantDetails>();
+                List<SiteInfo> Final_list = new List<SiteInfo>();
                 return Final_list;
             }
         }

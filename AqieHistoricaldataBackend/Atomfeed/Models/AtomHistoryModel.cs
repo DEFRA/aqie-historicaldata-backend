@@ -27,6 +27,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? DailyPollutantName { get; set; }
             public string? AnnualPollutantName { get; set; }
             public string? AnnualVerification { get; set; }
+            public string? StationName { get; set; }
+            public string? SiteName { get; set; }
+            public string? SiteType { get; set; }
+            public string? Region { get; set; }
+            public string? Country { get; set; }
         }
 
         public class QueryStringData
@@ -42,8 +47,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? DownloadPollutant { get; set; }
             public string? DownloadPollutantType { get; set; }
 
-            public string?dataSource { get; set; }
-            public string?pollutantName { get; set; }
+            public string? dataSource { get; set; }
+            public string? pollutantName { get; set; }
             public string? dataselectorfiltertype { get; set; }
         }
 
@@ -59,6 +64,42 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? PollutantName { get; set; }
             public string? PollutantValue { get; set; }
             public string? Verification { get; set; }
+        }
+
+        public class FinalDataCsv
+        {
+            public string? StartTime { get; set; }
+            public string? EndTime { get; set; }
+            public string? Status { get; set; }
+            public string? Unit { get; set; }
+            public string? Value { get; set; }
+            public string? PollutantName { get; set; }
+            public string? SiteName { get; set; }
+            public string? SiteType { get; set; }
+            public string? Region { get; set; }
+            public string? Country { get; set; }
+
+        }
+        public class PollutantInfo
+        {
+            public string Name { get; set; }
+            public string StartDate { get; set; }
+            public string EndDate { get; set; }
+        }
+
+        public class SiteInfo
+        {
+            public string? SiteName { get; init; }
+            public string? LocalSiteId { get; init; }
+            public string? AreaType { get; init; }
+            public string? SiteType { get; init; }
+            public string? ZoneRegion { get; init; }
+            public string? Latitude { get; init; }
+            public string? Longitude { get; init; }
+            //public string? Name { get; init; }
+            //public string? StartDate { get; init; }
+            //public string? EndDate { get; init; }
+            public List<PollutantInfo> Pollutants { get; set; } = new List<PollutantInfo>();
         }
     }
 }

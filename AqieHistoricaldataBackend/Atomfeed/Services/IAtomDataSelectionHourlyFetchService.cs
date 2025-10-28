@@ -6,6 +6,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public interface IAtomDataSelectionHourlyFetchService
     {
         [ExcludeFromCodeCoverage]
-        Task<List<FinalData>> GetAtomDataSelectionHourlyFetchService(List<PollutantDetails> filteredstationpollutant, string pollutantName);
+        Task<List<FinalData>> GetAtomDataSelectionHourlyFetchService(List<SiteInfo> filteredstationpollutant, string pollutantName, string filteryear);
     }
 }

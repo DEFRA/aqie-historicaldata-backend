@@ -60,8 +60,13 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
         httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/");
     
     }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>(); ;
-    
-   
+
+    builder.Services.AddHttpClient("RicardoNewAPI", httpClient =>
+    {
+        httpClient.BaseAddress = new Uri("https://api-ukair.defra.gov.uk/");
+
+    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>(); ;
+
 
     // Propagate trace header.
     builder.Services.AddHeaderPropagation(options =>
@@ -108,6 +113,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAtomDataSelectionStationBoundryService, AtomDataSelectionStationBoundryService>();
     builder.Services.AddSingleton<IAtomDataSelectionHourlyFetchService, AtomDataSelectionHourlyFetchService>();
     builder.Services.AddSingleton<IDataSelectionHourlyAtomFeedExportCSV, DataSelectionHourlyAtomFeedExportCSV>();
+    builder.Services.AddSingleton<IAuthService, AuthService>();
 
 }
 
