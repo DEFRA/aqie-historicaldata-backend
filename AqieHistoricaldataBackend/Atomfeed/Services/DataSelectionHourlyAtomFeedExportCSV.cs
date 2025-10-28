@@ -48,7 +48,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
                 {
 
-                    await csv.WriteRecordsAsync(Final_list);
+                    await csv.WriteRecordsAsync(finalListCsv);
                     await writer.FlushAsync();
                     return memoryStream.ToArray();
                 }
