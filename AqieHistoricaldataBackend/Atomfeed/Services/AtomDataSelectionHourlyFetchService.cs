@@ -7,7 +7,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionHourlyFetchService(ILogger<HistoryexceedenceService> Logger,
     IHttpClientFactory httpClientFactory) : IAtomDataSelectionHourlyFetchService
     {
-            public async Task<List<FinalData>> GetAtomDataSelectionHourlyFetchService(List<PollutantDetails> filtered_station_pollutant, string pollutantName)
+            public async Task<List<FinalData>> GetAtomDataSelectionHourlyFetchService(List<SiteInfo> filtered_station_pollutant, string pollutantName, string filteryear)
             {
                 try
                 {
@@ -15,15 +15,25 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     List<FinalData> Final_list1 = new List<FinalData>();
                 //foreach (var pollutant in filtered_station_pollutant)
                 //{
-                        var siteID = "AH";//pollutant.stationCode;//AH
-                        var year = "2024";//pollutant.year;
-                        var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
-                        var atomJsonCollection = await FetchAtomFeedAsync("AH", "2024");//(siteID, year)
-                        var finalhourlypollutantresult = ProcessAtomData(atomJsonCollection, pollutantsToDisplay);
-                        Final_list1.AddRange(finalhourlypollutantresult);
-                    //}
-                    //var atomJsonCollection = await FetchAtomFeedAsync(siteID, year);
-                    return Final_list1;
+                //var siteID = "AH";//pollutant.stationCode;//AH
+                //var year = "2024";//pollutant.year;
+                //var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
+                //var atomJsonCollection = await FetchAtomFeedAsync("AH", "2024");//(siteID, year)
+                //var finalhourlypollutantresult = ProcessAtomData(atomJsonCollection, pollutantsToDisplay);
+                //Final_list1.AddRange(finalhourlypollutantresult);
+                //}
+                //var atomJsonCollection = await FetchAtomFeedAsync(siteID, year);
+
+                foreach (var siteinfo in filtered_station_pollutant)
+                {
+                    var siteID = siteinfo.LocalSiteId;
+                    var year = filteryear;
+                    var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
+                    var atomJsonCollection = await FetchAtomFeedAsync(siteID, year);
+                    var finalhourlypollutantresult = ProcessAtomData(atomJsonCollection, pollutantsToDisplay, siteinfo);
+                    Final_list1.AddRange(finalhourlypollutantresult);
+                }
+                return Final_list1;
 
                 }
                 catch (Exception ex)
@@ -70,7 +80,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var filtered = allPollutants.Where(p => p.PollutantName == filter);
                 return filtered.Any() ? filtered.ToList() : allPollutants;
             }
-            private List<FinalData> ProcessAtomData(JArray features, List<PollutantDetails> pollutants)
+            private List<FinalData> ProcessAtomData(JArray features, List<PollutantDetails> pollutants, SiteInfo siteinfo)
             {
                 var finalList = new List<FinalData>();
 
@@ -89,7 +99,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             var values = feature["om:OM_Observation"]?["om:result"]?["swe:DataArray"]?["swe:values"]?.ToString();
                             if (!string.IsNullOrEmpty(values))
                             {
-                                finalList.AddRange(ExtractFinalData(values, match.PollutantName));
+                                finalList.AddRange(ExtractFinalData(values, match.PollutantName, siteinfo));
                             }
                         }
                     }
@@ -102,7 +112,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return finalList;
             }
 
-            private List<FinalData> ExtractFinalData(string values, string pollutantName)
+            private List<FinalData> ExtractFinalData(string values, string pollutantName, SiteInfo siteinfo)
             {
                 return values.Replace("\r\n", "").Trim().Split("@@")
                     .Select(item => item.Split(','))
@@ -114,7 +124,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         Verification = parts[2],
                         Validity = parts[3],
                         Value = parts[4],
-                        PollutantName = pollutantName
+                        PollutantName = pollutantName,
+                        SiteName = siteinfo.SiteName,
+                        SiteType = siteinfo.AreaType + siteinfo.SiteType,
+                        Region = "Greater London",
+                        Country = "England"
                     }).ToList();
             }
     }

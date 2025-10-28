@@ -6,6 +6,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public interface IAtomDataSelectionStationBoundryService
     {
         [ExcludeFromCodeCoverage]
-        Task<List<PollutantDetails>> GetAtomDataSelectionStationBoundryService(List<PollutantDetails> filteredstationpollutant);
+        Task<List<SiteInfo>> GetAtomDataSelectionStationBoundryService(List<SiteInfo> filteredstationpollutant);
     }
 }

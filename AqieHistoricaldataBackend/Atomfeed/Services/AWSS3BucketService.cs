@@ -35,7 +35,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                if(downloadtype == "DataHourly")
+                if(downloadtype == "dataSelectorHourly")
                 {
                     var csvBytes = await GetDataselectorCsvBytesAsync(Final_list, data, downloadtype);
                     var key = dataselectorGenerateS3Key(data); var region = GetAwsRegion();
