@@ -99,14 +99,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 //string emailFromConfig = Environment.GetEnvironmentVariable("RICARDO_API_EMAIL") ?? "";
                 //string passwordFromConfig = Environment.GetEnvironmentVariable("RICARDO_API_PASSWORD") ?? "";
-                string emailFromConfig = "PFRijFKn";
-                string passwordFromConfig = "oG8mBc@ssf&7K3";
-                var token = await AuthService.GetTokenAsync(emailFromConfig, passwordFromConfig);
-                if (string.IsNullOrEmpty(token))
-                {
-                    Logger.LogError("Auth failed - no token returned");
-                    return "Failure";
-                }
+
+                var token = await GetRicardoToken();   
 
                 var client = httpClientFactory.CreateClient("RicardoNewAPI");
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -124,12 +118,56 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     .Where(s => s.Pollutants?.Any(p => p.Name?.Contains("Ozone", StringComparison.OrdinalIgnoreCase) == true) == true)
                     .ToList();
 
+                // For single pollutant filtering
                 // 3) Flattened list of pollutant records with site metadata for matches (useful to access both)
                 var ozoneRecords = sitemetadatainfo
                     .SelectMany(s => (s.Pollutants ?? Enumerable.Empty<PollutantInfo>())
                         .Where(p => p.Name != null && p.Name.Contains("Ozone", StringComparison.OrdinalIgnoreCase))
                         .Select(p => new { Site = s, Pollutant = p }))
                     .ToList();
+
+                //For multiple pollutant filtering
+                var targetPollutants = new List<string>
+                                        {
+                                            //"Ozone",
+                                            //"Nitrogen dioxide",
+                                            //"Carbon monoxide",
+                                            //"Sulphur dioxide",
+                                            //"Nitrogen oxides as nitrogen dioxide",
+                                            //"Nitric oxide",
+                                            //"PM10 particulate matter (Hourly measured)",
+                                            "PM<sub>2.5</sub> (Hourly measured)"
+                                        };
+
+                //var filteredRecords = sitemetadatainfo
+                //    .SelectMany(s => (s.Pollutants ?? Enumerable.Empty<PollutantInfo>())
+                //        .Where(p => p.Name != null && targetPollutants
+                //            .Any(tp => p.Name.Contains(tp, StringComparison.OrdinalIgnoreCase)))
+                //        .Select(p => new { Site = s, Pollutant = p }))
+                //    .GroupBy(x => x.Site.LocalSiteId)
+                //    .Select(g => g.First())
+                //    .ToList();
+
+                var filteredSites = sitemetadatainfo
+                    .Select(site => new SiteInfo
+                    {
+                        SiteName = site.SiteName,
+                        LocalSiteId = site.LocalSiteId,
+                        AreaType = site.AreaType,
+                        SiteType = site.SiteType,
+                        ZoneRegion = site.ZoneRegion,
+                        Latitude = site.Latitude,
+                        Longitude = site.Longitude,
+                        Pollutants = (site.Pollutants ?? new List<PollutantInfo>())
+                            .Where(p => p.Name != null && targetPollutants
+                                .Any(tp => p.Name.Contains(tp, StringComparison.OrdinalIgnoreCase)))
+                            .ToList()
+                    })
+                    .Where(site => site.Pollutants.Any()) // Keep only sites that have matching pollutants
+                    .GroupBy(site => site.LocalSiteId)
+                    .Select(g => g.First()) // Ensure distinct by LocalSiteId
+                    .ToList();
+
 
                 //var filterpollutantyear = ozoneRecords
                 //    .Where(r => r.Pollutant.StartDate != null && r.Pollutant.StartDate.StartsWith(year) ||
@@ -354,5 +392,19 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
             return siteList;
         }
+        private async Task<string> GetRicardoToken()
+        {
+            var emailFromConfig = Environment.GetEnvironmentVariable("RICARDO_API_KEY");
+            var passwordFromConfig = Environment.GetEnvironmentVariable("RICARDO_API_VALUE");
+            var token = await AuthService.GetTokenAsync(emailFromConfig, passwordFromConfig);
+            if (string.IsNullOrEmpty(token))
+            {
+                Logger.LogError("Auth failed - no token returned");
+                return "Failure";
+            }
+            return token;
+        }
     }
-}
+
+
+    }
