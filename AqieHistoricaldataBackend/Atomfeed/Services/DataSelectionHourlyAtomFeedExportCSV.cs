@@ -27,7 +27,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         _ => "others"
                     },
                     Unit = "ugm-3",
-                    Value = item.Value,
+                    Value = item.Value == "-99" ? "no data" : item.Value,
                     PollutantName = item.PollutantName,
                     SiteName = item.SiteName,
                     SiteType = item.SiteType,
