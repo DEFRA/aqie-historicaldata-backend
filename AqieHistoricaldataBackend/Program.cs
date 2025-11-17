@@ -114,6 +114,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAtomDataSelectionHourlyFetchService, AtomDataSelectionHourlyFetchService>();
     builder.Services.AddSingleton<IDataSelectionHourlyAtomFeedExportCSV, DataSelectionHourlyAtomFeedExportCSV>();
     builder.Services.AddSingleton<IAuthService, AuthService>();
+    builder.Services.AddSingleton<IAtomDataSelectionJobStatus, AtomDataSelectionJobStatus>();
 
 }
 

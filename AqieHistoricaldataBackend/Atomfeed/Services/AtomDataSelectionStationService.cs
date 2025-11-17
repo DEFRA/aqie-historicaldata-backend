@@ -68,7 +68,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     IAtomDataSelectionStationBoundryService AtomDataSelectionStationBoundryService,
     IAtomDataSelectionHourlyFetchService AtomDataSelectionHourlyFetchService,
     IAWSS3BucketService AWSS3BucketService, IAuthService AuthService,
-    IMongoDbClientFactory iMongoDbClientFactory) : IAtomDataSelectionStationService
+    IMongoDbClientFactory MongoDbClientFactory) : IAtomDataSelectionStationService
     {
         // MongoDB collection for job documents
         private IMongoCollection<JobDocument>? _jobCollection;
@@ -182,7 +182,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         //var db = client1.GetDatabase(mongoDb);
                         //_jobCollection = db.GetCollection<JobDocument>(mongoCollection);
 
-                        _jobCollection = iMongoDbClientFactory.GetCollection<JobDocument>("aqie_csvexport_jobs");
+                        _jobCollection = MongoDbClientFactory.GetCollection<JobDocument>("aqie_csvexport_jobs");
 
                         // ensure index on JobId for quick lookup
                         var indexKeys = Builders<JobDocument>.IndexKeys.Ascending(j => j.JobId);
