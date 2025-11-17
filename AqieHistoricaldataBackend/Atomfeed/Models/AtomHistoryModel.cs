@@ -54,6 +54,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? pollutantName { get; set; }
             public string? dataselectorfiltertype { get; set; }
             public string? dataselectordownloadtype { get; set; }
+            public string? jobId { get; set; }
         }
 
         public class PivotPollutant

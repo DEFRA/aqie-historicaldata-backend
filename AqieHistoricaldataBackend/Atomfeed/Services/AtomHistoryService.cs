@@ -161,11 +161,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        public async Task<JobInfoDto?> GetAtomDataSelectionJobStatus(string jobID)
+        public async Task<JobInfoDto?> GetAtomDataSelectionJobStatusdata(QueryStringData data)
         {
             try
             {
-                var jobidresult = await AtomDataSelectionJobStatus.GetAtomDataSelectionJobStatus(jobID);
+                var jobidresult = await AtomDataSelectionJobStatus.GetAtomDataSelectionJobStatusdata(data.jobId);
                 return jobidresult;
             }
             catch (Exception ex)
