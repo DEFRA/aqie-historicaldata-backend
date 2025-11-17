@@ -15,10 +15,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 string year = data.Year;
                 string region = data.Region;
                 string dataselectorfiltertype = data.dataselectorfiltertype;
+                string dataselectordownloadtype = data.dataselectordownloadtype;
+        
 
-                var data1 = data;
+        var data1 = data;
                 //var stationresultcountData = await AtomDataSelectionStationService.GetAtomDataSelectionStation(data);
-                var stationresultcountData = await AtomDataSelectionStationService.GetAtomDataSelectionStation(pollutantName, datasource, year, region, dataselectorfiltertype);
+                var stationresultcountData = await AtomDataSelectionStationService.GetAtomDataSelectionStation(pollutantName, datasource, year, region, dataselectorfiltertype, dataselectordownloadtype);
                 return stationresultcountData;
             }
             catch (Exception ex)

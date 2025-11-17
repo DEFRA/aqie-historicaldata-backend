@@ -2,16 +2,22 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using AqieHistoricaldataBackend.Atomfeed.Models;
 using Hangfire.MemoryStorage.Database;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Driver;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.Index.Strtree;
 using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Channels;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
-using static AqieHistoricaldataBackend.Atomfeed.Services.AtomDataSelectionStationService;
+using static AqieHistoricaldataBackend.Atomfeed.Services.AWSS3BucketService;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
@@ -62,45 +68,34 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     IAtomDataSelectionHourlyFetchService AtomDataSelectionHourlyFetchService,
     IAWSS3BucketService AWSS3BucketService, IAuthService AuthService) : IAtomDataSelectionStationService
     {
-        //public async Task<string> GetAtomDataSelectionStation(QueryString data)
-        public async Task<string> GetAtomDataSelectionStation(string pollutantName, string datasource, string year, string region, string dataselectorfiltertype)
+        // MongoDB collection for job documents
+        private IMongoCollection<JobDocument>? _jobCollection;
+
+        // In-memory queue for work items (stores minimal in-memory data; persistent state is in MongoDB)
+        private readonly Channel<JobItem> _jobChannel = Channel.CreateUnbounded<JobItem>();
+        private Task? _processorTask;
+        private readonly object _processorLock = new();
+
+        // Primary constructor parameters are available as fields by the primary-constructor syntax used in this project.
+        // (Logger, httpClientFactory, AtomDataSelectionStationBoundryService, AtomDataSelectionHourlyFetchService, AWSS3BucketService, AuthService)
+
+        public async Task<string> GetAtomDataSelectionStation(string pollutantName, string datasource, string year, string region, string dataselectorfiltertype, string dataselectordownloadtype)
         {
 
             try
             {
-                QueryString queryStringsdata = new QueryString();
-                //queryStringsdata.Add("pollutantName", pollutantName);
-                //queryStringsdata.Add("dataSource", datasource);
-                //queryStringsdata.Add("Year", year);
-                //queryStringsdata.Add("Region", region);
-                //queryStringsdata.Add("dataselectorfiltertype", dataselectorfiltertype);
-                //string datasource = queryStringsdata.dataSource = datasource;
-                //string year = queryStringsdataqueryStringsdata.Year = year;
-                //string region = data.Region =region;
-                //string dataselectorfiltertype = queryStringsdata.dataselectorfiltertype = dataselectorfiltertype;
-
-                //queryStringsdata = queryStringsdata.Add("pollutantName", pollutantName);
-                //queryStringsdata = queryStringsdata.Add("dataSource", datasource);
-                //queryStringsdata = queryStringsdata.Add("Year", year);
-                //queryStringsdata = queryStringsdata.Add("Region", region);
-                //queryStringsdata = queryStringsdata.Add("dataselectorfiltertype", dataselectorfiltertype);
-
-                //// Map QueryString to AtomHistoryModel.QueryStringData
-                //var queryStringData = new AtomHistoryModel.QueryStringData();
-
                 var queryStringData = new AtomHistoryModel.QueryStringData
                 {
                     pollutantName = pollutantName,
                     dataSource = datasource,
                     Year = year,
                     Region = region,
-                    dataselectorfiltertype = dataselectorfiltertype
+                    dataselectorfiltertype = dataselectorfiltertype,
+                    dataselectordownloadtype = dataselectordownloadtype
                 };
 
-                //string emailFromConfig = Environment.GetEnvironmentVariable("RICARDO_API_EMAIL") ?? "";
-                //string passwordFromConfig = Environment.GetEnvironmentVariable("RICARDO_API_PASSWORD") ?? "";
-
-                var token = await GetRicardoToken();   
+                //For CDP
+                var token = await GetRicardoToken();
 
                 var client = httpClientFactory.CreateClient("RicardoNewAPI");
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -113,42 +108,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 var sitemetadatainfo = ParseSiteMeta(responsebody);
 
-                // 2) Sites that have any pollutant whose name contains "Ozone" (covers "Ozone (O3)" etc.)
-                var ozoneSitesContains = sitemetadatainfo
-                    .Where(s => s.Pollutants?.Any(p => p.Name?.Contains("Ozone", StringComparison.OrdinalIgnoreCase) == true) == true)
-                    .ToList();
+                var mappedPollutants = GetMappedPollutants(pollutantName, includeUnknowns: true);
 
-                // For single pollutant filtering
-                // 3) Flattened list of pollutant records with site metadata for matches (useful to access both)
-                var ozoneRecords = sitemetadatainfo
-                    .SelectMany(s => (s.Pollutants ?? Enumerable.Empty<PollutantInfo>())
-                        .Where(p => p.Name != null && p.Name.Contains("Ozone", StringComparison.OrdinalIgnoreCase))
-                        .Select(p => new { Site = s, Pollutant = p }))
-                    .ToList();
-
-                //For multiple pollutant filtering
-                var targetPollutants = new List<string>
-                                        {
-                                            //"Ozone",
-                                            //"Nitrogen dioxide",
-                                            //"Carbon monoxide",
-                                            //"Sulphur dioxide",
-                                            //"Nitrogen oxides as nitrogen dioxide",
-                                            //"Nitric oxide",
-                                            //"PM10 particulate matter (Hourly measured)",
-                                            "PM<sub>2.5</sub> (Hourly measured)"
-                                        };
-
-                //var filteredRecords = sitemetadatainfo
-                //    .SelectMany(s => (s.Pollutants ?? Enumerable.Empty<PollutantInfo>())
-                //        .Where(p => p.Name != null && targetPollutants
-                //            .Any(tp => p.Name.Contains(tp, StringComparison.OrdinalIgnoreCase)))
-                //        .Select(p => new { Site = s, Pollutant = p }))
-                //    .GroupBy(x => x.Site.LocalSiteId)
-                //    .Select(g => g.First())
-                //    .ToList();
-
-                var filteredSites = sitemetadatainfo
+                var filteredSites1 = sitemetadatainfo
                     .Select(site => new SiteInfo
                     {
                         SiteName = site.SiteName,
@@ -159,7 +121,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         Latitude = site.Latitude,
                         Longitude = site.Longitude,
                         Pollutants = (site.Pollutants ?? new List<PollutantInfo>())
-                            .Where(p => p.Name != null && targetPollutants
+                            .Where(p => p.Name != null && mappedPollutants
                                 .Any(tp => p.Name.Contains(tp, StringComparison.OrdinalIgnoreCase)))
                             .ToList()
                     })
@@ -168,161 +130,36 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     .Select(g => g.First()) // Ensure distinct by LocalSiteId
                     .ToList();
 
+                // Parse years and create year ranges once
+                var yearInts = year.Split(',')
+                                   .Select(y => int.TryParse(y, out int val) ? val : (int?)null)
+                                   .Where(y => y.HasValue)
+                                   .Select(y => y.Value)
+                                   .ToList();
 
-                //var filterpollutantyear = ozoneRecords
-                //    .Where(r => r.Pollutant.StartDate != null && r.Pollutant.StartDate.StartsWith(year) ||
-                //                r.Pollutant.EndDate != null && r.Pollutant.EndDate.StartsWith(year))
-                //    .ToList();
+                var yearRanges = yearInts
+                    .Select(y => new { Start = new DateTime(y, 1, 1), End = new DateTime(y, 12, 31) })
+                    .ToList();
 
-                var filterpollutantyear = ozoneRecords
-                .Where(r =>
-                {
-                    DateTime startDate, endDate;
-                    bool hasStartDate = DateTime.TryParseExact(r.Pollutant.StartDate, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out startDate);
-                    bool hasEndDate = DateTime.TryParseExact(r.Pollutant.EndDate, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out endDate);
-
-                    if (int.TryParse(year, out int yearInt))
-                    {
-                        var yearStart = new DateTime(yearInt, 1, 1);
-                        var yearEnd = new DateTime(yearInt, 12, 31);
-
-                        if (hasStartDate && hasEndDate)
+                // Filter sites based on pollutant date ranges intersecting with any year range
+                var filterpollutantyear = filteredSites1
+                    .Where(site =>
+                        site.Pollutants != null &&
+                        site.Pollutants.Any(p =>
                         {
-                            return startDate <= yearEnd && endDate >= yearStart;
-                        }
-                        else if (hasStartDate && !hasEndDate)
-                        {
-                            // Treat null endDate as ongoing
-                            return startDate <= yearEnd;
-                        }
-                    }
-                    return false;
-                })
-                .ToList();
+                            if (!DateTime.TryParseExact(p.StartDate, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime startDate))
+                                return false;
 
-                //var client = httpClientFactory.CreateClient("RicardoNewAPI");
-                //var url = $"api/site_meta_datas?with-closed=true&with-pollutants=1";
-                //var response = await client.GetAsync(url);
-                //response.EnsureSuccessStatusCode();
+                            bool hasEndDate = DateTime.TryParseExact(p.EndDate, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime endDate);
 
-                //string responsebody = await response.content.readasstringasync();
+                            return yearRanges.Any(range =>
+                                hasEndDate
+                                    ? startDate <= range.End && endDate >= range.Start
+                                    : startDate <= range.End);
+                        }))
+                    .ToList();
 
-                //For Atom feed data
-                //var client1 = httpClientFactory.CreateClient("Atomfeed");
-                //var url1 = $"data/atom-dls/auto/{year}/atom.en.xml";
-                //var response1 = await client1.GetAsync(url1);
-                //response1.EnsureSuccessStatusCode();
-
-                //var xmlContent = await response1.Content.ReadAsStringAsync();
-                //XDocument doc = XDocument.Parse(xmlContent);
-                //XNamespace atom = "http://www.w3.org/2005/Atom";
-                //XNamespace georss = "http://www.georss.org/georss";
-                //var entries = doc.Descendants(atom + "entry");
-                //var allPollutants = new List<PollutantDetails>();
-                //var finalallpollutatns = new List<PollutantDetails>();
-
-                //foreach (var entry in entries)
-                //{
-                //    var title = entry.Element(atom + "title")?.Value;
-                //    string stationCode = string.Empty;
-                //    var polygonElement = entry.Element(georss + "polygon");
-                //    string polygonCoordinates = polygonElement?.Value;
-                //    string coordinatesresult = string.Empty;
-
-                //    if (!string.IsNullOrEmpty(title))
-                //    {
-                //        var match = System.Text.RegularExpressions.Regex.Match(title, @"\(([^)]+)\)");
-                //        if (match.Success)
-                //        {
-                //            stationCode = match.Groups[1].Value;
-                //        }
-                //    }
-
-                //    //List<(double lat, double lon)> coordinates = new List<(double, double)>();
-
-                //    //if (!string.IsNullOrEmpty(polygonCoordinates))
-                //    //{
-                //    //    var parts = polygonCoordinates.Split(' ');
-                //    //    for (int i = 0; i < parts.Length - 1; i += 2)
-                //    //    {
-                //    //        if (double.TryParse(parts[i], out double lat) && double.TryParse(parts[i + 1], out double lon))
-                //    //        {
-                //    //            coordinates.Add((lat, lon));
-                //    //        }
-                //    //    }
-                //    //}
-                //    if (!string.IsNullOrEmpty(polygonCoordinates))
-                //    {
-                //        string[] coordinates = polygonCoordinates.Split(' ');
-                //        coordinatesresult = $"{coordinates[0]},{coordinates[1]}";
-                //    }
-
-                //    var relatedLinks = entry.Elements(atom + "link")
-                //                        .Where(l => l.Attribute("rel")?.Value == "related");
-
-                //    foreach (var link in relatedLinks)
-                //    {
-                //        var pollutantTitle = link.Attribute("title")?.Value;
-                //        var pollutantHref = link.Attribute("href")?.Value;
-
-                //        if (!string.IsNullOrEmpty(pollutantHref))
-                //        {
-                //            pollutantHref = pollutantHref.Replace("http://", "").Replace("https://", "");
-                //        }
-
-                //        if (!string.IsNullOrEmpty(pollutantTitle) && !string.IsNullOrEmpty(pollutantHref))
-                //        {
-                //            var nameParts = pollutantTitle.Split(new[] { "Pollutant in feed - " }, StringSplitOptions.None);
-                //            var pollutantNameurl = nameParts.Length > 1 ? nameParts[1] : pollutantTitle;
-
-                //            allPollutants.Add(new PollutantDetails
-                //            {
-                //                stationCode = stationCode,
-                //                PollutantName = pollutantNameurl,
-                //                PollutantMasterUrl = pollutantHref,
-                //                polygon = coordinatesresult,
-                //                year = year
-                //            });
-                //        }
-                //    }
-                //    finalallpollutatns.AddRange(allPollutants);
-                //}
-
-                //var targetUrls = new List<string>
-                //    {
-                //        "dd.eionet.europa.eu/vocabulary/aq/pollutant/8",
-                //        "dd.eionet.europa.eu/vocabulary/aq/pollutant/5",
-                //        "dd.eionet.europa.eu/vocabulary/aq/pollutant/6001",
-                //        "dd.eionet.europa.eu/vocabulary/aq/pollutant/7",
-                //        "dd.eionet.europa.eu/vocabulary/aq/pollutant/1"
-                //    };
-
-                //var filteredPollutants = allPollutants
-                //    .Where(p => targetUrls.Contains(p.PollutantMasterUrl))
-                //    .GroupBy(p => new { p.PollutantName, p.PollutantMasterUrl })
-                //    .Select(g => g.First())
-                //    .ToList();
-
-                //var uniquePollutants = allPollutants
-                //    .GroupBy(p => new { p.PollutantName, p.PollutantMasterUrl })
-                //    .Select(g => g.First())
-                //    .ToList();
-
-                //var uniquestationCode = allPollutants
-                //        .GroupBy(p => new { p.stationCode })
-                //        .Select(g => g.First())
-                //        //.Take(50)
-                //        .ToList();
-
-                ////var filtered = allPollutants.Where(p => p.PollutantName == filter);
-                //var filtered = uniquePollutants.Where(p => p.PollutantName == pollutantName);
-                //var filtered_station_pollutant = uniquestationCode.Where(p => p.PollutantName == pollutantName).ToList();
-                ////var filtered = filteredPollutants.Where(p => p.PollutantName == filter);
-                ////var resultfiltered = filtered.Any() ? filtered.ToList() : allPollutants;
-                //var resultfiltered = filtered.Any() ? filtered.ToList() : filteredPollutants;
-
-                //var stationData = await AtomDataSelectionStationBoundryService.GetAtomDataSelectionStationBoundryService(filtered_station_pollutant);
-                var stationData = await AtomDataSelectionStationBoundryService.GetAtomDataSelectionStationBoundryService(filterpollutantyear.Select(r => r.Site).ToList());
+                var stationData = await AtomDataSelectionStationBoundryService.GetAtomDataSelectionStationBoundryService(filterpollutantyear, region);
 
                 var stationcountresult = stationData.Count();
 
@@ -330,13 +167,59 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     return stationcountresult.ToString();
                 }
-                else
+                else if (dataselectorfiltertype == "dataSelectorHourly")
                 {
-                    string PresignedUrl = string.Empty;
-                    var stationlistdata = await AtomDataSelectionHourlyFetchService.GetAtomDataSelectionHourlyFetchService(stationData, pollutantName, year);
-                    PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(stationlistdata, queryStringData, dataselectorfiltertype);
-                    return PresignedUrl.ToString();
+                    if (dataselectordownloadtype == "dataSelectorSingle")
+                    {
+                        // Setup MongoDB collection
+                        var mongoConn = Environment.GetEnvironmentVariable("MONGO_CONNECTION_STRING") ?? "mongodb://localhost:27017";
+                        var mongoDb = Environment.GetEnvironmentVariable("MONGO_DATABASE") ?? "AqieHistoricaldataBackend";
+                        var mongoCollection = Environment.GetEnvironmentVariable("MONGO_JOB_COLLECTION_NAME") ?? "aqie_export_jobs";
+
+                        var client1 = new MongoClient(mongoConn);
+                        var db = client1.GetDatabase(mongoDb);
+                        _jobCollection = db.GetCollection<JobDocument>(mongoCollection);
+
+                        // ensure index on JobId for quick lookup
+                        var indexKeys = Builders<JobDocument>.IndexKeys.Ascending(j => j.JobId);
+                        _jobCollection.Indexes.CreateOne(new CreateIndexModel<JobDocument>(indexKeys));
+
+                        // create GUID and persist job in MongoDB as Pending, then enqueue background work
+                        var jobId = Guid.NewGuid().ToString("N");
+
+                        var jobDoc = new JobDocument
+                        {
+                            JobId = jobId,
+                            Status = JobStatusEnum.Pending,
+                            StartTime = DateTime.UtcNow,
+                            EndTime = null,
+                            ErrorReason = null,
+                            ResultUrl = null,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+
+                        await _jobCollection.InsertOneAsync(jobDoc);
+
+                        var job = new JobItem
+                        {
+                            JobId = jobId,
+                            StationData = stationData,
+                            PollutantName = pollutantName,
+                            Year = year,
+                            Data = queryStringData,
+                            DownloadType = dataselectordownloadtype
+                        };
+
+                        await _jobChannel.Writer.WriteAsync(job);
+                        _ = EnsureQueueProcessorStartedAsync(); // fire-and-forget ensure processor running
+
+                        // Return the job id immediately to front-end
+                        return jobId;
+                    }
                 }
+
+                return "Failure";
             }
             catch (Exception ex)
             {
@@ -345,8 +228,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return "Failure";
             }
 
-        }  
-    private static List<SiteInfo> ParseSiteMeta(string json)
+        }
+        private static List<SiteInfo> ParseSiteMeta(string json)
         {
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
@@ -364,7 +247,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         LocalSiteId = site.TryGetProperty("localSiteId", out var localSiteIdEl) ? localSiteIdEl.ToString() : null,
                         AreaType = site.TryGetProperty("areaType", out var areaTypeEl) ? areaTypeEl.ToString() : null,
                         SiteType = site.TryGetProperty("siteType", out var siteTypeEl) ? siteTypeEl.ToString() : null,
-                        ZoneRegion = site.TryGetProperty("zoneRegion", out var zoneRegionEl) ? zoneRegionEl.ToString() : null,
+                        ZoneRegion = site.TryGetProperty("governmentRegion", out var zoneRegionEl) ? zoneRegionEl.ToString() : null,
                         Latitude = site.TryGetProperty("latitude", out var latitudeEl) ? latitudeEl.ToString() : null,
                         Longitude = site.TryGetProperty("longitude", out var longitudeEl) ? longitudeEl.ToString() : null,
                         Pollutants = new List<PollutantInfo>()
@@ -404,7 +287,169 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             return token;
         }
+
+
+        private static List<string> GetMappedPollutants(string pollutantNames, bool includeUnknowns = false)
+        {
+            var result = new List<string>();
+            var names = pollutantNames.Split(',');
+
+            var pollutantMap = new Dictionary<string, string>
+            {
+                { "Ozone", "Ozone" },
+                { "PM2.5", "PM<sub>2.5</sub> (Hourly measured)" },
+                { "PM10", "PM<sub>10</sub> (Hourly measured)" },
+                { "NO2", "Nitrogen dioxide" },
+                { "CO", "Carbon monoxide" },
+                { "SO2", "Sulphur dioxide" },
+                { "NOx", "Nitrogen oxides as nitrogen dioxide" },
+                { "NO", "Nitric oxide" }
+            };
+
+            foreach (var name in names)
+            {
+                var trimmedName = name.Trim();
+                if (pollutantMap.TryGetValue(trimmedName, out var mappedName))
+                {
+                    result.Add(mappedName);
+                }
+                else if (includeUnknowns)
+                {
+                    result.Add(trimmedName); // Add raw name if not found
+                }
+                else
+                {
+                    Console.WriteLine($"Warning: Unknown pollutant '{trimmedName}' not found in map.");
+                }
+            }
+
+            return result;
+        }
+
+        // Background processor start guard
+        private Task EnsureQueueProcessorStartedAsync()
+        {
+            lock (_processorLock)
+            {
+                if (_processorTask is null || _processorTask.IsCompleted)
+                {
+                    _processorTask = Task.Run(ProcessQueueAsync);
+                }
+                return _processorTask;
+            }
+        }
+
+        // Background processor: reads queue, updates MongoDB job document lifecycle
+        private async Task ProcessQueueAsync()
+        {
+            await foreach (var job in _jobChannel.Reader.ReadAllAsync())
+            {
+                if (job == null) continue;
+
+                if (_jobCollection == null)
+                {
+                    Logger.LogError("MongoDB job collection is not initialized. Skipping job {JobId}", job.JobId);
+                    continue;
+                }
+
+                var filter = Builders<JobDocument>.Filter.Eq(d => d.JobId, job.JobId);
+                var updateStart = Builders<JobDocument>.Update
+                    .Set(d => d.Status, JobStatusEnum.Processing)
+                    .Set(d => d.UpdatedAt, DateTime.UtcNow);
+                await _jobCollection.UpdateOneAsync(filter, updateStart);
+
+                try
+                {
+                    // 1) generate csv bytes in background by fetching hourly data
+                    var csvData = await AtomDataSelectionHourlyFetchService.GetAtomDataSelectionHourlyFetchService(job.StationData, job.PollutantName, job.Year);
+
+                    // 2) write CSV to S3 and get presigned url
+                    var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, job.Data, job.DownloadType);
+                    //var presignedUrl = "test";
+
+                    // 3) update job as completed with ResultUrl
+                    var updateCompleted = Builders<JobDocument>.Update
+                        .Set(d => d.Status, JobStatusEnum.Completed)
+                        .Set(d => d.EndTime, DateTime.UtcNow)
+                        .Set(d => d.ResultUrl, presignedUrl)
+                        .Set(d => d.UpdatedAt, DateTime.UtcNow);
+
+                    await _jobCollection.UpdateOneAsync(filter, updateCompleted);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "Background job {JobId} failed", job.JobId);
+
+                    var updateFailed = Builders<JobDocument>.Update
+                        .Set(d => d.Status, JobStatusEnum.Failed)
+                        .Set(d => d.EndTime, DateTime.UtcNow)
+                        .Set(d => d.ErrorReason, ex.Message)
+                        .Set(d => d.UpdatedAt, DateTime.UtcNow);
+
+                    await _jobCollection.UpdateOneAsync(filter, updateFailed);
+                }
+            }
+        }
+
+        // Public helper to query job status/result from MongoDB by jobId
+        //public async Task<JobDocument?> GetJobInfoAsync(string jobId)
+        //{
+        //    if (string.IsNullOrWhiteSpace(jobId)) return null;
+        //    if (_jobCollection == null) return null;
+        //    var filter = Builders<JobDocument>.Filter.Eq(d => d.JobId, jobId);
+        //    return await _jobCollection.Find(filter).FirstOrDefaultAsync();
+        //}
+
+        // Internal classes used for queue and MongoDB persistence
+        //private sealed class JobItem
+        //{
+        //    public string JobId { get; init; } = string.Empty;
+        //    public List<SiteInfo> StationData { get; init; } = new();
+        //    public string PollutantName { get; init; } = string.Empty;
+        //    public string Year { get; init; } = string.Empty;
+        //    public QueryStringData Data { get; init; } = new();
+        //    public string DownloadType { get; init; } = string.Empty;
+        //}
+
+        //public sealed class JobDocument
+        //{
+        //    [BsonId]
+        //    [BsonRepresentation(BsonType.ObjectId)]
+        //    public string? Id { get; set; }
+
+        //    [BsonElement("jobId")]
+        //    public string JobId { get; set; } = string.Empty;
+
+        //    [BsonElement("status")]
+        //    public JobStatusEnum Status { get; set; }
+
+        //    [BsonElement("startTime")]
+        //    public DateTime StartTime { get; set; }
+
+        //    [BsonElement("endTime")]
+        //    public DateTime? EndTime { get; set; }
+
+        //    [BsonElement("errorReason")]
+        //    public string? ErrorReason { get; set; }
+
+        //    [BsonElement("resultUrl")]
+        //    public string? ResultUrl { get; set; }
+
+        //    [BsonElement("createdAt")]
+        //    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        //    [BsonElement("updatedAt")]
+        //    public DateTime? UpdatedAt { get; set; }
+        //}
+
+        //public enum JobStatusEnum
+        //{
+        //    Pending,
+        //    Processing,
+        //    Completed,
+        //    Failed
+        //}
     }
 
 
-    }
+}

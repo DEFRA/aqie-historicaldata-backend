@@ -35,19 +35,32 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                if(downloadtype == "dataSelectorHourly")
+                byte[] csvBytes;
+                string key;
+                string bucketName = GetBucketName();
+                string region = GetAwsRegion();
+
+                if (downloadtype == "dataSelectorHourly")
                 {
-                    var csvBytes = await GetDataselectorCsvBytesAsync(Final_list, data, downloadtype);
-                    var key = dataselectorGenerateS3Key(data); var region = GetAwsRegion();
-                    var bucketName = GetBucketName();
+                    if(data.dataselectordownloadtype == "dataSelectorSingle")
+                    {                       
+                        csvBytes = await GetDataselectorCsvBytesAsync(Final_list, data, downloadtype);
+                    }
+                    else
+                    {
+                        csvBytes = await GetDataselectorCsvBytesAsync(Final_list, data, downloadtype);
+                    }
+
+                    key = dataselectorGenerateS3Key(data);  region = GetAwsRegion();
+                    bucketName = GetBucketName();
                     await UploadToS3Async(csvBytes, bucketName, key);
                     return await GeneratePresignedUrlAsync(bucketName, key);
                 }
                 else
                 {
-                    var csvBytes = await GetCsvBytesAsync(Final_list, data, downloadtype);
-                    var key = GenerateS3Key(data); var region = GetAwsRegion();
-                    var bucketName = GetBucketName();
+                    csvBytes = await GetCsvBytesAsync(Final_list, data, downloadtype);
+                    key = GenerateS3Key(data);  region = GetAwsRegion();
+                    bucketName = GetBucketName();
                     await UploadToS3Async(csvBytes, bucketName, key);
                     return await GeneratePresignedUrlAsync(bucketName, key);
                 }
