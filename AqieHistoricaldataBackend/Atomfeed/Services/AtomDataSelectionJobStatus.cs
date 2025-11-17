@@ -28,7 +28,23 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 if (string.IsNullOrWhiteSpace(jobId)) return null;
-                if (_jobCollection == null) return null;
+                // Lazy-initialize the collection using the injected factory so _jobCollection won't be null
+                if (_jobCollection == null)
+                {
+                    _jobCollection = MongoDbClientFactory.GetCollection<JobDocument>("aqie_csvexport_jobs");
+
+                    // Ensure an index exists for quick lookups by JobId (no-op if it already exists)
+                    try
+                    {
+                        var indexKeys = Builders<JobDocument>.IndexKeys.Ascending(j => j.JobId);
+                        _jobCollection.Indexes.CreateOne(new CreateIndexModel<JobDocument>(indexKeys));
+                    }
+                    catch (Exception ix)
+                    {
+                        // Log index creation failure but continue — reads can still function
+                        Logger.LogWarning(ix, "Failed to create index on aqie_csvexport_jobs collection");
+                    }
+                }
 
                 var filter = Builders<JobDocument>.Filter.Eq(d => d.JobId, jobId);
                 var doc = await _jobCollection.Find(filter).FirstOrDefaultAsync();
