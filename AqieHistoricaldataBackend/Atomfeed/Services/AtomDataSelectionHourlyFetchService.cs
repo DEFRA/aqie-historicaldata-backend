@@ -1,4 +1,7 @@
+using Hangfire;
 using Newtonsoft.Json.Linq;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Xml;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
@@ -23,20 +26,232 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 //Final_list1.AddRange(finalhourlypollutantresult);
                 //}
                 //var atomJsonCollection = await FetchAtomFeedAsync(siteID, year);
+                //one by one order for multiple year and multiple site
+                //var result = new List<string>();
+                //var yearssplit = filteryear.Split(',');
+                //var stopwatch = Stopwatch.StartNew(); // Start timing
+                //foreach (var singleyear in yearssplit)
+                //{
+                //    foreach (var siteinfo in filtered_station_pollutant)
+                //    {
+                //        var siteID = siteinfo.LocalSiteId;
+                //        var year = singleyear;//filteryear;
+                //        var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
+                //        var atomJsonCollection = await FetchAtomFeedAsync(siteID, year);
+                //        var finalhourlypollutantresult = ProcessAtomData(atomJsonCollection, pollutantsToDisplay, siteinfo, year);
+                //        Final_list1.AddRange(finalhourlypollutantresult);
+                //    }
+                //}
+                ////stopwatch.Stop(); // Stop timing
+                //Console.WriteLine($"Fetch and processing completed in {stopwatch.Elapsed.TotalSeconds} seconds.");
 
-                foreach (var siteinfo in filtered_station_pollutant)
+                ////// Format duration as hh:mm:ss
+                //var formattedDuration = stopwatch.Elapsed.ToString(@"hh\:mm\:ss");
+
+                ////// Log to file
+                //var logFilePath = "fetch_duration_log.txt";
+                //File.AppendAllText(logFilePath, $"Fetch completed at {DateTime.Now} - Duration: {formattedDuration}{Environment.NewLine}");
+
+                //return Final_list1;
+
+                //single year and multiple site with limit 20 concurrent requests
+                //var yearssplit = filteryear.Split(',');
+                //var stopwatch = Stopwatch.StartNew(); // Start timing
+                //var semaphore = new SemaphoreSlim(20); // Limit to 20 concurrent tasks
+                //var tasks = filtered_station_pollutant.Select(async siteinfo =>
+                //{
+                //    await semaphore.WaitAsync();
+                //    try
+                //    {
+                //        var siteID = siteinfo.LocalSiteId;
+                //        var year = yearssplit;
+                //        var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
+                //        var atomJsonCollection = await FetchAtomFeedAsync(siteID, year);
+                //        var finalhourlypollutantresult = ProcessAtomData(atomJsonCollection, pollutantsToDisplay, siteinfo, year);
+                //        return finalhourlypollutantresult;
+                //    }
+                //    finally
+                //    {
+                //        semaphore.Release();
+                //    }
+                //});
+
+                //var results = await Task.WhenAll(tasks);
+                //foreach (var result in results)
+                //{
+                //    Final_list1.AddRange(result);
+                //}
+
+                //stopwatch.Stop(); // Stop timing
+                //Console.WriteLine($"Fetch and processing completed in {stopwatch.Elapsed.TotalSeconds} seconds.");
+
+                //// Format duration as hh:mm:ss
+                //var formattedDuration = stopwatch.Elapsed.ToString(@"hh\:mm\:ss");
+
+                //// Log to file
+                //var logFilePath = "fetch_duration_log.txt";
+                //File.AppendAllText(logFilePath, $"Fetch completed at {DateTime.Now} - Duration: {formattedDuration}{Environment.NewLine}");
+
+                //mutliple year and multiple site with limit 20 concurrent requests with foreach
+                //var result = new List<string>();
+                //var yearssplit = filteryear.Split(',');
+                //var stopwatch = Stopwatch.StartNew(); // Start timing
+                //var semaphore = new SemaphoreSlim(20); // Limit to 20 concurrent tasks
+
+                //var tasks = new List<Task<List<FinalData>>>();
+                //var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
+                //foreach (var singleyear in yearssplit)
+                //{
+                //    foreach (var siteinfo in filtered_station_pollutant)
+                //    {
+                //        tasks.Add(Task.Run(async () =>
+                //        {
+                //            await semaphore.WaitAsync();
+                //            try
+                //            {
+                //                var siteID = siteinfo.LocalSiteId;
+                //                var year = singleyear;
+                //                var atomJsonCollection = await FetchAtomFeedAsync(siteID, year);
+                //                var finalhourlypollutantresult = ProcessAtomData(atomJsonCollection, pollutantsToDisplay, siteinfo, year);
+                //                return finalhourlypollutantresult;
+                //            }
+                //            finally
+                //            {
+                //                semaphore.Release();
+                //            }
+                //        }));
+                //    }
+                //}
+
+                //var results = await Task.WhenAll(tasks);
+                //foreach (var result in results)
+                //{
+                //    Final_list1.AddRange(result);
+                //}
+
+                //stopwatch.Stop(); // Stop timing
+                //Console.WriteLine($"Fetch and processing completed in {stopwatch.Elapsed.TotalSeconds} seconds.");
+
+                //// Format duration as hh:mm:ss
+                //var formattedDuration = stopwatch.Elapsed.ToString(@"hh\:mm\:ss");
+
+                //// Log to file
+                //var logFilePath = "fetch_duration_log.txt";
+                //File.AppendAllText(logFilePath, $"Fetch completed at {DateTime.Now} - Duration: {formattedDuration}{Environment.NewLine}");
+
+                //mulitple year and multiple site with limit 20 concurrent requests with linq
+                //var years = filteryear.Split(',');
+                //var stopwatch = Stopwatch.StartNew();
+                //var semaphore = new SemaphoreSlim(20);
+                //var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
+
+                //var tasks = filtered_station_pollutant.SelectMany(siteinfo =>
+                //    years.Select(async year =>
+                //    {
+                //        await semaphore.WaitAsync();
+                //        try
+                //        {
+                //            var siteID = siteinfo.LocalSiteId;
+                //            var atomJsonCollection = await FetchAtomFeedAsync(siteID, year);
+                //            var finalhourlypollutantresult = ProcessAtomData(atomJsonCollection, pollutantsToDisplay, siteinfo, year);
+                //            return finalhourlypollutantresult;
+                //        }
+                //        catch (Exception ex)
+                //        {
+                //            // Log the error with context
+                //            var errorMessage = $"Error processing site {siteinfo.LocalSiteId} for year {year}: {ex.Message}";
+                //            Console.WriteLine(errorMessage);
+                //            File.AppendAllText("error_log.txt", $"{DateTime.Now}: {errorMessage}{Environment.NewLine}");
+                //            return new List<FinalData>(); // Return empty result to avoid breaking the flow
+                //        }
+                //        finally
+                //        {
+                //            semaphore.Release();
+                //        }
+                //    })
+                //);
+
+                //var results = await Task.WhenAll(tasks);
+                //foreach (var result in results)
+                //{
+                //    Final_list1.AddRange(result);
+                //}
+
+                //stopwatch.Stop();
+                //Console.WriteLine($"Fetch and processing completed in {stopwatch.Elapsed.TotalSeconds} seconds.");
+
+                //var formattedDuration = stopwatch.Elapsed.ToString(@"hh\:mm\:ss");
+                //File.AppendAllText("fetch_duration_log.txt", $"Fetch completed at {DateTime.Now} - Duration: {formattedDuration}{Environment.NewLine}");
+
+                //mulitple year and multiple site with limit 20 concurrent requests with parllel foreach
+                //var years = filteryear.Split(',');
+                //var stopwatch = Stopwatch.StartNew();
+                //var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
+                //var resultsBag = new ConcurrentBag<FinalData>();
+                //await Parallel.ForEachAsync(filtered_station_pollutant, new ParallelOptions { MaxDegreeOfParallelism = 20 }, async (siteinfo, _) =>
+                //{
+                //    foreach (var year in years)
+                //    {
+                //        try
+                //        {
+                //            var atomJsonCollection = await FetchAtomFeedAsync(siteinfo.LocalSiteId, year);
+                //            var result = ProcessAtomData(atomJsonCollection, pollutantsToDisplay, siteinfo, year);
+                //            foreach (var item in result)
+                //                resultsBag.Add(item);
+                //        }
+                //        catch (Exception ex)
+                //        {
+                //            var errorMessage = $"Error processing site {siteinfo.LocalSiteId} for year {year}: {ex.Message}";
+                //            Console.WriteLine(errorMessage);
+                //            File.AppendAllTextAsync("error_log.txt", $"{DateTime.Now}: {errorMessage}{Environment.NewLine}");
+                //        }
+                //    }
+                //});
+                //Final_list1.AddRange(resultsBag);
+
+                //stopwatch.Stop();
+                //Console.WriteLine($"Fetch and processing completed in {stopwatch.Elapsed.TotalSeconds} seconds.");
+
+                //var formattedDuration = stopwatch.Elapsed.ToString(@"hh\:mm\:ss");
+                //File.AppendAllText("fetch_duration_log.txt", $"Fetch completed at {DateTime.Now} - Duration: {formattedDuration}{Environment.NewLine}");
+
+                //mulitple year and multiple site with limit 20 concurrent requests with parllel foreach more optimised code
+                var years = filteryear.Split(',');
+                var stopwatch = Stopwatch.StartNew();
+                var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
+                var resultsBag = new ConcurrentBag<FinalData>();
+                var siteYearPairs = filtered_station_pollutant
+                                    .SelectMany(siteinfo => years.Select(year => new { siteinfo, year }));
+                await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 20 }, async (pair, _) =>
                 {
-                    var siteID = siteinfo.LocalSiteId;
-                    var year = filteryear;
-                    var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
-                    var atomJsonCollection = await FetchAtomFeedAsync(siteID, year);
-                    var finalhourlypollutantresult = ProcessAtomData(atomJsonCollection, pollutantsToDisplay, siteinfo);
-                    Final_list1.AddRange(finalhourlypollutantresult);
-                }
+                        try
+                        {
+                            var atomJsonCollection = await FetchAtomFeedAsync(pair.siteinfo.LocalSiteId, pair.year);
+                            var result = ProcessAtomData(atomJsonCollection, pollutantsToDisplay, pair.siteinfo, pair.year);
+                            foreach (var item in result)
+                                resultsBag.Add(item);
+                        }
+                        catch (Exception ex)
+                        {
+                            var errorMessage = $"Error processing site {pair.siteinfo.LocalSiteId} for year {pair.year}: {ex.Message}";
+                            Console.WriteLine(errorMessage);
+                            File.AppendAllTextAsync("error_log.txt", $"{DateTime.Now}: {errorMessage}{Environment.NewLine}");
+                        }                    
+                });
+                Final_list1.AddRange(resultsBag);
+
+
+                stopwatch.Stop();
+                Console.WriteLine($"Fetch and processing completed in {stopwatch.Elapsed.TotalSeconds} seconds.");
+
+                var formattedDuration = stopwatch.Elapsed.ToString(@"hh\:mm\:ss");
+                File.AppendAllText("fetch_duration_log.txt", $"Fetch completed at {DateTime.Now} - Duration: {formattedDuration}{Environment.NewLine}");
+
+
                 return Final_list1;
 
-                }
-                catch (Exception ex)
+            }
+            catch (Exception ex)
                 {
                     Logger.LogError("Error in GetAtomDataSelectionHourlyFetchService {Error}", ex.Message);
                     Logger.LogError("Error in GetAtomDataSelectionHourlyFetchService {Error}", ex.StackTrace);
@@ -66,50 +281,83 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
             }
 
-            private List<PollutantDetails> GetPollutantsToDisplay(string filter)
-            {
-                var allPollutants = new List<PollutantDetails>
-                {
-                    new PollutantDetails { PollutantName = "Nitrogen dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/8" },
-                    new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" },
-                    new PollutantDetails { PollutantName = "PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/6001" },
-                    new PollutantDetails { PollutantName = "Ozone", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/7" },
-                    new PollutantDetails { PollutantName = "Sulphur dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1" }
-                };
+        //private List<PollutantDetails> GetPollutantsToDisplay(string filter)
+        //{
+        //    var allPollutants = new List<PollutantDetails>
+        //    {
+        //        new PollutantDetails { PollutantName = "Nitrogen dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/8" },
+        //        new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" },
+        //        new PollutantDetails { PollutantName = "PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/6001" },
+        //        new PollutantDetails { PollutantName = "Ozone", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/7" },
+        //        new PollutantDetails { PollutantName = "Sulphur dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1" }
+        //    };
 
-                var filtered = allPollutants.Where(p => p.PollutantName == filter);
-                return filtered.Any() ? filtered.ToList() : allPollutants;
-            }
-            private List<FinalData> ProcessAtomData(JArray features, List<PollutantDetails> pollutants, SiteInfo siteinfo)
+        //    var filtered = allPollutants.Where(p => p.PollutantName == filter);
+        //    return filtered.Any() ? filtered.ToList() : allPollutants;
+        //}
+
+        private List<PollutantDetails> GetPollutantsToDisplay(string filter)
+        {
+            var allPollutants = new List<PollutantDetails>
+            {
+                new PollutantDetails { PollutantName = "Nitrogen dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/8" },
+                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" },
+                new PollutantDetails { PollutantName = "PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/6001" },
+                new PollutantDetails { PollutantName = "Ozone", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/7" },
+                new PollutantDetails { PollutantName = "Sulphur dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1" }
+                //new PollutantDetails { PollutantName = "Nitrogen oxides as nitrogen dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/9" },
+                //new PollutantDetails { PollutantName = "Carbon monoxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/10" }                
+                //new PollutantDetails { PollutantName = "Nitric oxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/38" }               
+                
+            };
+
+                    // Split and normalize the filter string
+                    var filterList = filter.Split(',')
+                                           .Select(f => f.Trim())
+                                           .ToList();
+
+                    // Filter using case-insensitive comparison
+                    var filtered = allPollutants
+                        .Where(p => filterList.Contains(p.PollutantName, StringComparer.OrdinalIgnoreCase))
+                        .ToList();
+
+                    // Return filtered list if any match, otherwise return all
+                    return filtered.Any() ? filtered : allPollutants;
+        }
+
+        private List<FinalData> ProcessAtomData(JArray features, List<PollutantDetails> pollutants, SiteInfo siteinfo, string year)
             {
                 var finalList = new List<FinalData>();
 
-                for (int i = 1; i < features.Count; i++)
-                {
-                    try
-                    {
-                        var feature = features[i];
-                        var href = feature["om:OM_Observation"]?["om:observedProperty"]?["@xlink:href"]?.ToString();
-                        string cleanedUrl = href?.Replace("http://", "");
-                        if (string.IsNullOrEmpty(href)) continue;
+                if (features == null || features.Count == 0)
+                    return new List<FinalData>();
 
-                        var match = pollutants.FirstOrDefault(p => p.PollutantMasterUrl == cleanedUrl);
-                        if (match != null)
+                for (int i = 1; i < features.Count; i++)
                         {
-                            var values = feature["om:OM_Observation"]?["om:result"]?["swe:DataArray"]?["swe:values"]?.ToString();
-                            if (!string.IsNullOrEmpty(values))
+                            try
                             {
-                                finalList.AddRange(ExtractFinalData(values, match.PollutantName, siteinfo));
+                                var feature = features[i];
+                                var href = feature["om:OM_Observation"]?["om:observedProperty"]?["@xlink:href"]?.ToString();
+                                string cleanedUrl = href?.Replace("http://", "");
+                                if (string.IsNullOrEmpty(href)) continue;
+
+                                var match = pollutants.FirstOrDefault(p => p.PollutantMasterUrl == cleanedUrl);
+                                if (match != null)
+                                {
+                                    var values = feature["om:OM_Observation"]?["om:result"]?["swe:DataArray"]?["swe:values"]?.ToString();
+                                    if (!string.IsNullOrEmpty(values))
+                                    {
+                                        finalList.AddRange(ExtractFinalData(values, match.PollutantName, siteinfo));
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.LogError("Error processing ProcessAtomData feature member: {Error}", ex);
                             }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError("Error processing ProcessAtomData feature member: {Error}", ex);
-                    }
-                }
 
-                return finalList;
+                        return finalList;
             }
 
             private List<FinalData> ExtractFinalData(string values, string pollutantName, SiteInfo siteinfo)
@@ -127,7 +375,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         PollutantName = pollutantName,
                         SiteName = siteinfo.SiteName,
                         SiteType = siteinfo.AreaType + siteinfo.SiteType,
-                        Region = "Greater London",
+                        Region = siteinfo.ZoneRegion,
                         Country = "England"
                     }).ToList();
             }

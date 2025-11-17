@@ -1,3 +1,6 @@
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+
 namespace AqieHistoricaldataBackend.Atomfeed.Models
 {
     public class AtomHistoryModel
@@ -50,6 +53,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? dataSource { get; set; }
             public string? pollutantName { get; set; }
             public string? dataselectorfiltertype { get; set; }
+            public string? dataselectordownloadtype { get; set; }
         }
 
         public class PivotPollutant
@@ -100,6 +104,67 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             //public string? StartDate { get; init; }
             //public string? EndDate { get; init; }
             public List<PollutantInfo> Pollutants { get; set; } = new List<PollutantInfo>();
+        }
+
+        public sealed class JobItem
+        {
+            public string JobId { get; init; } = string.Empty;
+            public List<SiteInfo> StationData { get; init; } = new();
+            public string PollutantName { get; init; } = string.Empty;
+            public string Year { get; init; } = string.Empty;
+            public QueryStringData Data { get; init; } = new();
+            public string DownloadType { get; init; } = string.Empty;
+        }
+
+        public sealed class JobDocument
+        {
+            [BsonId]
+            [BsonRepresentation(BsonType.ObjectId)]
+            public string? Id { get; set; }
+
+            [BsonElement("jobId")]
+            public string JobId { get; set; } = string.Empty;
+
+            [BsonElement("status")]
+            public JobStatusEnum Status { get; set; }
+
+            [BsonElement("startTime")]
+            public DateTime StartTime { get; set; }
+
+            [BsonElement("endTime")]
+            public DateTime? EndTime { get; set; }
+
+            [BsonElement("errorReason")]
+            public string? ErrorReason { get; set; }
+
+            [BsonElement("resultUrl")]
+            public string? ResultUrl { get; set; }
+
+            [BsonElement("createdAt")]
+            public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+            [BsonElement("updatedAt")]
+            public DateTime? UpdatedAt { get; set; }
+        }
+
+        public enum JobStatusEnum
+        {
+            Pending,
+            Processing,
+            Completed,
+            Failed
+        }
+
+        public sealed record JobInfoDto
+        {
+            public string JobId { get; init; } = string.Empty;
+            public string Status { get; init; } = string.Empty;
+            public string? ResultUrl { get; init; }
+            public string? ErrorReason { get; init; }
+            public DateTime? CreatedAt { get; init; }
+            public DateTime? UpdatedAt { get; init; }
+            public DateTime? StartTime { get; init; }
+            public DateTime? EndTime { get; init; }
         }
     }
 }

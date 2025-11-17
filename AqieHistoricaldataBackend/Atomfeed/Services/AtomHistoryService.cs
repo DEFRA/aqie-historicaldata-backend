@@ -42,7 +42,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomHistoryService(ILogger<AtomHistoryService> logger, IHttpClientFactory httpClientFactory,
         IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService, IAtomAnnualFetchService AtomAnnualFetchService,
         IAWSS3BucketService AWSS3BucketService, IAtomDataSelectionService AtomDataSelectionService,
-        IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService 
+        IAtomDataSelectionJobStatus AtomDataSelectionJobStatus,
+        IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService
     {
         public async Task<string> AtomHealthcheck()
         {
@@ -154,9 +155,24 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.Message);
-                logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.StackTrace);
+                logger.LogError("Error in Atom GetatomDataSelectiondata {Error}", ex.Message);
+                logger.LogError("Error in Atom GetatomDataSelectiondata {Error}", ex.StackTrace);
                 return "Failure";
+            }
+        }
+
+        public async Task<JobInfoDto?> GetAtomDataSelectionJobStatus(string jobID)
+        {
+            try
+            {
+                var jobidresult = await AtomDataSelectionJobStatus.GetAtomDataSelectionJobStatus(jobID);
+                return jobidresult;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError("Error in GetAtomDataSelectionJobStatus {Error}", ex.Message);
+                logger.LogError("Error in GetAtomDataSelectionJobStatus {Error}", ex.StackTrace);
+                return default(JobInfoDto); // Return default value for JobInfoDto instead of "Failure"
             }
         }
     }

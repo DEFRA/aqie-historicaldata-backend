@@ -7,6 +7,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     {
         [ExcludeFromCodeCoverage]
         //Task<string> GetAtomDataSelectionStation(QueryString data);
-        Task<string> GetAtomDataSelectionStation(string pollutantName, string datasource, string year, string region, string dataselectorfiltertype);
+        Task<string> GetAtomDataSelectionStation(string pollutantName, string datasource, string year, string region, string dataselectorfiltertype, string dataselectordownloadtype);
     }
 }

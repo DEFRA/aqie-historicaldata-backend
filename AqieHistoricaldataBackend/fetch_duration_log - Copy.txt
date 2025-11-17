@@ -1,0 +1,2 @@
+Fetch completed at 04/11/2025 15:36:37 - Duration: 00:00:33 //parllel call for 2024
+Fetch completed at 04/11/2025 15:43:50 - Duration: 00:01:01 // loop call for 2024
