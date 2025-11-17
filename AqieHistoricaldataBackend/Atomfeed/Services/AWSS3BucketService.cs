@@ -42,15 +42,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 if (downloadtype == "dataSelectorHourly")
                 {
-                    if(data.dataselectordownloadtype == "dataSelectorSingle")
-                    {                       
+                    logger.LogInformation("dataSelectorHourly entered {Starttime}", DateTime.Now);
+                    if (data.dataselectordownloadtype == "dataSelectorSingle")
+                    {
+                        logger.LogInformation("dataSelectorSingle entered {Starttime}", DateTime.Now);
                         csvBytes = await GetDataselectorCsvBytesAsync(Final_list, data, downloadtype);
                     }
                     else
                     {
+                        logger.LogInformation("else part {Starttime}", DateTime.Now);
                         csvBytes = await GetDataselectorCsvBytesAsync(Final_list, data, downloadtype);
                     }
-
                     key = dataselectorGenerateS3Key(data);  region = GetAwsRegion();
                     bucketName = GetBucketName();
                     await UploadToS3Async(csvBytes, bucketName, key);
@@ -58,6 +60,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
                 else
                 {
+                    logger.LogInformation("else dataSelectorHourly entered {Starttime}", DateTime.Now);
                     csvBytes = await GetCsvBytesAsync(Final_list, data, downloadtype);
                     key = GenerateS3Key(data);  region = GetAwsRegion();
                     bucketName = GetBucketName();
