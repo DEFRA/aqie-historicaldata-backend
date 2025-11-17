@@ -6,6 +6,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public interface IAtomDataSelectionJobStatus
     {
         [ExcludeFromCodeCoverage]
-        Task<JobInfoDto> GetAtomDataSelectionJobStatus(string jobID);
+        Task<JobInfoDto> GetAtomDataSelectionJobStatusdata(string jobID);
     }
 }

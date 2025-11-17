@@ -17,6 +17,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             app.MapPost("AtomHistoryHourlydata", GetHistorydataById);
             app.MapPost("AtomHistoryexceedence", GetHistoryexceedence);
             app.MapPost("AtomDataSelection", GetAtomDataSelection);
+            app.MapPost("AtomDataSelectionJobStatus", GetAtomDataSelectionJobStatus);
         }
         private static async Task<IResult> GetHealthcheckdata(IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {
@@ -95,6 +96,28 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             {
                 logger.LogError("Error GetAtomDataSelection endpoints Info message {Error}", ex.Message);
                 logger.LogError("Error GetAtomDataSelection endpoints Info stacktrace {Error}", ex.StackTrace);
+                return Results.NotFound();
+
+            }
+        }
+        private static async Task<IResult> GetAtomDataSelectionJobStatus([FromBody] QueryStringData data, IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
+        {
+            try
+            {
+                if (data is not null)
+                {
+                    var atomDataSelectionJobStatusresult = await Persistence.GetAtomDataSelectionJobStatusdata(data);
+                    return atomDataSelectionJobStatusresult is not null ? Results.Ok(atomDataSelectionJobStatusresult) : Results.NotFound();
+                }
+                else
+                {
+                    return Results.NotFound();
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError("Error GetAtomDataSelectionJobStatus endpoints Info message {Error}", ex.Message);
+                logger.LogError("Error GetAtomDataSelectionJobStatus endpoints Info stacktrace {Error}", ex.StackTrace);
                 return Results.NotFound();
 
             }

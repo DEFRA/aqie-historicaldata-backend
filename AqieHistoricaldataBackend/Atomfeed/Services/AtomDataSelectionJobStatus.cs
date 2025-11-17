@@ -1,3 +1,4 @@
+using AqieHistoricaldataBackend.Utils.Mongo;
 using MongoDB.Driver;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 using static AqieHistoricaldataBackend.Atomfeed.Services.AtomDataSelectionStationService;
@@ -17,11 +18,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     //}
     public class AtomDataSelectionJobStatus(ILogger<HistoryexceedenceService> Logger,
     IAtomHourlyFetchService AtomHourlyFetchService,
-    IAtomDataSelectionStationService AtomDataSelectionStationService) : IAtomDataSelectionJobStatus
+    IAtomDataSelectionStationService AtomDataSelectionStationService,
+    IMongoDbClientFactory MongoDbClientFactory) : IAtomDataSelectionJobStatus
     {
         // MongoDB collection for job documents
         private IMongoCollection<JobDocument>? _jobCollection;
-        public async Task<JobInfoDto?> GetAtomDataSelectionJobStatus(string jobId)
+        public async Task<JobInfoDto?> GetAtomDataSelectionJobStatusdata(string jobId)
         {
             try
             {

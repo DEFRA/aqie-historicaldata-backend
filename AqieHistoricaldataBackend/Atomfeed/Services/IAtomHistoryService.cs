@@ -11,6 +11,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         public Task<dynamic> GetHistoryexceedencedata(QueryStringData data);
         public Task<dynamic> GetatomDataSelectiondata(QueryStringData data);
+        public Task<JobInfoDto> GetAtomDataSelectionJobStatusdata(QueryStringData data);
 
     }
 }
