@@ -1,6 +1,7 @@
 using Amazon.S3;
 using Amazon.S3.Model;
 using AqieHistoricaldataBackend.Atomfeed.Models;
+using AqieHistoricaldataBackend.Utils.Mongo;
 using Hangfire.MemoryStorage.Database;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
@@ -66,7 +67,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         IHttpClientFactory httpClientFactory,
     IAtomDataSelectionStationBoundryService AtomDataSelectionStationBoundryService,
     IAtomDataSelectionHourlyFetchService AtomDataSelectionHourlyFetchService,
-    IAWSS3BucketService AWSS3BucketService, IAuthService AuthService) : IAtomDataSelectionStationService
+    IAWSS3BucketService AWSS3BucketService, IAuthService AuthService,
+    IMongoDbClientFactory MongoDbClientFactory) : IAtomDataSelectionStationService
     {
         // MongoDB collection for job documents
         private IMongoCollection<JobDocument>? _jobCollection;
@@ -172,13 +174,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     if (dataselectordownloadtype == "dataSelectorSingle")
                     {
                         // Setup MongoDB collection
-                        var mongoConn = Environment.GetEnvironmentVariable("MONGO_CONNECTION_STRING") ?? "mongodb://localhost:27017";
-                        var mongoDb = Environment.GetEnvironmentVariable("MONGO_DATABASE") ?? "AqieHistoricaldataBackend";
-                        var mongoCollection = Environment.GetEnvironmentVariable("MONGO_JOB_COLLECTION_NAME") ?? "aqie_export_jobs";
+                        //var mongoConn = Environment.GetEnvironmentVariable("MONGO_CONNECTION_STRING") ?? "mongodb://localhost:27017";
+                        //var mongoDb = Environment.GetEnvironmentVariable("MONGO_DATABASE") ?? "AqieHistoricaldataBackend";
+                        //var mongoCollection = Environment.GetEnvironmentVariable("MONGO_JOB_COLLECTION_NAME") ?? "aqie_csvexport_jobs";
 
-                        var client1 = new MongoClient(mongoConn);
-                        var db = client1.GetDatabase(mongoDb);
-                        _jobCollection = db.GetCollection<JobDocument>(mongoCollection);
+                        //var client1 = new MongoClient(mongoConn);
+                        //var db = client1.GetDatabase(mongoDb);
+                        //_jobCollection = db.GetCollection<JobDocument>(mongoCollection);
+
+                        _jobCollection = MongoDbClientFactory.GetCollection<JobDocument>("aqie_csvexport_jobs");
 
                         // ensure index on JobId for quick lookup
                         var indexKeys = Builders<JobDocument>.IndexKeys.Ascending(j => j.JobId);
