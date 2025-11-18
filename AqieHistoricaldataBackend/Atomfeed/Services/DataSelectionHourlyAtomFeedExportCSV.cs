@@ -74,22 +74,22 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 //    {
                 //        await csv.WriteRecordsAsync(Final_list.Select(item => new FinalDataCsv
                 //        {
-                            //StartTime = item.StartTime?.Trim(),
-                            //EndTime = item.EndTime?.Trim(),
-                            //Status = (item.Verification switch
-                            //{
-                            //    "1" => "V",
-                            //    "2" => "P",
-                            //    "3" => "N",
-                            //    _ => "others"
-                            //}),
-                            //Unit = "ugm-3", // No whitespace to trim here
-                            //Value = (item.Value == "-99" ? "no data" : item.Value)?.Trim(),
-                            //PollutantName = item.PollutantName?.Trim(),
-                            //SiteName = item.SiteName?.Trim(),
-                            //SiteType = item.SiteType?.Trim(),
-                            //Region = item.Region?.Trim(),
-                            //Country = item.Country?.Trim()
+                //            StartTime = item.StartTime?.Trim(),
+                //            EndTime = item.EndTime?.Trim(),
+                //            Status = (item.Verification switch
+                //            {
+                //                "1" => "V",
+                //                "2" => "P",
+                //                "3" => "N",
+                //                _ => "others"
+                //            }),
+                //            Unit = "ugm-3", // No whitespace to trim here
+                //            Value = (item.Value == "-99" ? "no data" : item.Value)?.Trim(),
+                //            PollutantName = item.PollutantName?.Trim(),
+                //            SiteName = item.SiteName?.Trim(),
+                //            SiteType = item.SiteType?.Trim(),
+                //            Region = item.Region?.Trim(),
+                //            Country = item.Country?.Trim()
                 //        }));
                 //    }
                 //}
@@ -163,7 +163,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 //    return zipStream.ToArray();
                 //}
 
-                //final prod enviornment use the below code
+                //final version prod enviornment use the below code
+                logger.LogInformation("zipStream started {Starttime}", DateTime.Now);
                 using (var zipStream = new MemoryStream())
                 {
                     using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true))
@@ -186,7 +187,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                     "3" => "N",
                                     _ => "others"
                                 }),
-                                Unit = "ugm-3", 
+                                Unit = "ugm-3",
                                 Value = (item.Value == "-99" ? "no data" : item.Value)?.Trim(),
                                 PollutantName = item.PollutantName?.Trim(),
                                 SiteName = item.SiteName?.Trim(),
@@ -199,9 +200,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
 
                     zipStream.Position = 0; // Reset position before reading
+                    logger.LogInformation("zipStream ended {Starttime}", DateTime.Now);
                     return zipStream.ToArray(); // Return the zipped content as byte array
                 }
-
                 //final final prod environment code use below code
                 // Transform the data (deferred execution, no .ToList())
                 //var transformedData = Final_list

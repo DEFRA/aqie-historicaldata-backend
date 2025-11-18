@@ -45,24 +45,30 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     logger.LogInformation("dataSelectorHourly entered {Starttime}", DateTime.Now);
                     if (data.dataselectordownloadtype == "dataSelectorSingle")
                     {
-                        logger.LogInformation("dataSelectorSingle entered {Starttime}", DateTime.Now);
+                        logger.LogInformation("dataSelectorSingle started {Starttime}", DateTime.Now);
                         csvBytes = await GetDataselectorCsvBytesAsync(Final_list, data, downloadtype);
+                        logger.LogInformation("csvBytes generated ended {Starttime}", DateTime.Now);
                     }
                     else
                     {
                         logger.LogInformation("else part {Starttime}", DateTime.Now);
                         csvBytes = await GetDataselectorCsvBytesAsync(Final_list, data, downloadtype);
                     }
-                    key = dataselectorGenerateS3Key(data);  region = GetAwsRegion();
+                    key = dataselectorGenerateS3Key(data);
+                    logger.LogInformation("dataselectorGenerateS3Key entered {Starttime}", DateTime.Now);
+                    region = GetAwsRegion();
+                    logger.LogInformation("GetAwsRegion entered {Starttime}", DateTime.Now);
                     bucketName = GetBucketName();
+                    logger.LogInformation("GetBucketName entered {Starttime}", DateTime.Now);
                     await UploadToS3Async(csvBytes, bucketName, key);
+                    logger.LogInformation("UploadToS3Async entered {Starttime}", DateTime.Now);
                     return await GeneratePresignedUrlAsync(bucketName, key);
                 }
                 else
                 {
                     logger.LogInformation("else dataSelectorHourly entered {Starttime}", DateTime.Now);
                     csvBytes = await GetCsvBytesAsync(Final_list, data, downloadtype);
-                    key = GenerateS3Key(data);  region = GetAwsRegion();
+                    key = GenerateS3Key(data); region = GetAwsRegion();
                     bucketName = GetBucketName();
                     await UploadToS3Async(csvBytes, bucketName, key);
                     return await GeneratePresignedUrlAsync(bucketName, key);
@@ -72,8 +78,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError("Error AWS S3 bucket Info message {Error}", ex.Message);
-                logger.LogError("Error AWS S3 bucket Info stacktrace {Error}", ex.StackTrace);
+                logger.LogError("Error writecsvtoawss3bucket AWS S3 bucket Info message {Error}", ex.Message);
+                logger.LogError("Error writecsvtoawss3bucket AWS S3 bucket Info stacktrace {Error}", ex.StackTrace);
                 return string.Empty;
             }
         }
