@@ -40,7 +40,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 string bucketName = GetBucketName();
                 string region = GetAwsRegion();
 
-                if (downloadtype == "dataSelectorHourly")
+                if (data.dataselectorfiltertype == "dataSelectorHourly")
                 {
                     logger.LogInformation("dataSelectorHourly entered {Starttime}", DateTime.Now);
                     if (data.dataselectordownloadtype == "dataSelectorSingle")
