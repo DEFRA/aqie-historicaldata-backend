@@ -1,4 +1,7 @@
+using Amazon.S3;
 using CsvHelper;
+using NetTopologySuite.Index.HPRtree;
+using System.Diagnostics.Metrics;
 using System.Globalization;
 using System.IO.Compression;
 using System.Text;
@@ -71,22 +74,22 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 //    {
                 //        await csv.WriteRecordsAsync(Final_list.Select(item => new FinalDataCsv
                 //        {
-                //            StartTime = item.StartTime,
-                //            EndTime = item.EndTime,
-                //            Status = item.Verification switch
-                //            {
-                //                "1" => "V",
-                //                "2" => "P",
-                //                "3" => "N",
-                //                _ => "others"
-                //            },
-                //            Unit = "ugm-3",
-                //            Value = item.Value == "-99" ? "no data" : item.Value,
-                //            PollutantName = item.PollutantName,
-                //            SiteName = item.SiteName,
-                //            SiteType = item.SiteType,
-                //            Region = item.Region,
-                //            Country = item.Country
+                            //StartTime = item.StartTime?.Trim(),
+                            //EndTime = item.EndTime?.Trim(),
+                            //Status = (item.Verification switch
+                            //{
+                            //    "1" => "V",
+                            //    "2" => "P",
+                            //    "3" => "N",
+                            //    _ => "others"
+                            //}),
+                            //Unit = "ugm-3", // No whitespace to trim here
+                            //Value = (item.Value == "-99" ? "no data" : item.Value)?.Trim(),
+                            //PollutantName = item.PollutantName?.Trim(),
+                            //SiteName = item.SiteName?.Trim(),
+                            //SiteType = item.SiteType?.Trim(),
+                            //Region = item.Region?.Trim(),
+                            //Country = item.Country?.Trim()
                 //        }));
                 //    }
                 //}
@@ -174,22 +177,22 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         {
                             await csv.WriteRecordsAsync(Final_list.Select(item => new FinalDataCsv
                             {
-                                StartTime = item.StartTime,
-                                EndTime = item.EndTime,
-                                Status = item.Verification switch
+                                StartTime = item.StartTime?.Trim(),
+                                EndTime = item.EndTime?.Trim(),
+                                Status = (item.Verification switch
                                 {
                                     "1" => "V",
                                     "2" => "P",
                                     "3" => "N",
                                     _ => "others"
-                                },
-                                Unit = "ugm-3",
-                                Value = item.Value == "-99" ? "no data" : item.Value,
-                                PollutantName = item.PollutantName,
-                                SiteName = item.SiteName,
-                                SiteType = item.SiteType,
-                                Region = item.Region,
-                                Country = item.Country
+                                }),
+                                Unit = "ugm-3", // No whitespace to trim here
+                                Value = (item.Value == "-99" ? "no data" : item.Value)?.Trim(),
+                                PollutantName = item.PollutantName?.Trim(),
+                                SiteName = item.SiteName?.Trim(),
+                                SiteType = item.SiteType?.Trim(),
+                                Region = item.Region?.Trim(),
+                                Country = item.Country?.Trim()
                             }));
                             await writer.FlushAsync();
                         }
