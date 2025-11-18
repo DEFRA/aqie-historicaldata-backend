@@ -261,25 +261,40 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             private async Task<JArray> FetchAtomFeedAsync(string siteID, string year)
             {
-                try
+            // 1. Null/empty check
+            if (string.IsNullOrWhiteSpace(siteID) || string.IsNullOrWhiteSpace(year))
+            {
+                Logger.LogWarning("Invalid FetchAtomFeedAsync siteID or year: siteID='{SiteID}', year='{Year}'", siteID, year);
+                return new JArray();
+            }
+            var client = httpClientFactory.CreateClient("Atomfeed");
+            var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
+            try
+            {
+                var response = await client.GetAsync(url);
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    var client = httpClientFactory.CreateClient("Atomfeed");
-                    var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
-                    var response = await client.GetAsync(url);
-                    response.EnsureSuccessStatusCode();
-
-                    var stream = await response.Content.ReadAsStreamAsync();
-                    var xml = new XmlDocument();
-                    xml.Load(stream);
-                    var json = Newtonsoft.Json.JsonConvert.SerializeXmlNode(xml);
-                    return JObject.Parse(json)["gml:FeatureCollection"]["gml:featureMember"] as JArray;
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError("Error fetching Atom feed: {Error}", ex);
+                    Logger.LogWarning("Atom feed not found (404) for URL: {Url} (siteID: {SiteID}, year: {Year})", url, siteID, year);
                     return new JArray();
                 }
+                response.EnsureSuccessStatusCode();
+                var stream = await response.Content.ReadAsStreamAsync();
+                var xml = new XmlDocument();
+                xml.Load(stream);
+                var json = Newtonsoft.Json.JsonConvert.SerializeXmlNode(xml);
+                return JObject.Parse(json)["gml:FeatureCollection"]["gml:featureMember"] as JArray;
             }
+            catch (HttpRequestException ex)
+            {
+                Logger.LogError("HTTP error FetchAtomFeedAsync fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex.Message);
+                return new JArray();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error FetchAtomFeedAsync fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex);
+                return new JArray();
+            }
+        }
 
         //private List<PollutantDetails> GetPollutantsToDisplay(string filter)
         //{
