@@ -366,6 +366,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     // 1) generate csv bytes in background by fetching hourly data
                     var csvData = await AtomDataSelectionHourlyFetchService.GetAtomDataSelectionHourlyFetchService(job.StationData, job.PollutantName, job.Year);
+                    Logger.LogInformation("Background job {JobId} generated CSV data of count {Count}", job.JobId, csvData.Count);
 
                     // 2) write CSV to S3 and get presigned url
                     var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, job.Data, job.DownloadType);

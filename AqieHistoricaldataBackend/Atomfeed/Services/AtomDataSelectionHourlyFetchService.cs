@@ -218,6 +218,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 //mulitple year and multiple site with limit 20 concurrent requests with parllel foreach more optimised code
                 var years = filteryear.Split(',');
                 var stopwatch = Stopwatch.StartNew();
+                Logger.LogInformation("Fetch and processing started in {ElapsedSeconds} seconds.", stopwatch.Elapsed.TotalSeconds);
                 var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
                 var resultsBag = new ConcurrentBag<FinalData>();
                 var siteYearPairs = filtered_station_pollutant
@@ -235,6 +236,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         {
                             var errorMessage = $"Error processing site {pair.siteinfo.LocalSiteId} for year {pair.year}: {ex.Message}";
                             Console.WriteLine(errorMessage);
+                            Logger.LogError("Error processing site {SiteID} for year {Year}: {Error}", pair.siteinfo.LocalSiteId, pair.year, ex.Message);
                             File.AppendAllTextAsync("error_log.txt", $"{DateTime.Now}: {errorMessage}{Environment.NewLine}");
                         }                    
                 });
@@ -243,6 +245,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 stopwatch.Stop();
                 Console.WriteLine($"Fetch and processing completed in {stopwatch.Elapsed.TotalSeconds} seconds.");
+                Logger.LogInformation("Fetch and processing completed in {ElapsedSeconds} seconds.", stopwatch.Elapsed.TotalSeconds);
 
                 var formattedDuration = stopwatch.Elapsed.ToString(@"hh\:mm\:ss");
                 File.AppendAllText("fetch_duration_log.txt", $"Fetch completed at {DateTime.Now} - Duration: {formattedDuration}{Environment.NewLine}");
@@ -270,7 +273,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var client = httpClientFactory.CreateClient("Atomfeed");
             var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
             try
-            {
+            {               
                 var response = await client.GetAsync(url);
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
