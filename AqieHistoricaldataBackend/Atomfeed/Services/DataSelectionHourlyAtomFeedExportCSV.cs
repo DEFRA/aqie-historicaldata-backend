@@ -186,7 +186,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                     "3" => "N",
                                     _ => "others"
                                 }),
-                                Unit = "ugm-3", // No whitespace to trim here
+                                Unit = "ugm-3", 
                                 Value = (item.Value == "-99" ? "no data" : item.Value)?.Trim(),
                                 PollutantName = item.PollutantName?.Trim(),
                                 SiteName = item.SiteName?.Trim(),
