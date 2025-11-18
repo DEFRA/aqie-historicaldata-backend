@@ -121,7 +121,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         private string dataselectorGenerateS3Key(QueryStringData data)
         {
             //return $"{data.SiteName}_{data.DownloadPollutant}_{data.DownloadPollutantType}_{data.Year}.csv";
-            return $"{data.dataSource}_{data.pollutantName}_{data.Region}_{data.Year}.csv";
+            return $"{data.dataSource}_{data.pollutantName}_{data.Region}_{data.Year}.zip";
         }
         private async Task UploadToS3Async(byte[] csvBytes, string bucketName, string key)
         {
