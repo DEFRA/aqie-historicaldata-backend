@@ -79,8 +79,8 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     });
 
     // Add Hangfire services.
-    builder.Services.AddHangfire(config => config.UseMemoryStorage());
-    builder.Services.AddHangfireServer();
+    //builder.Services.AddHangfire(config => config.UseMemoryStorage());
+    //builder.Services.AddHangfireServer();
     // Register AWS SDK services
     builder.Services.AddAWSService<IAmazonS3>();
     if(builder.Environment.IsDevelopment())
@@ -128,6 +128,6 @@ static WebApplication SetupApplication(WebApplication app)
     // Example module, remove before deploying!
     app.UseExampleEndpoints();
     app.UseServiceAtomHistoryEndpoints();
-    app.UseHangfireDashboard("/hangfire");
+    //app.UseHangfireDashboard("/hangfire");
     return app;
 }
