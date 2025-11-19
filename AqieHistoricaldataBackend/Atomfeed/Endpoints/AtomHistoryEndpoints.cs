@@ -19,21 +19,21 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             app.MapPost("AtomDataSelection", GetAtomDataSelection);
             app.MapPost("AtomDataSelectionJobStatus", GetAtomDataSelectionJobStatus);
         }
-        private static async Task<IResult> GetHealthcheckdata(IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
-        {
-            try
-            {
-                var matches = await Persistence.AtomHealthcheck();
-                return Results.Ok(matches);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError("Error GetHealthcheckdata endpoints Info message {Error}", ex.Message);
-                logger.LogError("Error GetHealthcheckdata endpoints Info stacktrace {Error}", ex.StackTrace);
-                return Results.NotFound();
+        //private static async Task<IResult> GetHealthcheckdata(IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
+        //{
+        //    try
+        //    {
+        //        var matches = await Persistence.AtomHealthcheck();
+        //        return Results.Ok(matches);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        logger.LogError("Error GetHealthcheckdata endpoints Info message {Error}", ex.Message);
+        //        logger.LogError("Error GetHealthcheckdata endpoints Info stacktrace {Error}", ex.StackTrace);
+        //        return Results.NotFound();
 
-            }
-        }
+        //    }
+        //}
         private static async Task<IResult> GetHistorydataById([FromBody] QueryStringData data,IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {
             try
