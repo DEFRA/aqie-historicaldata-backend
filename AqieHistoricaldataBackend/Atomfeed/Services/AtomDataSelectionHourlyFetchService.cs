@@ -223,7 +223,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var resultsBag = new ConcurrentBag<FinalData>();
                 var siteYearPairs = filtered_station_pollutant
                                     .SelectMany(siteinfo => years.Select(year => new { siteinfo, year }));
-                await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 20 }, async (pair, _) =>
+                await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 5 }, async (pair, _) =>
                 {
                         try
                         {

@@ -6,7 +6,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public interface IAtomHistoryService
     {
         [ExcludeFromCodeCoverage]
-        public Task<string> AtomHealthcheck();
+        //public Task<string> AtomHealthcheck();
         public Task<string> GetAtomHourlydata(QueryStringData data);
 
         public Task<dynamic> GetHistoryexceedencedata(QueryStringData data);
