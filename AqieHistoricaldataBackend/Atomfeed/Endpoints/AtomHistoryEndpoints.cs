@@ -12,7 +12,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
     {       
         public static void UseServiceAtomHistoryEndpoints(this IEndpointRouteBuilder app)
         {
-            app.MapGet("AtomHistoryHealthchecks", GetHealthcheckdata);
+            //app.MapGet("AtomHistoryHealthchecks", GetHealthcheckdata);
             app.MapGet("AtomHistoryHourlydata", GetHistorydataById);
             app.MapPost("AtomHistoryHourlydata", GetHistorydataById);
             app.MapPost("AtomHistoryexceedence", GetHistoryexceedence);
