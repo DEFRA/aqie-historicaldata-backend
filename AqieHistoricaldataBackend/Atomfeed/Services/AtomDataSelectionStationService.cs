@@ -2,6 +2,7 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using AqieHistoricaldataBackend.Atomfeed.Models;
 using AqieHistoricaldataBackend.Utils.Mongo;
+using Hangfire.Common;
 using Hangfire.MemoryStorage.Database;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
@@ -81,7 +82,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         // Primary constructor parameters are available as fields by the primary-constructor syntax used in this project.
         // (Logger, httpClientFactory, AtomDataSelectionStationBoundryService, AtomDataSelectionHourlyFetchService, AWSS3BucketService, AuthService)
 
-        public async Task<string> GetAtomDataSelectionStation(string pollutantName, string datasource, string year, string region, string dataselectorfiltertype, string dataselectordownloadtype)
+        public async Task<string> GetAtomDataSelectionStation(string pollutantName, string datasource, 
+            string year, string region, string dataselectorfiltertype, string dataselectordownloadtype, string email)
         {
 
             try
@@ -93,8 +95,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     Year = year,
                     Region = region,
                     dataselectorfiltertype = dataselectorfiltertype,
-                    dataselectordownloadtype = dataselectordownloadtype
+                    dataselectordownloadtype = dataselectordownloadtype,
+                    email = email
                 };
+
+
 
                 //For CDP
                 var token = await GetRicardoToken();
@@ -173,14 +178,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     if (dataselectordownloadtype == "dataSelectorSingle")
                     {
-                        // Setup MongoDB collection
-                        //var mongoConn = Environment.GetEnvironmentVariable("MONGO_CONNECTION_STRING") ?? "mongodb://localhost:27017";
-                        //var mongoDb = Environment.GetEnvironmentVariable("MONGO_DATABASE") ?? "AqieHistoricaldataBackend";
-                        //var mongoCollection = Environment.GetEnvironmentVariable("MONGO_JOB_COLLECTION_NAME") ?? "aqie_csvexport_jobs";
-
-                        //var client1 = new MongoClient(mongoConn);
-                        //var db = client1.GetDatabase(mongoDb);
-                        //_jobCollection = db.GetCollection<JobDocument>(mongoCollection);
 
                         _jobCollection = MongoDbClientFactory.GetCollection<JobDocument>("aqie_csvexport_jobs");
 
@@ -199,6 +196,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             EndTime = null,
                             ErrorReason = null,
                             ResultUrl = null,
+                            //email = email,
+                            //mailSent = null,
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
                         };
@@ -215,11 +214,28 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             DownloadType = dataselectordownloadtype
                         };
 
-                        await _jobChannel.Writer.WriteAsync(job);
-                        _ = EnsureQueueProcessorStartedAsync(); // fire-and-forget ensure processor running
+                        //if (dataselectordownloadtype == "dataSelectorSingle")
+                        //{
+                            await _jobChannel.Writer.WriteAsync(job);
+                            _ = EnsureQueueProcessorStartedAsync(); // fire-and-forget ensure processor running
 
-                        // Return the job id immediately to front-end
-                        return jobId;
+                            // Return the job id immediately to front-end
+                            return jobId;
+                        //}
+                    }
+                    else
+                    {
+                        // dataselectordownloadtype == "dataSelectorMultiple"
+                        // 1) generate csv bytes in background by fetching hourly data
+                        Logger.LogInformation("Mail job strated generating CSV data");
+                        var csvData = await AtomDataSelectionHourlyFetchService.GetAtomDataSelectionHourlyFetchService(stationData, pollutantName, year);
+                        Logger.LogInformation("Mail job completed generating CSV data of count {Count}", csvData.Count);
+                        // 2) write CSV to S3 and get presigned url
+                        Logger.LogInformation("Mail job presigned strated writecsvtoawss3bucket");
+                        var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, queryStringData, dataselectordownloadtype);
+                        Logger.LogInformation("Mail job presigned completed writecsvtoawss3bucket");
+                        //var presignedUrl = "test";
+                        return presignedUrl;
                     }
                 }
 
@@ -396,64 +412,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        // Public helper to query job status/result from MongoDB by jobId
-        //public async Task<JobDocument?> GetJobInfoAsync(string jobId)
-        //{
-        //    if (string.IsNullOrWhiteSpace(jobId)) return null;
-        //    if (_jobCollection == null) return null;
-        //    var filter = Builders<JobDocument>.Filter.Eq(d => d.JobId, jobId);
-        //    return await _jobCollection.Find(filter).FirstOrDefaultAsync();
-        //}
-
-        // Internal classes used for queue and MongoDB persistence
-        //private sealed class JobItem
-        //{
-        //    public string JobId { get; init; } = string.Empty;
-        //    public List<SiteInfo> StationData { get; init; } = new();
-        //    public string PollutantName { get; init; } = string.Empty;
-        //    public string Year { get; init; } = string.Empty;
-        //    public QueryStringData Data { get; init; } = new();
-        //    public string DownloadType { get; init; } = string.Empty;
-        //}
-
-        //public sealed class JobDocument
-        //{
-        //    [BsonId]
-        //    [BsonRepresentation(BsonType.ObjectId)]
-        //    public string? Id { get; set; }
-
-        //    [BsonElement("jobId")]
-        //    public string JobId { get; set; } = string.Empty;
-
-        //    [BsonElement("status")]
-        //    public JobStatusEnum Status { get; set; }
-
-        //    [BsonElement("startTime")]
-        //    public DateTime StartTime { get; set; }
-
-        //    [BsonElement("endTime")]
-        //    public DateTime? EndTime { get; set; }
-
-        //    [BsonElement("errorReason")]
-        //    public string? ErrorReason { get; set; }
-
-        //    [BsonElement("resultUrl")]
-        //    public string? ResultUrl { get; set; }
-
-        //    [BsonElement("createdAt")]
-        //    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-        //    [BsonElement("updatedAt")]
-        //    public DateTime? UpdatedAt { get; set; }
-        //}
-
-        //public enum JobStatusEnum
-        //{
-        //    Pending,
-        //    Processing,
-        //    Completed,
-        //    Failed
-        //}
+        
     }
 
 
