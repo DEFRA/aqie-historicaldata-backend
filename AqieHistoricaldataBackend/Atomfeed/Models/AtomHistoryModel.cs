@@ -55,6 +55,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? dataselectorfiltertype { get; set; }
             public string? dataselectordownloadtype { get; set; }
             public string? jobId { get; set; }
+            public string? email { get; set; }
         }
 
         public class PivotPollutant
@@ -105,8 +106,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             //public string? StartDate { get; init; }
             //public string? EndDate { get; init; }
             public List<PollutantInfo> Pollutants { get; set; } = new List<PollutantInfo>();
+            public string Country { get; set; }
         }
-
+        public class SiteInfoWithCountry
+        {
+            public SiteInfo Site { get; set; }
+            public string Country { get; set; }
+        }
         public sealed class JobItem
         {
             public string JobId { get; init; } = string.Empty;
@@ -148,6 +154,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public DateTime? UpdatedAt { get; set; }
         }
 
+      
         public enum JobStatusEnum
         {
             Pending,
@@ -166,6 +173,45 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public DateTime? UpdatedAt { get; init; }
             public DateTime? StartTime { get; init; }
             public DateTime? EndTime { get; init; }
+        }
+
+        public class eMailJobDocument
+        {
+            [BsonId]
+            [BsonRepresentation(BsonType.ObjectId)]
+            public string? Id { get; set; }
+            [BsonElement("jobId")]
+            public string JobId { get; set; } = string.Empty;
+            [BsonElement("pollutantName")]
+            public string PollutantName { get; set; }
+            [BsonElement("dataSource")]
+            public string DataSource { get; set; }
+            [BsonElement("year")]
+            public string Year { get; set; }
+            [BsonElement("region")]
+            public string Region { get; set; }
+            [BsonElement("dataselectorfiltertype")]
+            public string Dataselectorfiltertype { get; set; }
+            [BsonElement("dataselectordownloadtype")]
+            public string Dataselectordownloadtype { get; set; }
+            [BsonElement("status")]
+            public JobStatusEnum Status { get; set; }
+            [BsonElement("startTime")]
+            public DateTime? StartTime { get; set; }
+            [BsonElement("endTime")]
+            public DateTime? EndTime { get; set; }
+            [BsonElement("errorReason")]
+            public string ErrorReason { get; set; }
+            [BsonElement("resultUrl")]
+            public string ResultUrl { get; set; }
+            [BsonElement("email")]
+            public string Email { get; set; }
+            [BsonElement("mailSent")]
+            public bool? MailSent { get; set; }
+            [BsonElement("createdAt")]
+            public DateTime CreatedAt { get; set; }
+            [BsonElement("updatedAt")]
+            public DateTime? UpdatedAt { get; set; }
         }
     }
 }

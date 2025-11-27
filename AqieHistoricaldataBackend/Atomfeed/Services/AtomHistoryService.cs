@@ -43,6 +43,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService, IAtomAnnualFetchService AtomAnnualFetchService,
         IAWSS3BucketService AWSS3BucketService, IAtomDataSelectionService AtomDataSelectionService,
         IAtomDataSelectionJobStatus AtomDataSelectionJobStatus,
+        IAtomDataSelectionEmailJobService AtomDataSelectionEmailJobService,
         IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService
     {
         //public async Task<string> AtomHealthcheck()
@@ -173,6 +174,21 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 logger.LogError("Error in GetAtomDataSelectionJobStatus {Error}", ex.Message);
                 logger.LogError("Error in GetAtomDataSelectionJobStatus {Error}", ex.StackTrace);
                 return default(JobInfoDto); // Return default value for JobInfoDto instead of "Failure"
+            }
+        }
+
+        public async Task<dynamic> GetAtomemailjobDataSelection(QueryStringData data)
+        {
+            try
+            {
+                var emailJobresult = await AtomDataSelectionEmailJobService.GetAtomemailjobDataSelection(data);
+                return emailJobresult;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError("Error in Atom GetatomDataSelectiondata {Error}", ex.Message);
+                logger.LogError("Error in Atom GetatomDataSelectiondata {Error}", ex.StackTrace);
+                return "Failure";
             }
         }
     }
