@@ -3,9 +3,9 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public interface IAtomDataSelectionStationBoundryService
+    public interface IAtomDataSelectionLocalAuthoritiesService
     {
         [ExcludeFromCodeCoverage]
-        Task<List<SiteInfo>> GetAtomDataSelectionStationBoundryService(List<SiteInfo> filteredstationpollutant, string region, string regiontype);
+        Task<List<LocalAuthorityData>> GetAtomDataSelectionLocalAuthoritiesService(string region);
     }
 }

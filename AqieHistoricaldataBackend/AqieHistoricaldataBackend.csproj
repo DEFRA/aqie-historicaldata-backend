@@ -27,6 +27,7 @@
     <PackageReference Include="NetTopologySuite" Version="2.6.0" />
     <PackageReference Include="NetTopologySuite.IO.GeoJSON" Version="4.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="ProjNET" Version="2.1.0" />
     <PackageReference Include="RichardSzalay.MockHttp" Version="7.0.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.2" />
     <PackageReference Include="Serilog.Enrichers.ClientInfo" Version="2.1.2" />

@@ -67,6 +67,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionStationService(ILogger<HistoryexceedenceService> Logger,
         IHttpClientFactory httpClientFactory,
     IAtomDataSelectionStationBoundryService AtomDataSelectionStationBoundryService,
+    IAtomDataSelectionLocalAuthoritiesService AtomDataSelectionLocalAuthoritiesService,
     IAtomDataSelectionHourlyFetchService AtomDataSelectionHourlyFetchService,
     IAWSS3BucketService AWSS3BucketService, IAuthService AuthService,
     IMongoDbClientFactory MongoDbClientFactory) : IAtomDataSelectionStationService
@@ -83,7 +84,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         // (Logger, httpClientFactory, AtomDataSelectionStationBoundryService, AtomDataSelectionHourlyFetchService, AWSS3BucketService, AuthService)
 
         public async Task<string> GetAtomDataSelectionStation(string pollutantName, string datasource, 
-            string year, string region, string dataselectorfiltertype, string dataselectordownloadtype, string email)
+            string year, string region, string regiontype, string dataselectorfiltertype, string dataselectordownloadtype, string email)
         {
 
             try
@@ -94,12 +95,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     dataSource = datasource,
                     Year = year,
                     Region = region,
+                    regiontype = regiontype,
                     dataselectorfiltertype = dataselectorfiltertype,
                     dataselectordownloadtype = dataselectordownloadtype,
                     email = email
                 };
-
-
 
                 //For CDP
                 var token = await GetRicardoToken();
@@ -166,8 +166,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         }))
                     .ToList();
 
-                var stationData = await AtomDataSelectionStationBoundryService.GetAtomDataSelectionStationBoundryService(filterpollutantyear, region);
-
+                var stationData = await AtomDataSelectionStationBoundryService.GetAtomDataSelectionStationBoundryService(filterpollutantyear, region, regiontype);
                 var stationcountresult = stationData.Count();
 
                 if (dataselectorfiltertype == "dataSelectorCount")

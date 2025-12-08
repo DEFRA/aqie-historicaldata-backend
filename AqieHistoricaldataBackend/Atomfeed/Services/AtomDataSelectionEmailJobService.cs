@@ -42,6 +42,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     DataSource = data.dataSource,
                     Year = data.Year,
                     Region = data.Region,
+                    Regiontype = data.regiontype,
                     Dataselectorfiltertype = data.dataselectorfiltertype,
                     Dataselectordownloadtype = data.dataselectordownloadtype,
                     Status = JobStatusEnum.Pending,
@@ -102,6 +103,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             job.DataSource,
                             job.Year,
                             job.Region,
+                            job.Regiontype,
                             job.Dataselectorfiltertype,
                             job.Dataselectordownloadtype,
                             job.Email
