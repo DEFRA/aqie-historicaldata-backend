@@ -59,13 +59,19 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     {
         httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/");
     
-    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>(); ;
+    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>(); 
 
     builder.Services.AddHttpClient("RicardoNewAPI", httpClient =>
     {
         httpClient.BaseAddress = new Uri("https://api-ukair.defra.gov.uk/");
 
-    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>(); ;
+    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
+
+    builder.Services.AddHttpClient("laqmAPI", httpClient =>
+    {
+        httpClient.BaseAddress = new Uri("https://www.laqmportal.co.uk/");
+
+    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
 
 
     // Propagate trace header.
@@ -111,6 +117,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAtomDataSelectionService, AtomDataSelectionService>();
     builder.Services.AddSingleton<IAtomDataSelectionStationService, AtomDataSelectionStationService>();
     builder.Services.AddSingleton<IAtomDataSelectionStationBoundryService, AtomDataSelectionStationBoundryService>();
+    builder.Services.AddSingleton<IAtomDataSelectionLocalAuthoritiesService, AtomDataSelectionLocalAuthoritiesService>();
     builder.Services.AddSingleton<IAtomDataSelectionHourlyFetchService, AtomDataSelectionHourlyFetchService>();
     builder.Services.AddSingleton<IDataSelectionHourlyAtomFeedExportCSV, DataSelectionHourlyAtomFeedExportCSV>();
     builder.Services.AddSingleton<IAuthService, AuthService>();

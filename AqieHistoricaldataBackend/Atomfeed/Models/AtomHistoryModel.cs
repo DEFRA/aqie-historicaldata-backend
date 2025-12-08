@@ -41,6 +41,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
         {
             public string? StationReadDate { get; set; }
             public string? Region { get; set; }
+            public string? regiontype { get; set; }
             public string? SiteType { get; set; }
             public string? SiteName { get; set; }
             public string? SiteId { get; set; }
@@ -190,6 +191,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string Year { get; set; }
             [BsonElement("region")]
             public string Region { get; set; }
+            [BsonElement("regiontype")]
+            public string Regiontype { get; set; }
+            
             [BsonElement("dataselectorfiltertype")]
             public string Dataselectorfiltertype { get; set; }
             [BsonElement("dataselectordownloadtype")]
