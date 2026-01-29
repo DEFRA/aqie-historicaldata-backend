@@ -101,6 +101,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     email = email
                 };
 
+
+
                 //For CDP
                 var token = await GetRicardoToken();
 
@@ -301,7 +303,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var token = await AuthService.GetTokenAsync(emailFromConfig, passwordFromConfig);
             if (string.IsNullOrEmpty(token))
             {
-                Logger.LogError("Auth failed - no token returned");
+                Logger.LogError("GetRicardoToken Auth failed - no token returned");
                 return "Failure";
             }
             return token;
@@ -313,24 +315,38 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var result = new List<string>();
             var names = pollutantNames.Split(',');
 
-            var pollutantMap = new Dictionary<string, string>
+            var pollutantMap = new Dictionary<string, List<string>>
             {
-                { "Ozone", "Ozone" },
-                { "PM2.5", "PM<sub>2.5</sub> (Hourly measured)" },
-                { "PM10", "PM<sub>10</sub> (Hourly measured)" },
-                { "NO2", "Nitrogen dioxide" },
-                { "CO", "Carbon monoxide" },
-                { "SO2", "Sulphur dioxide" },
-                { "NOx", "Nitrogen oxides as nitrogen dioxide" },
-                { "NO", "Nitric oxide" }
+                { "Ozone", new List<string> { "Ozone" } },
+                { "PM2.5", new List<string>
+                    {
+                        "PM<sub>2.5</sub> (Hourly measured)",
+                        "Volatile PM<sub>2.5</sub> (Hourly measured)",
+                        "Non-volatile PM<sub>2.5</sub> (Hourly measured)",
+                        "PM<sub>2.5</sub> particulate matter (Hourly measured)"
+                    }
+                },
+                { "PM10", new List<string>
+                    {
+                        "PM<sub>10</sub> (Hourly measured)",
+                        "Volatile PM<sub>10</sub> (Hourly measured)",
+                        "Non-volatile PM<sub>10</sub> (Hourly measured)",
+                        "PM<sub>10</sub> particulate matter (Hourly measured)"
+                    }
+                },
+                { "NO2", new List<string> { "Nitrogen dioxide" } },
+                { "CO", new List<string> { "Carbon monoxide" } },
+                { "SO2", new List<string> { "Sulphur dioxide" } },
+                { "NOx", new List<string> { "Nitrogen oxides as nitrogen dioxide" } },
+                { "NO", new List<string> { "Nitric oxide" } }
             };
 
             foreach (var name in names)
             {
                 var trimmedName = name.Trim();
-                if (pollutantMap.TryGetValue(trimmedName, out var mappedName))
+                if (pollutantMap.TryGetValue(trimmedName, out var mappedNames))
                 {
-                    result.Add(mappedName);
+                    result.AddRange(mappedNames); // Add all mapped values for this key
                 }
                 else if (includeUnknowns)
                 {
@@ -367,7 +383,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 if (_jobCollection == null)
                 {
-                    Logger.LogError("MongoDB job collection is not initialized. Skipping job {JobId}", job.JobId);
+                    Logger.LogError("ProcessQueueAsync MongoDB job collection is not initialized. Skipping job {JobId}", job.JobId);
                     continue;
                 }
 
@@ -381,7 +397,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     // 1) generate csv bytes in background by fetching hourly data
                     var csvData = await AtomDataSelectionHourlyFetchService.GetAtomDataSelectionHourlyFetchService(job.StationData, job.PollutantName, job.Year);
-                    Logger.LogInformation("Background job {JobId} generated CSV data of count {Count}", job.JobId, csvData.Count);
+                    Logger.LogInformation("ProcessQueueAsync Background job {JobId} generated CSV data of count {Count}", job.JobId, csvData.Count);
 
                     // 2) write CSV to S3 and get presigned url
                     var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, job.Data, job.DownloadType);
@@ -398,7 +414,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex, "Background job {JobId} failed", job.JobId);
+                    Logger.LogError(ex, "ProcessQueueAsync Background job {JobId} failed", job.JobId);
 
                     var updateFailed = Builders<JobDocument>.Update
                         .Set(d => d.Status, JobStatusEnum.Failed)

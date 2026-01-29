@@ -121,20 +121,38 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         private List<dynamic> GetDataCapturePercentages(List<FinalData> data, string year)
         {
+            DateTime today = DateTime.Today;
             int currentYear = DateTime.Now.Year;
             int yearToCheck = Convert.ToInt32(year);
-            int daysInYear = (yearToCheck == currentYear)
-                ? (DateTime.Now - new DateTime(currentYear, 1, 1)).Days
-                : (DateTime.IsLeapYear(yearToCheck) ? 366 : 365);
-            int totalPossibleDataPoints = daysInYear * 24;
 
-            return data.Where(p => Convert.ToInt32(p.Validity) > 0)
+            DateTime startInclusive = new DateTime(yearToCheck, 1, 1);
+            DateTime endExclusive = (yearToCheck == currentYear)
+                ? today // up to yesterday (today is exclusive)
+                : new DateTime(yearToCheck + 1, 1, 1);
+
+            // Compute total days consistent with the filter window
+            int daysInWindow = (yearToCheck == currentYear)
+                ? (today - startInclusive).Days           // full days elapsed this year up to yesterday
+                : (DateTime.IsLeapYear(yearToCheck) ? 366 : 365);
+
+            int totalPossibleDataPoints = daysInWindow * 24;
+
+            var result = data
+                .Where(p => Convert.ToInt32(p.Validity) > 0
+                            && DateTime.TryParse(p.StartTime, out var startTimeDt)
+                            && startTimeDt >= startInclusive
+                            && startTimeDt < endExclusive) // <-- correctly bounded to the year
                 .GroupBy(p => p.PollutantName)
                 .Select(g => new
                 {
                     PollutantName = g.Key,
-                    DataCapturePercentage = ((double)g.Select(p => p.StartTime).Distinct().Count() / totalPossibleDataPoints) * 100
-                }).ToList<dynamic>();
+                    //ValidCount = g.Count(),
+                    DataCapturePercentage =
+                        ((double)g.Select(p => DateTime.Parse(p.StartTime)).Distinct().Count() / totalPossibleDataPoints) * 100
+                })
+                .ToList<dynamic>();
+
+            return result;
         }
 
         private List<dynamic> MergeExceedanceData(

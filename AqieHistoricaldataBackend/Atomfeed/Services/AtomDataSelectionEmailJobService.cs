@@ -1,12 +1,17 @@
 using AqieHistoricaldataBackend.Utils.Mongo;
+using Elastic.CommonSchema;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using MongoDB.Driver;
 using System.Net;
+using System.Net.Http.Json;
 using System.Net.Mail;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-
     public interface IEmailService
     {
         Task SendEmailAsync(string to, string subject, string body);
@@ -16,14 +21,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         IAtomHourlyFetchService AtomHourlyFetchService,
         IMongoDbClientFactory MongoDbClientFactory,
         IAtomDataSelectionStationService AtomDataSelectionStationService,
-        IEmailService emailService
+        IEmailService emailService,
+        IHttpClientFactory httpClientFactory
     ) : IAtomDataSelectionEmailJobService
     {
         private readonly IEmailService _emailService = emailService;
+        //private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
         public async Task<string> GetAtomemailjobDataSelection(QueryStringData data)
         {
             try
             {
+                //for local
                 //ProcessPendingEmailJobsAsync();
                 // Declare _jobCollection as a local variable
                 var jobCollection = MongoDbClientFactory.GetCollection<eMailJobDocument>("aqie_csvemailexport_jobs");
@@ -68,6 +76,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
 
         // Change the parameter type of ProcessPendingEmailJobsAsync from string to CancellationToken
+        //public async Task ProcessPendingEmailJobsAsync(CancellationToken stoppingToken)
+        //public async Task ProcessPendingEmailJobsAsync()
         public async Task ProcessPendingEmailJobsAsync(CancellationToken stoppingToken)
         {
             try
@@ -84,7 +94,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var allJobs = await jobCollection.Find(Builders<eMailJobDocument>.Filter.Empty).ToListAsync(stoppingToken);
                 Logger.LogInformation("Total jobs in collection: {Count}", allJobs.Count);
 
-                // Read the filtered data
+                //Read the filtered data
                 var pendingJobs = await jobCollection.Find(filter).ToListAsync(stoppingToken);
                 Logger.LogInformation("Found {Count} pending email jobs.", pendingJobs.Count);
 
@@ -97,33 +107,36 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     try
                     {
-                        // Call the station service for each job
-                        var ResultUrl = await AtomDataSelectionStationService.GetAtomDataSelectionStation(
-                            job.PollutantName,
-                            job.DataSource,
-                            job.Year,
-                            job.Region,
-                            job.Regiontype,
-                            job.Dataselectorfiltertype,
-                            job.Dataselectordownloadtype,
-                            job.Email
-                        );
+                        //Call the station service for each job
+
+                       var ResultUrl = await AtomDataSelectionStationService.GetAtomDataSelectionStation(
+                           job.PollutantName,
+                           job.DataSource,
+                           job.Year,
+                           job.Region,
+                           job.Regiontype,
+                           job.Dataselectorfiltertype,
+                           job.Dataselectordownloadtype,
+                           job.Email
+                       );
 
                         if (!string.IsNullOrEmpty(job.Email) && !string.IsNullOrEmpty(ResultUrl))
-                        {
-                            await _emailService.SendEmailAsync(job.Email, "Your Data Export", $"Download: {job.ResultUrl}");
-                            // Mark job as mail sent (set to "success")
-                            var update = Builders<eMailJobDocument>.Update
-                                .Set(j => j.MailSent, true)
-                                .Set(j => j.UpdatedAt, DateTime.UtcNow);
-                            await jobCollection.UpdateOneAsync(
-                                Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, job.JobId),
-                                update,
-                                cancellationToken: stoppingToken
-                            );
-                        }
-
-                        Logger.LogInformation("Processed email job {JobId} for {Email}", job.JobId, job.Email);
+                            {
+                                //await _emailService.SendEmailAsync(job.Email, "Mail job Your Data Export", $"Download: {job.ResultUrl}");
+                                var mailresult = await MailService(job.Email, ResultUrl);
+                                if (mailresult == "Success")
+                                {
+                                    // Mark job as mail sent (set to "success")
+                                    var update = Builders<eMailJobDocument>.Update
+                                        .Set(j => j.MailSent, true)
+                                        .Set(j => j.UpdatedAt, DateTime.UtcNow);
+                                    await jobCollection.UpdateOneAsync(
+                                        Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, job.JobId),
+                                        update,
+                                        cancellationToken: stoppingToken
+                                    );
+                                }
+                            }
                     }
                     catch (Exception exJob)
                     {
@@ -143,6 +156,54 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             catch (Exception ex)
             {
                 Logger.LogError("Error in ProcessPendingEmailJobsAsync: {Error}", ex.Message);
+            }
+        }
+
+        public async Task<string> MailService(string email, string ResultUrl)
+        {
+            try
+            {
+                var client = httpClientFactory.CreateClient("sendnotification");
+                var url = $"aqie-notify-service/send-notification";
+
+                // Create the request payload
+                var notificationRequest = new
+                {
+                    emailAddress = email,
+                    templateId = Environment.GetEnvironmentVariable("EMAIL_TEMPLATEID"),
+                    personalisation = new
+                    {
+                        datalink = ResultUrl
+                    }
+                };
+
+                // Serialize to JSON and create HttpContent
+                //var jsonContent = JsonSerializer.Serialize(notificationRequest);
+                //var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+                // Send POST request
+                Logger.LogInformation("Sending notification to {BaseAddress}{Url}", client.BaseAddress, url);
+                var response = await client.PostAsJsonAsync(url, notificationRequest);
+                //var response = await client.PostAsync(url, httpContent);
+                Logger.LogInformation("response post email call{Response}", response);
+                if (response.IsSuccessStatusCode)
+                {
+                    Logger.LogInformation("Email notification sent successfully to {response}", response.IsSuccessStatusCode);
+                    return "Success";
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Logger.LogError("Failed to send email notification to {Email}. Status: {StatusCode}, Error: {Error}",
+                        email, response.StatusCode, errorContent);
+                    return "Failure";
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error in mailservice: {Error}", ex.Message);
+                return "Failure";
             }
         }
 

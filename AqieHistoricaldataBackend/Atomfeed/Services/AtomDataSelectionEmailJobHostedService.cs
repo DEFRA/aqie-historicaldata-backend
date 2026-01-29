@@ -22,7 +22,7 @@
 
 //        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
 //        {
-//            _logger.LogInformation("AtomDataSelectionEmailJobHostedService started.");
+//            _logger.LogInformation("AtomDataSelectionEmailJobHostedService started ExecuteAsync.");
 //            while (!stoppingToken.IsCancellationRequested)
 //            {
 //                try
