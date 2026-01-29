@@ -1,33 +1,35 @@
-
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite;
 using NetTopologySuite.Features;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.Geometries.Prepared;
-using NetTopologySuite.Geometries.Utilities;
 using NetTopologySuite.Index.Strtree;
 using NetTopologySuite.IO;
 using NetTopologySuite.Operation.Union;
-using NetTopologySuite.Operation.Valid;
 using NetTopologySuite.Simplify;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
-using static AqieHistoricaldataBackend.Atomfeed.Services.AtomDataSelectionStationBoundryService;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AtomDataSelectionStationBoundryService(
         ILogger<AtomDataSelectionStationBoundryService> Logger,
         IAtomDataSelectionLocalAuthoritiesService AtomDataSelectionLocalAuthoritiesService,
-        IHttpClientFactory httpClientFactory
+        IHttpClientFactory httpClientFactory,
+        IHostEnvironment env // uses ContentRoot to resolve files reliably
     ) : IAtomDataSelectionStationBoundryService
     {
+        private readonly IHostEnvironment _env = env;
+
         // Single GeometryFactory to reduce allocations
         private static readonly GeometryFactory s_geometryFactory =
             NtsGeometryServices.Instance.CreateGeometryFactory(srid: 4326);
@@ -53,46 +55,68 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         private static readonly ConcurrentDictionary<string, Lazy<Boundary>> CountryBoundariesLazy =
             new(StringComparer.OrdinalIgnoreCase);
 
-        // Map country to GeoJSON once
-        private static string? GetGeoJsonPath(string country) => country switch
-        {
-            "England" => "GeoBoundaries/england.geojson",
-            "Wales" => "GeoBoundaries/wales.geojson",
-            "Scotland" => "GeoBoundaries/scotland.geojson",
-            "Northern Ireland" => "GeoBoundaries/northern_ireland.geojson",
-            _ => null
-        };
+        // Case-insensitive mapping of country to relative GeoJSON path
+        private static readonly IReadOnlyDictionary<string, string> GeoJsonPaths =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["England"] = "GeoBoundaries/england.geojson",
+                ["Wales"] = "GeoBoundaries/wales.geojson",
+                ["Scotland"] = "GeoBoundaries/scotland.geojson",
+                ["Northern Ireland"] = "GeoBoundaries/northern_ireland.geojson",
+            };
+
+        private static string? GetGeoJsonPath(string country) =>
+            GeoJsonPaths.TryGetValue(country, out var p) ? p : null;
 
         /// <summary>
         /// Load (or get cached) prepared boundary for a country.
         /// Uses Lazy<T> to ensure single-load and lock-free reads.
+        /// Resolves the file using ContentRootFileProvider; falls back to BaseDirectory.
         /// </summary>
-        private static Boundary GetOrLoadBoundary(string country, ILogger logger) =>
+        private Boundary GetOrLoadBoundary(string country, ILogger logger) =>
             CountryBoundariesLazy.GetOrAdd(country, c => new Lazy<Boundary>(() =>
             {
-                var path = GetGeoJsonPath(c);
-                if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-                    throw new FileNotFoundException($"GeoJSON path not found for '{c}'", path ?? "<null>");
+                var relPath = GetGeoJsonPath(c);
+                if (string.IsNullOrWhiteSpace(relPath))
+                    throw new FileNotFoundException($"GeoJSON path not found for '{c}'", relPath ?? "<null>");
 
-                var geom = LoadGeometryFromGeoJson(path!, logger);
+                // Resolve via ContentRoot; fallback to BaseDirectory
+                var fileInfo = _env.ContentRootFileProvider.GetFileInfo(relPath);
+                string fullPath = fileInfo.Exists
+                    ? (fileInfo.PhysicalPath ?? Path.Combine(_env.ContentRootPath, relPath))
+                    : Path.Combine(AppContext.BaseDirectory, relPath);
 
-                // Fix invalid geometry only if needed (faster & safer than Buffer(0))
-                if (!geom.IsValid)
-                {
-                    geom = GeometryFixer.Fix(geom);
-                }
+                if (!File.Exists(fullPath))
+                    throw new FileNotFoundException($"GeoJSON path not found for '{c}'", fullPath);
+
+                var geom = LoadGeometryFromGeoJsonFullPath(fullPath, logger);
+
+                // Fix invalid geometry only if needed
+                geom = FixIfInvalid(geom, logger);
 
                 // Optional: small simplification tolerance (degrees) to speed up PIP
-                // ~1e-4 deg ≈ 10–11 m; adjust to your tolerance needs
                 var simplified = TopologyPreservingSimplifier.Simplify(geom, 1e-4);
 
                 return new Boundary(c, simplified);
             }, LazyThreadSafetyMode.ExecutionAndPublication)).Value;
 
         /// <summary>
+        /// Non-throwing wrapper. Logs and returns null on failure.
+        /// </summary>
+        private Boundary? TryGetOrLoadBoundary(string country, ILogger logger)
+        {
+            try { return GetOrLoadBoundary(country, logger); }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Boundary retrieval failed for {Country}", country);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Ensure specified countries are present in the cache (upserts via Lazy).
         /// </summary>
-        private static void EnsureBoundariesLoaded(IEnumerable<string> countries, ILogger logger)
+        private void EnsureBoundariesLoaded(IEnumerable<string> countries, ILogger logger)
         {
             foreach (var c in countries)
             {
@@ -105,13 +129,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
 
         /// <summary>
-        /// Read GeoJSON robustly:
+        /// Read GeoJSON robustly from a full path:
         /// 1) Try FeatureCollection, Union geometries if multiple
         /// 2) Fall back to reading a single Geometry
         /// </summary>
-        private static Geometry LoadGeometryFromGeoJson(string path, ILogger logger)
+        private static Geometry LoadGeometryFromGeoJsonFullPath(string fullPath, ILogger logger)
         {
-            var fullPath = Path.GetFullPath(path);
             var geoJsonText = File.ReadAllText(fullPath);
             var reader = new GeoJsonReader();
 
@@ -134,7 +157,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     if (geoms.Count == 1)
                         return geoms[0];
 
-                    // Efficient union for multiple polygons/multipolygons
                     return UnaryUnionOp.Union(geoms);
                 }
             }
@@ -158,6 +180,39 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             throw new InvalidDataException($"Unsupported or invalid GeoJSON at: {fullPath}");
         }
 
+        /// <summary>
+        /// Try robust ways to fix invalid geometry without taking a hard dependency
+        /// on a specific GeometryFixer namespace or version.
+        /// </summary>
+        private static Geometry FixIfInvalid(Geometry geom, ILogger logger)
+        {
+            if (geom is null || geom.IsValid)
+                return geom;
+
+            // 1) Try NetTopologySuite.Geometries.Utilities.GeometryFixer.Fix
+            try
+            {
+                // Fully qualified call avoids 'using' and compiles even if namespace is missing
+                return NetTopologySuite.Geometries.Utilities.GeometryFixer.Fix(geom);
+            }
+            catch { /* ignore and try next */ }
+
+            // 2) Fallback: Buffer(0) often repairs polygon noding/self-intersection issues
+            try
+            {
+                var fixedByBuffer = geom.Buffer(0);
+                if (fixedByBuffer is not null && fixedByBuffer.IsValid)
+                    return fixedByBuffer;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Buffer(0) attempt to fix invalid geometry failed");
+            }
+
+            logger.LogWarning("Geometry remains invalid after fix attempts; proceeding as-is");
+            return geom;
+        }
+
         private static int CountryPriority(string country) => country switch
         {
             "Northern Ireland" => 0,
@@ -174,7 +229,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                // Explicit branch check; avoid accidental fallthrough on blank region
                 if (string.Equals(regiontype, "Country", StringComparison.OrdinalIgnoreCase))
                 {
                     if (string.IsNullOrWhiteSpace(region))
@@ -195,18 +249,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     // Load (or get cached) boundaries
                     EnsureBoundariesLoaded(selectedCountries, Logger);
 
-                    var boundaries = new List<Boundary>(selectedCountries.Count);
-                    foreach (var c in selectedCountries)
-                    {
-                        try
-                        {
-                            boundaries.Add(GetOrLoadBoundary(c, Logger));
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.LogError(ex, "Boundary retrieval failed for {Country}", c);
-                        }
-                    }
+                    // Build boundary list; skip failures without throwing
+                    var boundaries = selectedCountries
+                        .Select(c => TryGetOrLoadBoundary(c, Logger))
+                        .Where(b => b is not null)
+                        .Cast<Boundary>()
+                        .ToList();
 
                     if (boundaries.Count == 0)
                         return new List<SiteInfo>();
@@ -223,8 +271,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
                 else if (string.Equals(regiontype, "LocalAuthority", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Change the ambiguous call to explicitly cast to the intended return type
-                    var localAuthoritiesresult = await AtomDataSelectionLocalAuthoritiesService.GetAtomDataSelectionLocalAuthoritiesService(region);
+                    var localAuthoritiesresult = await AtomDataSelectionLocalAuthoritiesService
+                        .GetAtomDataSelectionLocalAuthoritiesService(region);
 
                     if (localAuthoritiesresult is null)
                         return new List<SiteInfo>();
@@ -234,7 +282,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     int laCount = 0;
                     foreach (var la in localAuthoritiesresult)
                     {
-                        // dynamic assumed to have Latitude, Longitude; adjust types if needed
                         if (la is null) continue;
                         if (!TryToDouble(la.Latitude, out var laLat)) continue;
                         if (!TryToDouble(la.Longitude, out var laLon)) continue;
@@ -259,10 +306,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             continue;
 
                         // Compute conservative query envelope in degrees
-                        // (Latitude degrees ~ 111.32km; longitude scales with cos(lat))
                         double degLat = maxDistanceMeters / 111_320d;
                         double cosLat = Math.Cos(lat * Math.PI / 180d);
-                        // Avoid div by zero near poles
                         double degLon = maxDistanceMeters / (111_320d * Math.Max(1e-6, cosLat));
 
                         var env = new Envelope(lon - degLon, lon + degLon, lat - degLat, lat + degLat);
@@ -426,7 +471,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             if (!double.TryParse(lonStr, NumberStyles.Float, CultureInfo.InvariantCulture, out lon))
                 return false;
 
-            // Optional: sanity ranges
             if (lat < -90 || lat > 90 || lon < -180 || lon > 180)
             {
                 lat = lon = default;

@@ -102,7 +102,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 };
 
 
-
                 //For CDP
                 var token = await GetRicardoToken();
 
