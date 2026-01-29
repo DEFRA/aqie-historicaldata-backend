@@ -101,9 +101,19 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     email = email
                 };
 
+                //for local
+                // Get token local
+                string emailfromconfig = "PFRijFKn";
+                string passwordfromconfig = "oG8mBc@ssf&7K3";
+                var token = await AuthService.GetTokenAsync(emailfromconfig, passwordfromconfig);
+                if (string.IsNullOrEmpty(token))
+                {
+                    Logger.LogError("auth failed - no token returned");
+                    return "failure";
+                }
 
                 //For CDP
-                var token = await GetRicardoToken();
+                //var token = await GetRicardoToken();
 
                 var client = httpClientFactory.CreateClient("RicardoNewAPI");
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
