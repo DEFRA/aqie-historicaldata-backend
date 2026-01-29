@@ -59,10 +59,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         private static readonly IReadOnlyDictionary<string, string> GeoJsonPaths =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["England"] = "GeoBoundaries/england.geojson",
-                ["Wales"] = "GeoBoundaries/wales.geojson",
-                ["Scotland"] = "GeoBoundaries/scotland.geojson",
-                ["Northern Ireland"] = "GeoBoundaries/northern_ireland.geojson",
+                ["England"] = "/app/GeoBoundaries/england.geojson",
+                ["Wales"] = "/app/GeoBoundaries/wales.geojson",
+                ["Scotland"] = "/app/GeoBoundaries/scotland.geojson",
+                ["Northern Ireland"] = "/app/GeoBoundaries/northern_ireland.geojson",
             };
 
         private static string? GetGeoJsonPath(string country) =>
@@ -77,21 +77,21 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             CountryBoundariesLazy.GetOrAdd(country, c => new Lazy<Boundary>(() =>
             {
                 var relPath = GetGeoJsonPath(c);
-                logger.LogInformation($"relPath print '{c}'", relPath);
+                logger.LogInformation($"relPath print '{relPath}'", relPath);
 
                 if (string.IsNullOrWhiteSpace(relPath))
                     throw new FileNotFoundException($"GeoJSON relPath path not found for '{relPath}'", relPath ?? "<null>");
 
                 // Resolve via ContentRoot; fallback to BaseDirectory
                 var fileInfo = _env.ContentRootFileProvider.GetFileInfo(relPath);
-                logger.LogInformation($"fileInfo resolved '{fileInfo}'", fileInfo);
+                logger.LogInformation($"fileInfo path print '{fileInfo}'", fileInfo);
                 string fullPath = fileInfo.Exists
                     ? (fileInfo.PhysicalPath ?? Path.Combine(_env.ContentRootPath, relPath))
                     : Path.Combine(AppContext.BaseDirectory, relPath);
-
+                logger.LogInformation($"fullPath info print '{fullPath}'", fullPath);
                 if (!File.Exists(fullPath))
                     throw new FileNotFoundException($"GeoJSON fileInfo path not found for '{fullPath}'", fullPath);
-
+                logger.LogInformation($"fullPath path resolved print '{fullPath}'", fullPath);
                 var geom = LoadGeometryFromGeoJsonFullPath(fullPath, logger);
 
                 // Fix invalid geometry only if needed
