@@ -77,17 +77,20 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             CountryBoundariesLazy.GetOrAdd(country, c => new Lazy<Boundary>(() =>
             {
                 var relPath = GetGeoJsonPath(c);
+                logger.LogInformation($"relPath print '{c}'", relPath);
+
                 if (string.IsNullOrWhiteSpace(relPath))
-                    throw new FileNotFoundException($"GeoJSON path not found for '{c}'", relPath ?? "<null>");
+                    throw new FileNotFoundException($"GeoJSON relPath path not found for '{c}'", relPath ?? "<null>");
 
                 // Resolve via ContentRoot; fallback to BaseDirectory
                 var fileInfo = _env.ContentRootFileProvider.GetFileInfo(relPath);
+                logger.LogInformation($"fileInfo not resolved '{c}'", fileInfo);
                 string fullPath = fileInfo.Exists
                     ? (fileInfo.PhysicalPath ?? Path.Combine(_env.ContentRootPath, relPath))
                     : Path.Combine(AppContext.BaseDirectory, relPath);
 
                 if (!File.Exists(fullPath))
-                    throw new FileNotFoundException($"GeoJSON path not found for '{c}'", fullPath);
+                    throw new FileNotFoundException($"GeoJSON fileInfo path not found for '{c}'", fullPath);
 
                 var geom = LoadGeometryFromGeoJsonFullPath(fullPath, logger);
 
