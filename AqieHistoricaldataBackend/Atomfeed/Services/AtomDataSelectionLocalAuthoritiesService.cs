@@ -43,16 +43,17 @@ IHttpClientFactory httpClientFactory) : IAtomDataSelectionLocalAuthoritiesServic
                     Logger.LogInformation($"Selected From frontend API LA ID: {laId}");
 
 
-                    string year = DateTime.Now.Year.ToString();
+                    string year = (DateTime.Now.Year - 1).ToString();
                     string localAuthorityId = laId;
                     string pageNumber = "1";
                     string itemsPerPage = "100";
                     //string url = $"/xapi/getSingleDTDataByYear/{year}/{localAuthorityId}/{pageNumber}/{itemsPerPage}/json";
 
 
-
                     // Fetch Local Authorities data
                     var laClient = httpClientFactory.CreateClient("laqmAPI");
+
+                    //for cdp
                     laClient.DefaultRequestHeaders.Add("X-API-Key", Environment.GetEnvironmentVariable("LAQM_API_KEY"));
                     laClient.DefaultRequestHeaders.Add("X-API-PartnerId", Environment.GetEnvironmentVariable("LAQM_USERID"));
 

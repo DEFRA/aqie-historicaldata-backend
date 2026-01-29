@@ -16,6 +16,7 @@ using Hangfire.MemoryStorage;
 using Microsoft.Net.Http.Headers;
 using Serilog;
 using System.Diagnostics.CodeAnalysis;
+using System.Net.Http.Headers;
 
 
 var app = CreateWebApplication(args);
@@ -73,6 +74,15 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
 
     }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
 
+    builder.Services.AddHttpClient("sendnotification", httpClient =>
+    {
+
+        httpClient.BaseAddress = new Uri(
+            "https://ephemeral-protected.api." +
+            (System.Environment.GetEnvironmentVariable("Environment") ?? "dev") +
+            ".cdp-int.defra.cloud/"
+        );
+    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
 
     // Propagate trace header.
     builder.Services.AddHeaderPropagation(options =>
