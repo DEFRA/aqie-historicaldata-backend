@@ -87,6 +87,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
              // 1. Try ContentRootFileProvider (works in most hosting scenarios)
              var fileInfo = _env.ContentRootFileProvider.GetFileInfo(relPath);
+             logger.LogInformation("fileInfo path: {fileInfo}", fileInfo);
              if (fileInfo.Exists && !string.IsNullOrEmpty(fileInfo.PhysicalPath))
              {
                  fullPath = fileInfo.PhysicalPath;
