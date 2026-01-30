@@ -59,10 +59,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         private static readonly IReadOnlyDictionary<string, string> GeoJsonPaths =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["England"] = "/app/GeoBoundaries/england.geojson",
-                ["Wales"] = "/app/GeoBoundaries/wales.geojson",
-                ["Scotland"] = "/app/GeoBoundaries/scotland.geojson",
-                ["Northern Ireland"] = "/app/GeoBoundaries/northern_ireland.geojson",
+                ["England"] = "GeoBoundaries/england.geojson",
+                ["Wales"] = "GeoBoundaries/wales.geojson",
+                ["Scotland"] = "GeoBoundaries/scotland.geojson",
+                ["Northern Ireland"] = "GeoBoundaries/northern_ireland.geojson",
             };
 
         private static string? GetGeoJsonPath(string country) =>
@@ -73,36 +73,92 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         /// Uses Lazy<T> to ensure single-load and lock-free reads.
         /// Resolves the file using ContentRootFileProvider; falls back to BaseDirectory.
         /// </summary>
-        private Boundary GetOrLoadBoundary(string country, ILogger logger) =>
-            CountryBoundariesLazy.GetOrAdd(country, c => new Lazy<Boundary>(() =>
-            {
-                var relPath = GetGeoJsonPath(c);
-                logger.LogInformation($"relPath print '{relPath}'", relPath);
+            private Boundary GetOrLoadBoundary(string country, ILogger logger) =>
+         CountryBoundariesLazy.GetOrAdd(country, c => new Lazy<Boundary>(() =>
+         {
+             var relPath = GetGeoJsonPath(c);
+             logger.LogInformation("Attempting to load GeoJSON for country: {Country}, relative path: {RelPath}", c, relPath);
 
-                if (string.IsNullOrWhiteSpace(relPath))
-                    throw new FileNotFoundException($"GeoJSON relPath path not found for '{relPath}'", relPath ?? "<null>");
+             if (string.IsNullOrWhiteSpace(relPath))
+                 throw new FileNotFoundException($"GeoJSON relative path not configured for country '{c}'");
 
-                // Resolve via ContentRoot; fallback to BaseDirectory
-                var fileInfo = _env.ContentRootFileProvider.GetFileInfo(relPath);
-                logger.LogInformation($"fileInfo path print '{fileInfo}'", fileInfo);
-                string fullPath = fileInfo.Exists
-                    ? (fileInfo.PhysicalPath ?? Path.Combine(_env.ContentRootPath, relPath))
-                    : Path.Combine(AppContext.BaseDirectory, relPath);
-                logger.LogInformation($"fullPath info print '{fullPath}'", fullPath);
-                if (!File.Exists(fullPath))
-                    throw new FileNotFoundException($"GeoJSON fileInfo path not found for '{fullPath}'", fullPath);
-                logger.LogInformation($"fullPath path resolved print '{fullPath}'", fullPath);
-                var geom = LoadGeometryFromGeoJsonFullPath(fullPath, logger);
+             // Try multiple resolution strategies in order
+             string? fullPath = null;
 
-                // Fix invalid geometry only if needed
-                geom = FixIfInvalid(geom, logger);
+             // 1. Try ContentRootFileProvider (works in most hosting scenarios)
+             var fileInfo = _env.ContentRootFileProvider.GetFileInfo(relPath);
+             if (fileInfo.Exists && !string.IsNullOrEmpty(fileInfo.PhysicalPath))
+             {
+                 fullPath = fileInfo.PhysicalPath;
+                 logger.LogInformation("Resolved via ContentRootFileProvider: {Path}", fullPath);
+             }
 
-                // Optional: small simplification tolerance (degrees) to speed up PIP
-                var simplified = TopologyPreservingSimplifier.Simplify(geom, 1e-4);
+             // 2. Try ContentRootPath + relative path
+             if (string.IsNullOrEmpty(fullPath))
+             {
+                 var contentRootPath = Path.Combine(_env.ContentRootPath, relPath);
+                 if (File.Exists(contentRootPath))
+                 {
+                     fullPath = contentRootPath;
+                     logger.LogInformation("Resolved via ContentRootPath: {Path}", fullPath);
+                 }
+             }
 
-                return new Boundary(c, simplified);
-            }, LazyThreadSafetyMode.ExecutionAndPublication)).Value;
+             // 3. Try AppContext.BaseDirectory + relative path
+             if (string.IsNullOrEmpty(fullPath))
+             {
+                 var baseDirPath = Path.Combine(AppContext.BaseDirectory, relPath);
+                 if (File.Exists(baseDirPath))
+                 {
+                     fullPath = baseDirPath;
+                     logger.LogInformation("Resolved via BaseDirectory: {Path}", fullPath);
+                 }
+             }
 
+             // 4. Try current directory + relative path (last resort)
+             if (string.IsNullOrEmpty(fullPath))
+             {
+                 var currentDirPath = Path.Combine(Directory.GetCurrentDirectory(), relPath);
+                 if (File.Exists(currentDirPath))
+                 {
+                     fullPath = currentDirPath;
+                     logger.LogInformation("Resolved via CurrentDirectory: {Path}", fullPath);
+                 }
+             }
+
+             if (string.IsNullOrEmpty(fullPath) || !File.Exists(fullPath))
+             {
+                 // Log all attempted paths for debugging
+                 logger.LogError(
+                     "GeoJSON file not found. Attempted paths:\n" +
+                     "  ContentRootPath: {ContentRoot}\n" +
+                     "  BaseDirectory: {BaseDir}\n" +
+                     "  CurrentDirectory: {CurrentDir}\n" +
+                     "  Relative path: {RelPath}",
+                     _env.ContentRootPath,
+                     AppContext.BaseDirectory,
+                     Directory.GetCurrentDirectory(),
+                     relPath);
+
+                 throw new FileNotFoundException(
+                     $"GeoJSON file not found for country '{c}'. " +
+                     $"Expected relative path: {relPath}. " +
+                     $"Searched in ContentRoot: {_env.ContentRootPath}, " +
+                     $"BaseDirectory: {AppContext.BaseDirectory}",
+                     relPath);
+             }
+
+             logger.LogInformation("Successfully resolved GeoJSON file: {Path}", fullPath);
+             var geom = LoadGeometryFromGeoJsonFullPath(fullPath, logger);
+
+             // Fix invalid geometry only if needed
+             geom = FixIfInvalid(geom, logger);
+
+             // Optional: small simplification tolerance (degrees) to speed up PIP
+             var simplified = TopologyPreservingSimplifier.Simplify(geom, 1e-4);
+
+             return new Boundary(c, simplified);
+         }, LazyThreadSafetyMode.ExecutionAndPublication)).Value;
         /// <summary>
         /// Non-throwing wrapper. Logs and returns null on failure.
         /// </summary>
