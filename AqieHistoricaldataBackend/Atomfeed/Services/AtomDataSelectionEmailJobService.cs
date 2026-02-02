@@ -169,7 +169,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 Logger.LogInformation("MailService enterted.");
                 var client = httpClientFactory.CreateClient("sendnotification");
-                var url = $"aqie-notify-service/send-notification";
+                //for local
+                //var url = $"aqie-notify-service/send-notification";
+                //for CDP
+                var url = $"/send-notification";
+                
                 Logger.LogInformation("Sending notification to {BaseAddress}{Url}", client.BaseAddress, url);
 
                 // Create the request payload
