@@ -49,7 +49,6 @@ IHttpClientFactory httpClientFactory) : IAtomDataSelectionLocalAuthoritiesServic
                     string itemsPerPage = "100";
                     //string url = $"/xapi/getSingleDTDataByYear/{year}/{localAuthorityId}/{pageNumber}/{itemsPerPage}/json";
 
-
                     // Fetch Local Authorities data
                     var laClient = httpClientFactory.CreateClient("laqmAPI");
 
