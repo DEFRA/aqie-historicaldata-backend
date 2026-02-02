@@ -172,7 +172,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 //for local
                 //var url = $"aqie-notify-service/send-notification";
                 //for CDP
-                var url = $"/send-notification";
+                var url = $"send-notification";
                 
                 Logger.LogInformation("Sending notification to {BaseAddress}{Url}", client.BaseAddress, url);
 
