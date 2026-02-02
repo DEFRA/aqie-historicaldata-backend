@@ -135,6 +135,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAtomDataSelectionEmailJobService, AtomDataSelectionEmailJobService>();
     builder.Services.AddSingleton<IEmailService, AtomDataSelectionEmailJobService.EmailService>();
     //builder.Services.AddHostedService<AqieHistoricaldataBackend.Atomfeed.Services.AtomDataSelectionEmailJobHostedService>();
+    builder.Services.AddHostedService<AtomDataSelectionEmailJobHostedService>();
 }
 
 [ExcludeFromCodeCoverage]

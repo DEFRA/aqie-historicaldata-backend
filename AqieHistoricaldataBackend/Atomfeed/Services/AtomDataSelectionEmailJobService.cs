@@ -1,3 +1,4 @@
+using Amazon.Runtime.Internal.Endpoints.StandardLibrary;
 using AqieHistoricaldataBackend.Utils.Mongo;
 using Elastic.CommonSchema;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
@@ -82,6 +83,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
+                Logger.LogInformation("ProcessPendingEmailJobsAsync enterted.");
                 var jobCollection = MongoDbClientFactory.GetCollection<eMailJobDocument>("aqie_csvemailexport_jobs");
 
                 // Build the filter: email is not null/empty, mailSent is null
@@ -119,7 +121,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                            job.Dataselectordownloadtype,
                            job.Email
                        );
-
+                        Logger.LogInformation("ProcessPendingEmailJobsAsync presigned url {ResultUrl}", ResultUrl);
                         if (!string.IsNullOrEmpty(job.Email) && !string.IsNullOrEmpty(ResultUrl))
                             {
                                 //await _emailService.SendEmailAsync(job.Email, "Mail job Your Data Export", $"Download: {job.ResultUrl}");
@@ -140,7 +142,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
                     catch (Exception exJob)
                     {
-                        Logger.LogError("Error processing email job {JobId}: {Error}", job.JobId, exJob.Message);
+                        Logger.LogError("ProcessPendingEmailJobsAsync Error processing email job {JobId}: {Error}", job.JobId, exJob.Message);
                         // Optionally, update job with error reason
                         var update = Builders<eMailJobDocument>.Update
                             .Set(j => j.ErrorReason, exJob.Message)
