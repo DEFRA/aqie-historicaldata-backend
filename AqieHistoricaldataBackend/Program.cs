@@ -78,11 +78,21 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     {
 
         httpClient.BaseAddress = new Uri(
-            "https://ephemeral-protected.api." +
+            "https://aqie-notify-service." +
             (System.Environment.GetEnvironmentVariable("Environment") ?? "dev") +
             ".cdp-int.defra.cloud/"
         );
     }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
+
+    //builder.Services.AddHttpClient("sendnotification", httpClient =>
+    //{
+
+    //    httpClient.BaseAddress = new Uri(
+    //        "https://ephemeral-protected.api." +
+    //        (System.Environment.GetEnvironmentVariable("Environment") ?? "dev") +
+    //        ".cdp-int.defra.cloud/"
+    //    );
+    //}).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
 
     // Propagate trace header.
     builder.Services.AddHeaderPropagation(options =>
