@@ -124,9 +124,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         Logger.LogInformation("ProcessPendingEmailJobsAsync presigned url {ResultUrl}", ResultUrl);
                         if (!string.IsNullOrEmpty(job.Email) && !string.IsNullOrEmpty(ResultUrl))
                             {
-                                //await _emailService.SendEmailAsync(job.Email, "Mail job Your Data Export", $"Download: {job.ResultUrl}");
-                                var mailresult = await MailService(job.Email, ResultUrl);
-                                if (mailresult == "Success")
+                            //await _emailService.SendEmailAsync(job.Email, "Mail job Your Data Export", $"Download: {job.ResultUrl}");
+                            Logger.LogInformation("MailService method started{Email},{ResultUrl}", job.Email, ResultUrl);
+                            var mailresult = await MailService(job.Email, ResultUrl);
+                            Logger.LogInformation("MailService method status response {mailresult}", mailresult);
+                            if (mailresult == "Success")
                                 {
                                     // Mark job as mail sent (set to "success")
                                     var update = Builders<eMailJobDocument>.Update
@@ -165,8 +167,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
+                Logger.LogInformation("MailService enterted.");
                 var client = httpClientFactory.CreateClient("sendnotification");
                 var url = $"aqie-notify-service/send-notification";
+                Logger.LogInformation("Sending notification to {BaseAddress}{Url}", client.BaseAddress, url);
 
                 // Create the request payload
                 var notificationRequest = new
@@ -184,7 +188,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 //var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
                 // Send POST request
-                Logger.LogInformation("Sending notification to {BaseAddress}{Url}", client.BaseAddress, url);
+                Logger.LogInformation("PostAsJsonAsyncSending notification to {BaseAddress}{Url}", client.BaseAddress, url);
                 var response = await client.PostAsJsonAsync(url, notificationRequest);
                 //var response = await client.PostAsync(url, httpContent);
                 Logger.LogInformation("response post email call{Response}", response);
