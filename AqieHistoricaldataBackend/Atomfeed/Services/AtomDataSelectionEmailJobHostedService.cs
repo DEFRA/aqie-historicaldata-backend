@@ -20,6 +20,19 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             _emailJobService = emailJobService;
         }
 
+        public override Task StartAsync(CancellationToken cancellationToken)
+        {
+            _logger.LogInformation("Email job service starting...");
+            return base.StartAsync(cancellationToken);
+        }
+
+        public override Task StopAsync(CancellationToken cancellationToken)
+        {
+            _logger.LogInformation("Email job service stopping...");
+            return base.StopAsync(cancellationToken);
+        }
+
+
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation("AtomDataSelectionEmailJobHostedService started ExecuteAsync.");
