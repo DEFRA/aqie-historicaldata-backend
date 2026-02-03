@@ -4,6 +4,7 @@ using Elastic.CommonSchema;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using MongoDB.Driver;
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Json;
 using System.Net.Mail;
 using System.Text;
@@ -111,16 +112,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     {
                         //Call the station service for each job
 
-                       var ResultUrl = await AtomDataSelectionStationService.GetAtomDataSelectionStation(
-                           job.PollutantName,
-                           job.DataSource,
-                           job.Year,
-                           job.Region,
-                           job.Regiontype,
-                           job.Dataselectorfiltertype,
-                           job.Dataselectordownloadtype,
-                           job.Email
-                       );
+                        var ResultUrl = await AtomDataSelectionStationService.GetAtomDataSelectionStation(
+                            job.PollutantName,
+                            job.DataSource,
+                            job.Year,
+                            job.Region,
+                            job.Regiontype,
+                            job.Dataselectorfiltertype,
+                            job.Dataselectordownloadtype,
+                            job.Email
+                        );
+
                         Logger.LogInformation("ProcessPendingEmailJobsAsync presigned url {ResultUrl}", ResultUrl);
                         if (!string.IsNullOrEmpty(job.Email) && !string.IsNullOrEmpty(ResultUrl))
                             {
@@ -168,15 +170,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 Logger.LogInformation("MailService enterted.");
-                var client = httpClientFactory.CreateClient("sendnotification");
-                //for local
-                //var url = $"aqie-notify-service/send-notification";
-                //for CDP
-                var url = $"send-notification";
-                
-                Logger.LogInformation("Sending notification to {BaseAddress}{Url}", client.BaseAddress, url);
 
-                // Create the request payload
+                using var client = new HttpClient
+                {
+                    BaseAddress = new Uri(Environment.GetEnvironmentVariable("NOTIFY_BASEADDRESS"))
+                };
+
+                // Ensure the URL doesn't have leading slash if BaseAddress has trailing slash
+                var url = Environment.GetEnvironmentVariable("NOTIFY_URL");
+
                 var notificationRequest = new
                 {
                     emailAddress = email,
@@ -187,18 +189,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
                 };
 
-                // Serialize to JSON and create HttpContent
-                //var jsonContent = JsonSerializer.Serialize(notificationRequest);
-                //var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                Logger.LogInformation("Sending notification to {BaseAddress}{Url}", client.BaseAddress, url);
 
-                // Send POST request
-                Logger.LogInformation("PostAsJsonAsyncSending notification to {BaseAddress}{Url}", client.BaseAddress, url);
                 var response = await client.PostAsJsonAsync(url, notificationRequest);
-                //var response = await client.PostAsync(url, httpContent);
-                Logger.LogInformation("response post email call{Response}", response);
+
+                // Log the status code to help diagnose the issue
+                Logger.LogInformation("Response status: {StatusCode}", response.StatusCode);
+
                 if (response.IsSuccessStatusCode)
                 {
-                    Logger.LogInformation("Email notification sent successfully to {response}", response.IsSuccessStatusCode);
+                    Logger.LogInformation("Email notification sent successfully");
                     return "Success";
                 }
                 else
