@@ -94,60 +94,60 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                  logger.LogInformation("Resolved via ContentRootFileProvider: {Path}", fullPath);
              }
 
-             // 2. Try ContentRootPath + relative path
-             if (string.IsNullOrEmpty(fullPath))
-             {
-                 var contentRootPath = Path.Combine(_env.ContentRootPath, relPath);
-                 if (File.Exists(contentRootPath))
-                 {
-                     fullPath = contentRootPath;
-                     logger.LogInformation("Resolved via ContentRootPath: {Path}", fullPath);
-                 }
-             }
+             //// 2. Try ContentRootPath + relative path
+             //if (string.IsNullOrEmpty(fullPath))
+             //{
+             //    var contentRootPath = Path.Combine(_env.ContentRootPath, relPath);
+             //    if (File.Exists(contentRootPath))
+             //    {
+             //        fullPath = contentRootPath;
+             //        logger.LogInformation("Resolved via ContentRootPath: {Path}", fullPath);
+             //    }
+             //}
 
-             // 3. Try AppContext.BaseDirectory + relative path
-             if (string.IsNullOrEmpty(fullPath))
-             {
-                 var baseDirPath = Path.Combine(AppContext.BaseDirectory, relPath);
-                 if (File.Exists(baseDirPath))
-                 {
-                     fullPath = baseDirPath;
-                     logger.LogInformation("Resolved via BaseDirectory: {Path}", fullPath);
-                 }
-             }
+             //// 3. Try AppContext.BaseDirectory + relative path
+             //if (string.IsNullOrEmpty(fullPath))
+             //{
+             //    var baseDirPath = Path.Combine(AppContext.BaseDirectory, relPath);
+             //    if (File.Exists(baseDirPath))
+             //    {
+             //        fullPath = baseDirPath;
+             //        logger.LogInformation("Resolved via BaseDirectory: {Path}", fullPath);
+             //    }
+             //}
 
-             // 4. Try current directory + relative path (last resort)
-             if (string.IsNullOrEmpty(fullPath))
-             {
-                 var currentDirPath = Path.Combine(Directory.GetCurrentDirectory(), relPath);
-                 if (File.Exists(currentDirPath))
-                 {
-                     fullPath = currentDirPath;
-                     logger.LogInformation("Resolved via CurrentDirectory: {Path}", fullPath);
-                 }
-             }
+             //// 4. Try current directory + relative path (last resort)
+             //if (string.IsNullOrEmpty(fullPath))
+             //{
+             //    var currentDirPath = Path.Combine(Directory.GetCurrentDirectory(), relPath);
+             //    if (File.Exists(currentDirPath))
+             //    {
+             //        fullPath = currentDirPath;
+             //        logger.LogInformation("Resolved via CurrentDirectory: {Path}", fullPath);
+             //    }
+             //}
 
-             if (string.IsNullOrEmpty(fullPath) || !File.Exists(fullPath))
-             {
-                 // Log all attempted paths for debugging
-                 logger.LogError(
-                     "GeoJSON file not found. Attempted paths:\n" +
-                     "  ContentRootPath: {ContentRoot}\n" +
-                     "  BaseDirectory: {BaseDir}\n" +
-                     "  CurrentDirectory: {CurrentDir}\n" +
-                     "  Relative path: {RelPath}",
-                     _env.ContentRootPath,
-                     AppContext.BaseDirectory,
-                     Directory.GetCurrentDirectory(),
-                     relPath);
+             //if (string.IsNullOrEmpty(fullPath) || !File.Exists(fullPath))
+             //{
+             //    // Log all attempted paths for debugging
+             //    logger.LogError(
+             //        "GeoJSON file not found. Attempted paths:\n" +
+             //        "  ContentRootPath: {ContentRoot}\n" +
+             //        "  BaseDirectory: {BaseDir}\n" +
+             //        "  CurrentDirectory: {CurrentDir}\n" +
+             //        "  Relative path: {RelPath}",
+             //        _env.ContentRootPath,
+             //        AppContext.BaseDirectory,
+             //        Directory.GetCurrentDirectory(),
+             //        relPath);
 
-                 throw new FileNotFoundException(
-                     $"GeoJSON file not found for country '{c}'. " +
-                     $"Expected relative path: {relPath}. " +
-                     $"Searched in ContentRoot: {_env.ContentRootPath}, " +
-                     $"BaseDirectory: {AppContext.BaseDirectory}",
-                     relPath);
-             }
+             //    throw new FileNotFoundException(
+             //        $"GeoJSON file not found for country '{c}'. " +
+             //        $"Expected relative path: {relPath}. " +
+             //        $"Searched in ContentRoot: {_env.ContentRootPath}, " +
+             //        $"BaseDirectory: {AppContext.BaseDirectory}",
+             //        relPath);
+             //}
 
              logger.LogInformation("Successfully resolved GeoJSON file: {Path}", fullPath);
              var geom = LoadGeometryFromGeoJsonFullPath(fullPath, logger);
