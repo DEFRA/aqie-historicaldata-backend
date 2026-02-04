@@ -10,7 +10,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     {
         private readonly ILogger<AtomDataSelectionEmailJobHostedService> _logger;
         private readonly IAtomDataSelectionEmailJobService _emailJobService;
-        private readonly TimeSpan _interval = TimeSpan.FromMinutes(5);
+        private readonly TimeSpan _interval = TimeSpan.FromMinutes(15);
 
         public AtomDataSelectionEmailJobHostedService(
             ILogger<AtomDataSelectionEmailJobHostedService> logger,

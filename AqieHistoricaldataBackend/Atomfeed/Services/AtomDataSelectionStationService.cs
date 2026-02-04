@@ -101,7 +101,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     email = email
                 };
 
-
                 //For CDP
                 var token = await GetRicardoToken();
 

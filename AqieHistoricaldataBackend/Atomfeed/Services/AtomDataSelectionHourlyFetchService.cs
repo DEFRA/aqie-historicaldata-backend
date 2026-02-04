@@ -394,7 +394,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         SiteName = siteinfo.SiteName,
                         SiteType = siteinfo.AreaType + siteinfo.SiteType,
                         Region = siteinfo.ZoneRegion,
-                        Country = "England"
+                        Country = siteinfo.Country
                     }).ToList();
             }
     }
