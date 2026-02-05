@@ -59,8 +59,9 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddHttpClient("Atomfeed", httpClient =>
     {
         httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/");
-    
-    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>(); 
+
+    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
+
 
     builder.Services.AddHttpClient("RicardoNewAPI", httpClient =>
     {

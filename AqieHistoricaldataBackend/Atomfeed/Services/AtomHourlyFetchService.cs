@@ -40,7 +40,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
                 var response = await client.GetAsync(url);
                 response.EnsureSuccessStatusCode();
-                
+
                 var stream = await response.Content.ReadAsStreamAsync();
                 var xml = new XmlDocument();
                 xml.Load(stream);
