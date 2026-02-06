@@ -56,24 +56,55 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
         .AddHttpClient("proxy")
         .ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
 
+    //builder.Services.AddHttpClient("Atomfeed", httpClient =>
+    //{
+    //    httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/");
+
+    //}).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
+
+
     builder.Services.AddHttpClient("Atomfeed", httpClient =>
     {
         httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/");
-
-    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
+    })
+    .ConfigurePrimaryHttpMessageHandler(() =>
+    {
+        return new ProxyHttpMessageHandler
+        {
+            AutomaticDecompression =
+                System.Net.DecompressionMethods.GZip |
+                System.Net.DecompressionMethods.Deflate
+        };
+    });
 
 
     builder.Services.AddHttpClient("RicardoNewAPI", httpClient =>
     {
         httpClient.BaseAddress = new Uri("https://api-ukair.defra.gov.uk/");
 
-    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
+    }).ConfigurePrimaryHttpMessageHandler(() =>
+    {
+        return new ProxyHttpMessageHandler
+        {
+            AutomaticDecompression =
+                System.Net.DecompressionMethods.GZip |
+                System.Net.DecompressionMethods.Deflate
+        };
+    });
 
     builder.Services.AddHttpClient("laqmAPI", httpClient =>
     {
         httpClient.BaseAddress = new Uri("https://www.laqmportal.co.uk/");
 
-    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
+    }).ConfigurePrimaryHttpMessageHandler(() =>
+    {
+        return new ProxyHttpMessageHandler
+        {
+            AutomaticDecompression =
+                System.Net.DecompressionMethods.GZip |
+                System.Net.DecompressionMethods.Deflate
+        };
+    });
 
     builder.Services.AddHttpClient("sendnotification", httpClient =>
     {
@@ -83,7 +114,15 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
             (System.Environment.GetEnvironmentVariable("Environment") ?? "dev") +
             ".cdp-int.defra.cloud/"
         );
-    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
+    }).ConfigurePrimaryHttpMessageHandler(() =>
+    {
+        return new ProxyHttpMessageHandler
+        {
+            AutomaticDecompression =
+                System.Net.DecompressionMethods.GZip |
+                System.Net.DecompressionMethods.Deflate
+        };
+    });
 
     //builder.Services.AddHttpClient("sendnotification", httpClient =>
     //{

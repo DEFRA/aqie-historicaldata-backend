@@ -36,9 +36,24 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
+                //logger.LogInformation("using non proxy fetch{datetim}", DateTime.Now);
+                //using var testclient = new HttpClient
+                //{
+                //    BaseAddress = new Uri("https://uk-air.defra.gov.uk/")
+                //};
+                //logger.LogInformation("url{datetim}", DateTime.Now);
+                //// Ensure the URL doesn't have leading slash if BaseAddress has trailing slash
+                //var testurl = "data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
+
+                //var testresponse = await testclient.GetAsync(testurl);
+                //logger.LogInformation("using non proxy fetch response{datetim}", DateTime.Now);
+
+                logger.LogInformation("using proxy fetch{datetim}", DateTime.Now);
                 var client = httpClientFactory.CreateClient("Atomfeed");
                 var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
+
                 var response = await client.GetAsync(url);
+                logger.LogInformation("using proxy fetch response{datetim}", DateTime.Now);
                 response.EnsureSuccessStatusCode();
 
                 var stream = await response.Content.ReadAsStreamAsync();

@@ -8,7 +8,7 @@ public class ProxyHttpMessageHandler : HttpClientHandler
     [ExcludeFromCodeCoverage]
     public ProxyHttpMessageHandler()
     {
-        var proxyUri = Environment.GetEnvironmentVariable("CDP_HTTPS_PROXY");
+        var proxyUri = Environment.GetEnvironmentVariable("HTTP_PROXY");
         var proxy = new WebProxy { BypassProxyOnLocal = true };
         if (proxyUri != null)
         {
