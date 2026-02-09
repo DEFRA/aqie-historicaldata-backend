@@ -57,8 +57,10 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
 
     builder.Services.AddHttpClient("Atomfeed", httpClient =>
     {
-        httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/");
-    
+        httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/"); 
+        httpClient.DefaultRequestHeaders.Add("User-Agent", "AqieHistoricalDataBackend/1.0");
+        httpClient.DefaultRequestHeaders.Add("Accept", "application/xml, text/xml, */*");
+
     }).ConfigurePrimaryHttpMessageHandler(() =>
     {
         return new ProxyHttpMessageHandler
