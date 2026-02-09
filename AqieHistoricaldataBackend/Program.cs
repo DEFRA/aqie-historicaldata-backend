@@ -59,9 +59,15 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     {
         httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/");
     
-    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>(); ;
-    
-   
+    }).ConfigurePrimaryHttpMessageHandler(() =>
+    {
+        return new ProxyHttpMessageHandler
+        {
+            AutomaticDecompression =
+                System.Net.DecompressionMethods.GZip |
+                System.Net.DecompressionMethods.Deflate
+        };
+    });
 
     // Propagate trace header.
     builder.Services.AddHeaderPropagation(options =>
