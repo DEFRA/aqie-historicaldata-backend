@@ -43,11 +43,20 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     // Configure logging to use the CDP Platform standards.
     builder.Services.AddHttpContextAccessor();
     builder.Host.UseSerilog(CdpLogging.Configuration);
-    
+
     // Default HTTP Client
     //builder.Services
     //    .AddHttpClient("DefaultClient")
     //    .AddHeaderPropagation();
+
+    builder.Services.AddTransient<ProxyHttpMessageHandler>(sp =>
+    {
+        var logger = sp.GetRequiredService<ILogger<ProxyHttpMessageHandler>>();
+        return new ProxyHttpMessageHandler(logger);
+    });
+    builder.Services
+        .AddHttpClient("proxy")
+        .ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
 
     // Proxy HTTP Client
     builder.Services.AddTransient<ProxyHttpMessageHandler>();
@@ -57,13 +66,11 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
 
     builder.Services.AddHttpClient("Atomfeed", httpClient =>
     {
-        httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/"); 
-        httpClient.DefaultRequestHeaders.Add("User-Agent", "AqieHistoricalDataBackend/1.0");
-        httpClient.DefaultRequestHeaders.Add("Accept", "application/xml, text/xml, */*");
-
-    }).ConfigurePrimaryHttpMessageHandler(() =>
+        httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/");
+    }).ConfigurePrimaryHttpMessageHandler(sp =>
     {
-        return new ProxyHttpMessageHandler
+        var logger = sp.GetRequiredService<ILogger<ProxyHttpMessageHandler>>();
+        return new ProxyHttpMessageHandler(logger)
         {
             AutomaticDecompression =
                 System.Net.DecompressionMethods.GZip |

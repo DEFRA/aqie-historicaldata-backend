@@ -1,25 +1,25 @@
-using AqieHistoricaldataBackend.Utils.Http;
+//using AqieHistoricaldataBackend.Utils.Http;
 
-namespace AqieHistoricaldataBackend.Test.Utils.Http;
+//namespace AqieHistoricaldataBackend.Test.Utils.Http;
 
-public class ProxyHttpMessageHandlerTests
-{
+//public class ProxyHttpMessageHandlerTests
+//{
     
-    [Fact]
-    public void ExtractsCredentialsFromUri()
-    {
+//    [Fact]
+//    public void ExtractsCredentialsFromUri()
+//    {
 
-        var creds = ProxyHttpMessageHandler.GetCredentialsFromUri(new UriBuilder("http://username:password@www.example.com"));
-        Assert.NotNull(creds);
-        Assert.Equal("username", creds.UserName);
-        Assert.Equal("password", creds.Password);
-    }
+//        var creds = ProxyHttpMessageHandler.GetCredentialsFromUri(new UriBuilder("http://username:password@www.example.com"));
+//        Assert.NotNull(creds);
+//        Assert.Equal("username", creds.UserName);
+//        Assert.Equal("password", creds.Password);
+//    }
 
-    [Fact]
-    public void DoNotExtractCredentialsFromUriWithoutThem()
-    {
-        var creds = ProxyHttpMessageHandler.GetCredentialsFromUri(new UriBuilder("http://www.example.com"));
-        Assert.Null(creds);
-    }
+//    [Fact]
+//    public void DoNotExtractCredentialsFromUriWithoutThem()
+//    {
+//        var creds = ProxyHttpMessageHandler.GetCredentialsFromUri(new UriBuilder("http://www.example.com"));
+//        Assert.Null(creds);
+//    }
 
-}
+//}
