@@ -12,7 +12,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                Logger.LogInformation("GetHistoryexceedencedata method starts{datetime}", DateTime.Now);
                 string siteId = data.SiteId;
                 string year = data.Year;
                 string downloadfilter = "All";
@@ -22,17 +21,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var filteredHourly = GetFilteredHourlyPollutants(hourlyData);
                 var hourlyExceedances = GetHourlyExceedances(distinctPollutants, filteredHourly);
                 
-                Logger.LogInformation("After hourlyExceedances{datetime}", DateTime.Now);
                 var dailyData = await AtomDailyFetchService.GetAtomDailydatafetch(hourlyData, data);
                 var filteredDaily = GetFilteredDailyPollutants(dailyData);
                 var dailyExceedances = GetDailyExceedances(distinctPollutants, filteredDaily);
-              
-                Logger.LogInformation("dailyExceedances{datetime}", DateTime.Now);
                 var annualExceedances = GetAnnualExceedances(dailyData);
                 var dataVerifiedTag = GetDataVerifiedTag(hourlyData);
                 var dataCapturePercentages = GetDataCapturePercentages(hourlyData, year);
               
-                Logger.LogInformation("dataCapturePercentages{datetime}", DateTime.Now);
                 var mergedExceedances = MergeExceedanceData(
                     hourlyExceedances,
                     dailyExceedances,
@@ -40,7 +35,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     dataCapturePercentages,
                     dataVerifiedTag);
 
-                Logger.LogInformation("mergedExceedances{datetime}", DateTime.Now);
                 return mergedExceedances;
 
             }

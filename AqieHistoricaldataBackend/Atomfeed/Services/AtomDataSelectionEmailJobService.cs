@@ -14,20 +14,20 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public interface IEmailService
-    {
-        Task SendEmailAsync(string to, string subject, string body);
-    }
+    //public interface IEmailService
+    //{
+    //    Task SendEmailAsync(string to, string subject, string body);
+    //}
     public class AtomDataSelectionEmailJobService(
         ILogger<HistoryexceedenceService> Logger,
         IAtomHourlyFetchService AtomHourlyFetchService,
         IMongoDbClientFactory MongoDbClientFactory,
         IAtomDataSelectionStationService AtomDataSelectionStationService,
-        IEmailService emailService,
+        //IEmailService emailService,
         IHttpClientFactory httpClientFactory
     ) : IAtomDataSelectionEmailJobService
     {
-        private readonly IEmailService _emailService = emailService;
+        //private readonly IEmailService _emailService = emailService;
         //private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
         public async Task<string> GetAtomemailjobDataSelection(QueryStringData data)
         {
@@ -217,20 +217,20 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        public class EmailService : IEmailService
-        {
-            public async Task SendEmailAsync(string to, string subject, string body)
-            {
-                var smtpClient = new SmtpClient("smtp.yourserver.com")
-                {
-                    Port = 587,
-                    Credentials = new NetworkCredential("yourusername", "yourpassword"),
-                    EnableSsl = true,
-                };
+        //public class EmailService : IEmailService
+        //{
+        //    public async Task SendEmailAsync(string to, string subject, string body)
+        //    {
+        //        var smtpClient = new SmtpClient("smtp.yourserver.com")
+        //        {
+        //            Port = 587,
+        //            Credentials = new NetworkCredential("yourusername", "yourpassword"),
+        //            EnableSsl = true,
+        //        };
 
-                var mailMessage = new MailMessage("from@yourdomain.com", to, subject, body);
-                await smtpClient.SendMailAsync(mailMessage);
-            }
-        }
+        //        var mailMessage = new MailMessage("from@yourdomain.com", to, subject, body);
+        //        await smtpClient.SendMailAsync(mailMessage);
+        //    }
+        //}
     }
 }
