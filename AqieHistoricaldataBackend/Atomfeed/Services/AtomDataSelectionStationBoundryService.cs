@@ -337,8 +337,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     if (localAuthoritiesresult is null)
                         return new List<SiteInfo>();
 
-                    // Build STRtree of LA points
-                    var str = new STRtree<Point>();
+                    // Build STRtree of LA points with their data
+                    var str = new STRtree<(Point Point, object LocalAuthority)>();
                     int laCount = 0;
                     foreach (var la in localAuthoritiesresult)
                     {
@@ -348,7 +348,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         if (laLat == 0 && laLon == 0) continue;
 
                         var p = s_geometryFactory.CreatePoint(new Coordinate(laLon, laLat));
-                        str.Insert(new Envelope(p.Coordinate), p);
+                        str.Insert(new Envelope(p.Coordinate), (p, la));
                         laCount++;
                     }
                     str.Build();
@@ -356,7 +356,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     Logger.LogInformation("Built STRtree for {Count} local authority points for region {Region}", laCount, region);
 
                     // Proximity filter using indexed candidate selection + Haversine
-                    const double maxDistanceMeters = 30_000d;
+                    const double maxDistanceMeters = 50_000d;
 
                     var filtered = new List<SiteInfo>(capacity: Math.Min(2048, filtered_station_pollutant.Count));
 
@@ -373,19 +373,33 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         var env = new Envelope(lon - degLon, lon + degLon, lat - degLat, lat + degLat);
                         var candidates = str.Query(env);
 
-                        bool near = false;
+                        object? closestLA = null;
+                        double minDistance = double.MaxValue;
+                        
                         for (int i = 0; i < candidates.Count; i++)
                         {
-                            var pt = candidates[i];
-                            if (HaversineMeters(lat, lon, pt.Y, pt.X) <= maxDistanceMeters)
+                            var (pt, la) = candidates[i];
+                            double distance = HaversineMeters(lat, lon, pt.Y, pt.X);
+                            
+                            if (distance <= maxDistanceMeters && distance < minDistance)
                             {
-                                near = true;
-                                break;
+                                minDistance = distance;
+                                closestLA = la;
                             }
                         }
 
-                        if (near)
+                        if (closestLA is not null)
+                        {
+                            // Extract LA_REGION from the local authority object
+                            var laRegionProp = closestLA.GetType().GetProperty("LA_REGION");
+                            if (laRegionProp is not null)
+                            {
+                                var laRegion = laRegionProp.GetValue(closestLA);
+                                site.Country = laRegion?.ToString() ?? string.Empty;
+                            }
+                            
                             filtered.Add(site);
+                        }
                     }
 
                     Logger.LogInformation("Filtered {Count} stations near local authorities for region: {Region}", filtered.Count, region);
