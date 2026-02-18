@@ -84,20 +84,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                Logger.LogInformation("ProcessPendingEmailJobsAsync enterted.");
+                Logger.LogInformation("ProcessPendingEmailJobsAsync entered.");
                 var jobCollection = MongoDbClientFactory.GetCollection<eMailJobDocument>("aqie_csvemailexport_jobs");
 
-                // Build the filter: email is not null/empty, mailSent is null
+                // Filter: Status == Pending, email is not null/empty, mailSent is null
                 var filter = Builders<eMailJobDocument>.Filter.And(
+                    Builders<eMailJobDocument>.Filter.Eq(j => j.Status, JobStatusEnum.Pending),
                     Builders<eMailJobDocument>.Filter.Ne(j => j.Email, null),
-                    Builders<eMailJobDocument>.Filter.Ne(j => j.Email, ""), // Exclude empty strings
+                    Builders<eMailJobDocument>.Filter.Ne(j => j.Email, ""),
                     Builders<eMailJobDocument>.Filter.Eq(j => j.MailSent, null)
                 );
 
-                var allJobs = await jobCollection.Find(Builders<eMailJobDocument>.Filter.Empty).ToListAsync(stoppingToken);
-                Logger.LogInformation("Total jobs in collection: {Count}", allJobs.Count);
-
-                //Read the filtered data
                 var pendingJobs = await jobCollection.Find(filter).ToListAsync(stoppingToken);
                 Logger.LogInformation("Found {Count} pending email jobs.", pendingJobs.Count);
 
@@ -106,13 +103,36 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     Logger.LogInformation("No pending email jobs found. Exiting ProcessPendingEmailJobsAsync.");
                     return;
                 }
+
                 foreach (var job in pendingJobs)
                 {
                     try
                     {
-                        //Call the station service for each job
+                        // Atomically claim the job — only succeeds if Status is still Pending
+                        var claimFilter = Builders<eMailJobDocument>.Filter.And(
+                            Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, job.JobId),
+                            Builders<eMailJobDocument>.Filter.Eq(j => j.Status, JobStatusEnum.Pending)
+                        );
 
-                        var ResultUrl = await AtomDataSelectionStationService.GetAtomDataSelectionStation(
+                        var claimUpdate = Builders<eMailJobDocument>.Update
+                            .Set(j => j.Status, JobStatusEnum.Processing)
+                            .Set(j => j.StartTime, DateTime.UtcNow);
+
+                        var claimedJob = await jobCollection.FindOneAndUpdateAsync(
+                            claimFilter,
+                            claimUpdate,
+                            cancellationToken: stoppingToken
+                        );
+
+                        // If claimedJob is null, another process already claimed it
+                        if (claimedJob == null)
+                        {
+                            Logger.LogInformation("Job {JobId} already claimed by another process.", job.JobId);
+                            continue;
+                        }
+
+
+                        var resultUrl = await AtomDataSelectionStationService.GetAtomDataSelectionStation(
                             job.PollutantName,
                             job.DataSource,
                             job.Year,
@@ -123,39 +143,59 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             job.Email
                         );
 
-                        Logger.LogInformation("ProcessPendingEmailJobsAsync presigned url {ResultUrl}", ResultUrl);
-                        if (!string.IsNullOrEmpty(job.Email) && !string.IsNullOrEmpty(ResultUrl))
-                            {
-                            //await _emailService.SendEmailAsync(job.Email, "Mail job Your Data Export", $"Download: {job.ResultUrl}");
-                            Logger.LogInformation("MailService method started{Email},{ResultUrl}", job.Email, ResultUrl);
-                            var mailresult = await MailService(job.Email, ResultUrl);
-                            Logger.LogInformation("MailService method status response {mailresult}", mailresult);
-                            if (mailresult == "Success")
-                                {
-                                    // Mark job as mail sent (set to "success")
-                                    var update = Builders<eMailJobDocument>.Update
-                                        .Set(j => j.ResultUrl, ResultUrl)
-                                        .Set(j => j.MailSent, true)
-                                        .Set(j => j.UpdatedAt, DateTime.UtcNow);
-                                    await jobCollection.UpdateOneAsync(
-                                        Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, job.JobId),
-                                        update,
-                                        cancellationToken: stoppingToken
-                                    );
-                                }
-                            }
+                        Logger.LogInformation("ProcessPendingEmailJobsAsync presigned url {ResultUrl}", resultUrl);
+
+                        var endTimeUpdate = Builders<eMailJobDocument>.Update
+                            .Set(j => j.EndTime, DateTime.UtcNow);
+                        await jobCollection.UpdateOneAsync(
+                            Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, job.JobId),
+                            endTimeUpdate,
+                            cancellationToken: stoppingToken
+                        );
+
+                        Logger.LogInformation("MailService method started {Email},{ResultUrl}", job.Email, resultUrl);
+                        var mailResult = await MailService(job.Email, resultUrl);
+                        Logger.LogInformation("MailService method status response {MailResult}", mailResult);
+
+                        if (mailResult == "Success")
+                        {
+                            var update = Builders<eMailJobDocument>.Update
+                                .Set(j => j.ResultUrl, resultUrl)
+                                .Set(j => j.Status, JobStatusEnum.Completed)
+                                .Set(j => j.MailSent, true)
+                                .Set(j => j.UpdatedAt, DateTime.UtcNow);
+                            await jobCollection.UpdateOneAsync(
+                                Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, job.JobId),
+                                update,
+                                cancellationToken: stoppingToken
+                            );
+                        }
+                        else
+                        {
+                            var update = Builders<eMailJobDocument>.Update
+                                .Set(j => j.ResultUrl, resultUrl)
+                                .Set(j => j.Status, JobStatusEnum.Failed)
+                                .Set(j => j.MailSent, null)
+                                .Set(j => j.ErrorReason, mailResult)
+                                .Set(j => j.UpdatedAt, DateTime.UtcNow);
+                            await jobCollection.UpdateOneAsync(
+                                Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, job.JobId),
+                                update,
+                                cancellationToken: stoppingToken
+                            );
+                        }
                     }
                     catch (Exception exJob)
                     {
                         Logger.LogError("ProcessPendingEmailJobsAsync Error processing email job {JobId}: {Error}", job.JobId, exJob.Message);
-                        // Optionally, update job with error reason
                         var update = Builders<eMailJobDocument>.Update
                             .Set(j => j.ErrorReason, exJob.Message)
-                            .Set(j => j.MailSent, false)
+                            .Set(j => j.Status, JobStatusEnum.Failed)
                             .Set(j => j.UpdatedAt, DateTime.UtcNow);
                         await jobCollection.UpdateOneAsync(
                             Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, job.JobId),
-                            update
+                            update,
+                            cancellationToken: stoppingToken
                         );
                     }
                 }
@@ -207,14 +247,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     var errorContent = await response.Content.ReadAsStringAsync();
                     Logger.LogError("Failed to send email notification to {Email}. Status: {StatusCode}, Error: {Error}",
                         email, response.StatusCode, errorContent);
-                    return "Failure";
+                    //return "Failure";
+                    return errorContent;
                 }
 
             }
             catch (Exception ex)
             {
                 Logger.LogError("Error in mailservice: {Error}", ex.Message);
-                return "Failure";
+                //return "Failure";
+                return ex.Message;
             }
         }
 
