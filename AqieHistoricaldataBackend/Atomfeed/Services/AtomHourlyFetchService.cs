@@ -36,25 +36,33 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                //logger.LogInformation("using non proxy fetch{datetim}", DateTime.Now);
-                //using var testclient = new HttpClient
-                //{
-                //    BaseAddress = new Uri("https://uk-air.defra.gov.uk/")
-                //};
-                //logger.LogInformation("url{datetim}", DateTime.Now);
-                //// Ensure the URL doesn't have leading slash if BaseAddress has trailing slash
-                //var testurl = "data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
-
-                //var testresponse = await testclient.GetAsync(testurl);
-                //logger.LogInformation("using non proxy fetch response{datetim}", DateTime.Now);
 
                 logger.LogInformation("using proxy fetch{datetim}", DateTime.Now);
                 var client = httpClientFactory.CreateClient("Atomfeed");
                 var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
 
-                var response = await client.GetAsync(url);
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.IfModifiedSince = DateTimeOffset.UtcNow.AddDays(-1);
+                request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+                request.Headers.TryAddWithoutValidation("Pragma", "no-cache");
+
+                var response = await client.SendAsync(request);
                 logger.LogInformation("using proxy fetch response{datetim}", DateTime.Now);
-                response.EnsureSuccessStatusCode();
+
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    logger.LogWarning("HTTP {StatusCode} when fetching Atom feed for site {SiteID} year {Year}. Response: {Response}", 
+                        (int)response.StatusCode, siteID, year, errorContent);
+                    
+                    if (response.StatusCode == System.Net.HttpStatusCode.PreconditionRequired)
+                    {
+                        logger.LogError("Server returned 428 Precondition Required. Check if User-Agent, cookies, or other headers are needed.");
+                    }
+                    
+                    return new JArray();
+                }
 
                 var stream = await response.Content.ReadAsStreamAsync();
                 var xml = new XmlDocument();

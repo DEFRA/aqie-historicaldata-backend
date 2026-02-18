@@ -134,6 +134,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                 {
                                     // Mark job as mail sent (set to "success")
                                     var update = Builders<eMailJobDocument>.Update
+                                        .Set(j => j.ResultUrl, ResultUrl)
                                         .Set(j => j.MailSent, true)
                                         .Set(j => j.UpdatedAt, DateTime.UtcNow);
                                     await jobCollection.UpdateOneAsync(

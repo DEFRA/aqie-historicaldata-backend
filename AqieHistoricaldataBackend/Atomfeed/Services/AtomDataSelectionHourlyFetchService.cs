@@ -1,3 +1,4 @@
+using Amazon.Runtime.Internal;
 using Hangfire;
 using Newtonsoft.Json.Linq;
 using System.Collections.Concurrent;
@@ -273,11 +274,30 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var client = httpClientFactory.CreateClient("Atomfeed");
             var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
             try
-            {               
-                var response = await client.GetAsync(url);
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.IfModifiedSince = DateTimeOffset.UtcNow.AddDays(-1);
+                //request.Headers.IfModifiedSince = DateTime.UnixEpoch;
+                request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+                request.Headers.TryAddWithoutValidation("Pragma", "no-cache");
+
+                var response = await client.SendAsync(request);
+                //var response = await client.GetAsync(url);
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
                     Logger.LogWarning("Atom feed not found (404) for URL: {Url} (siteID: {SiteID}, year: {Year})", url, siteID, year);
+                    return new JArray();
+                }
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Logger.LogWarning("HTTP {StatusCode} when fetching Atom feed for site {SiteID} year {Year}. Response: {Response}",
+                        (int)response.StatusCode, siteID, year, errorContent);
+
+                    if (response.StatusCode == System.Net.HttpStatusCode.PreconditionRequired)
+                    {
+                        Logger.LogError("Server returned 428 Precondition Required. Check if User-Agent, cookies, or other headers are needed.");
+                    }
                     return new JArray();
                 }
                 response.EnsureSuccessStatusCode();

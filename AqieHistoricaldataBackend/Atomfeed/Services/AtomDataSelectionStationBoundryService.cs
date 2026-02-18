@@ -388,6 +388,19 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             }
                         }
 
+                        //if (closestLA is not null)
+                        //{
+                        //    // Extract LA_REGION from the local authority object
+                        //    var laRegionProp = closestLA.GetType().GetProperty("LA_REGION");
+                        //    if (laRegionProp is not null)
+                        //    {
+                        //        var laRegion = laRegionProp.GetValue(closestLA);
+                        //        site.Country = laRegion?.ToString() ?? string.Empty;
+
+                        //    }
+
+                        //    filtered.Add(site);
+                        //}
                         if (closestLA is not null)
                         {
                             // Extract LA_REGION from the local authority object
@@ -395,9 +408,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             if (laRegionProp is not null)
                             {
                                 var laRegion = laRegionProp.GetValue(closestLA);
-                                site.Country = laRegion?.ToString() ?? string.Empty;
+                                var laRegionStr = laRegion?.ToString() ?? string.Empty;
+
+                                // Map "London" to "England"
+                                site.Country = string.Equals(laRegionStr, "London", StringComparison.OrdinalIgnoreCase)
+                                    ? "England"
+                                    : laRegionStr;
                             }
-                            
+
                             filtered.Add(site);
                         }
                     }
