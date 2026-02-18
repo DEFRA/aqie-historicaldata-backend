@@ -36,19 +36,23 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-
                 logger.LogInformation("using proxy fetch{datetim}", DateTime.Now);
                 var client = httpClientFactory.CreateClient("Atomfeed");
                 var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.IfModifiedSince = DateTimeOffset.UtcNow.AddDays(-1);
+                request.Headers.IfModifiedSince = DateTime.UnixEpoch; // Jan 1, 1970 - ensures we always get data
                 request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
                 request.Headers.TryAddWithoutValidation("Pragma", "no-cache");
 
                 var response = await client.SendAsync(request);
                 logger.LogInformation("using proxy fetch response{datetim}", DateTime.Now);
 
+                if (response.StatusCode == System.Net.HttpStatusCode.NotModified)
+                {
+                    logger.LogWarning("Server returned 304 Not Modified for site {SiteID} year {Year}", siteID, year);
+                    return new JArray();
+                }
 
                 if (!response.IsSuccessStatusCode)
                 {
