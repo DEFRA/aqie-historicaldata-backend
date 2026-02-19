@@ -275,12 +275,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
             try
             {
-                var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
-                request.Headers.TryAddWithoutValidation("Pragma", "no-cache");
+                //var request = new HttpRequestMessage(HttpMethod.Get, url);
+                //request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+                //request.Headers.TryAddWithoutValidation("Pragma", "no-cache");
 
-                var response = await client.SendAsync(request);
-                //var response = await client.GetAsync(url);
+                //var response = await client.SendAsync(request);
+                ////var response = await client.GetAsync(url);
+                ///                var client = httpClientFactory.CreateClient("Atomfeed");
+                var response = await client.GetAsync(url);
+                response.EnsureSuccessStatusCode();
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
                     Logger.LogWarning("Atom feed not found (404) for URL: {Url} (siteID: {SiteID}, year: {Year})", url, siteID, year);
@@ -298,7 +301,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
                     return new JArray();
                 }
-                response.EnsureSuccessStatusCode();
                 var stream = await response.Content.ReadAsStreamAsync();
                 var xml = new XmlDocument();
                 xml.Load(stream);
