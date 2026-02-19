@@ -141,7 +141,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             logger.LogInformation("S3 bucket PresignedUrl start {Datetime}", DateTime.Now);
             // Expire in 2 days (172800 seconds) for 7days (604800 seconds)
-            var url = await awsPreSignedURLService.GeneratePreSignedURL(bucketName, key, double.Parse(Environment.GetEnvironmentVariable("PRESIGNED_DURATION")));
+            var url = await awsPreSignedURLService.GeneratePreSignedURL(bucketName, key, 604800);
             logger.LogInformation("S3 bucket PresignedUrl final URL {PresignedUrl}", url);
             return url;
         }
