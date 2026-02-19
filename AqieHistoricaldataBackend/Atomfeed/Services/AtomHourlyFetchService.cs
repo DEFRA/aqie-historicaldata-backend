@@ -34,22 +34,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         private async Task<JArray> FetchAtomFeedAsync(string siteID, string year)
         {
+            var client = httpClientFactory.CreateClient("Atomfeed");
+            var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
+
             try
             {
-                logger.LogInformation("using proxy fetch{datetim}", DateTime.Now);
-                //var client = httpClientFactory.CreateClient("Atomfeed");
-                //var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
-
-                //var request = new HttpRequestMessage(HttpMethod.Get, url);
-                //request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
-                //request.Headers.TryAddWithoutValidation("Pragma", "no-cache");
-
-                //var response = await client.SendAsync(request);
-                var client = httpClientFactory.CreateClient("Atomfeed");
-                var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
+                logger.LogInformation("Fetching Atom feed for site {SiteID} year {Year} at {DateTime}", siteID, year, DateTime.Now);
                 var response = await client.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-                logger.LogInformation("using proxy fetch response{datetim}", DateTime.Now);
+                logger.LogInformation("Received Atom feed response for site {SiteID} year {Year}: {StatusCode}", siteID, year, (int)response.StatusCode);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.NotModified)
                 {
@@ -60,14 +52,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
-                    logger.LogWarning("HTTP {StatusCode} when fetching Atom feed for site {SiteID} year {Year}. Response: {Response}", 
+                    logger.LogWarning("HTTP {StatusCode} when fetching Atom feed for site {SiteID} year {Year}. Response: {Response}",
                         (int)response.StatusCode, siteID, year, errorContent);
-                    
+
                     if (response.StatusCode == System.Net.HttpStatusCode.PreconditionRequired)
                     {
                         logger.LogError("Server returned 428 Precondition Required. Check if User-Agent, cookies, or other headers are needed.");
                     }
-                    
+
                     return new JArray();
                 }
 
@@ -77,9 +69,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var json = Newtonsoft.Json.JsonConvert.SerializeXmlNode(xml);
                 return JObject.Parse(json)["gml:FeatureCollection"]["gml:featureMember"] as JArray;
             }
+            catch (HttpRequestException ex)
+            {
+                logger.LogError("HTTP error fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex.Message);
+                return new JArray();
+            }
             catch (Exception ex)
             {
-                logger.LogError("Error fetching Atom feed: {Error}", ex);
+                logger.LogError("Error fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex);
                 return new JArray();
             }
         }
