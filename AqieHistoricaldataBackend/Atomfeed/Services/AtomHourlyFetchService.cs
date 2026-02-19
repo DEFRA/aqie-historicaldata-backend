@@ -37,14 +37,18 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 logger.LogInformation("using proxy fetch{datetim}", DateTime.Now);
+                //var client = httpClientFactory.CreateClient("Atomfeed");
+                //var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
+
+                //var request = new HttpRequestMessage(HttpMethod.Get, url);
+                //request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+                //request.Headers.TryAddWithoutValidation("Pragma", "no-cache");
+
+                //var response = await client.SendAsync(request);
                 var client = httpClientFactory.CreateClient("Atomfeed");
                 var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
-
-                var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
-                request.Headers.TryAddWithoutValidation("Pragma", "no-cache");
-
-                var response = await client.SendAsync(request);
+                var response = await client.GetAsync(url);
+                response.EnsureSuccessStatusCode();
                 logger.LogInformation("using proxy fetch response{datetim}", DateTime.Now);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.NotModified)
