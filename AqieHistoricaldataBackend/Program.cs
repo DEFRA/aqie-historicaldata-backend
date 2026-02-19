@@ -66,6 +66,26 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddHttpClient("Atomfeed", httpClient =>
     {
         httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/");
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        );
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+            "Accept",
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        );
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+            "Accept-Language",
+            "en-GB,en;q=0.9"
+        );
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+            "Referer",
+            "https://uk-air.defra.gov.uk/"
+        );
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation(
+            "Connection",
+            "keep-alive"
+        );
     })
     .ConfigurePrimaryHttpMessageHandler(() =>
     {

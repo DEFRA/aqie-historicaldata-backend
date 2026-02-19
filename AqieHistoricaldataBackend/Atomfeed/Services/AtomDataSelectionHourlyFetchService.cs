@@ -276,7 +276,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.IfModifiedSince = DateTime.UnixEpoch; // Jan 1, 1970 - ensures we always get data
                 request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
                 request.Headers.TryAddWithoutValidation("Pragma", "no-cache");
 
