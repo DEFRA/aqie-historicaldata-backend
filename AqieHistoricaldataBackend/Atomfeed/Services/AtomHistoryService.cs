@@ -1,40 +1,41 @@
-using AqieHistoricaldataBackend.Example.Models;
-using MongoDB.Bson.IO;
-using MongoDB.Driver;
-using System.Xml.Linq;
-using System.Xml;
-using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
-using Newtonsoft.Json;
-using System.Formats.Asn1;
-using System.Globalization;
-using CsvHelper;
-using AqieHistoricaldataBackend.Utils.Mongo;
-using AqieHistoricaldataBackend.Atomfeed.Models;
-using Microsoft.Extensions.Logging;
-using CsvHelper.Configuration;
-using System.Collections.Generic;
-using System.IO;
-using SharpCompress.Writers;
-using System.Text;
-using AqieHistoricaldataBackend.Utils.Http;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using Newtonsoft.Json.Linq;
-using SharpCompress.Common;
-using Amazon.S3.Model;
+using Amazon;
+using Amazon.Runtime.Internal;
 using Amazon.S3;
+using Amazon.S3.Model;
 using Amazon.S3.Transfer;
 using Amazon.Util;
-using static System.Net.Mime.MediaTypeNames;
-using Amazon;
+using AqieHistoricaldataBackend.Atomfeed.Models;
+using AqieHistoricaldataBackend.Example.Models;
+using AqieHistoricaldataBackend.Utils.Http;
+using AqieHistoricaldataBackend.Utils.Mongo;
+using CsvHelper;
+using CsvHelper.Configuration;
 using Elastic.CommonSchema;
-using System.Net.Sockets;
-using Microsoft.Extensions.Primitives;
-using Microsoft.AspNetCore.DataProtection.KeyManagement;
-using Amazon.Runtime.Internal;
-using static Amazon.Internal.RegionEndpointProviderV2;
 using Hangfire;
 using Hangfire.MemoryStorage.Database;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
+using MongoDB.Bson.IO;
+using MongoDB.Driver;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using SharpCompress.Common;
+using SharpCompress.Writers;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Formats.Asn1;
+using System.Globalization;
+using System.IO;
+using System.Net.Sockets;
+using System.Text;
+using System.Xml;
+using System.Xml.Linq;
+using static Amazon.Internal.RegionEndpointProviderV2;
+using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 using static AqieHistoricaldataBackend.Atomfeed.Services.AtomHistoryService;
+using static System.Net.Mime.MediaTypeNames;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
@@ -46,6 +47,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         IAtomDataSelectionEmailJobService AtomDataSelectionEmailJobService,
         IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService
     {
+        [ExcludeFromCodeCoverage]
         public async Task<string> AtomHealthcheck()
         {
             try
@@ -110,6 +112,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return PresignedUrl;
         }
 
+        [ExcludeFromCodeCoverage]
         public void CallApi()
         {
             try
