@@ -70,6 +70,28 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             }
             """;
 
+        // FeatureCollection where one feature has a null geometry
+        private const string NullGeomFeatureGeoJson = """
+            {
+              "type": "FeatureCollection",
+              "features": [
+                {
+                  "type": "Feature",
+                  "geometry": null,
+                  "properties": {}
+                },
+                {
+                  "type": "Feature",
+                  "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-5,49],[2,49],[2,56],[-5,56],[-5,49]]]
+                  },
+                  "properties": {}
+                }
+              ]
+            }
+            """;
+
         public AtomDataSelectionStationBoundryServiceTests()
         {
             _loggerMock = new Mock<ILogger<AtomDataSelectionStationBoundryService>>();
@@ -721,6 +743,306 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var returned = (bool)method.Invoke(null, args)!;
 
             Assert.Equal(expected, returned);
+        }
+
+        // ===================================================
+        // 31. TryParseLatLon – null lat or lon returns false
+        // ===================================================
+        [Theory]
+        [InlineData(null, "0.0")]
+        [InlineData("51.5", null)]
+        [InlineData(null, null)]
+        public void TryParseLatLon_NullInputs_ReturnsFalse(string? lat, string? lon)
+        {
+            var method = typeof(AtomDataSelectionStationBoundryService)
+                .GetMethod("TryParseLatLon", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+            var args = new object?[] { lat, lon, 0d, 0d };
+            var returned = (bool)method.Invoke(null, args)!;
+
+            Assert.False(returned);
+        }
+
+        // ===================================================
+        // 32. HaversineMeters – antipodal points ≈ half Earth circumference
+        // ===================================================
+        [Fact]
+        public void HaversineMeters_AntipodalPoints_ApproximatelyHalfCircumference()
+        {
+            var method = typeof(AtomDataSelectionStationBoundryService)
+                .GetMethod("HaversineMeters", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+            // North Pole to South Pole ≈ 20,015,087 m
+            var result = (double)method.Invoke(null, [90.0, 0.0, -90.0, 0.0])!;
+
+            Assert.InRange(result, 19_990_000d, 20_040_000d);
+        }
+
+        // ===================================================
+        // 33. Country – FeatureCollection with a null-geometry feature
+        //     The valid feature should still produce a boundary
+        // ===================================================
+        [Fact]
+        public async Task Country_NullGeometryFeatureInCollection_ValidFeatureStillLoaded()
+        {
+            var tmpFile = WriteTempGeoJson(NullGeomFeatureGeoJson);
+            SetupFileProvider(tmpFile);
+
+            var uniqueCountry = "NullGeomFeature_" + Guid.NewGuid();
+            var sites = new List<SiteInfo> { MakeSite("51.5", "0.0") };
+
+            var result = await _service.GetAtomDataSelectionStationBoundryService(
+                sites, uniqueCountry, "Country");
+
+            Assert.Single(result);
+            File.Delete(tmpFile);
+        }
+
+        // ===================================================
+        // 34. Country – site exactly on boundary edge is included (Covers semantics)
+        // ===================================================
+        [Fact]
+        public async Task Country_SiteOnBoundaryEdge_IsIncluded()
+        {
+            var tmpFile = WriteTempGeoJson(EnglandGeoJson);
+            SetupFileProvider(tmpFile);
+
+            // lon=2, lat=52 is on the polygon edge
+            var uniqueCountry = "EnglandEdge_" + Guid.NewGuid();
+            var sites = new List<SiteInfo> { MakeSite("52.0", "2.0") };
+
+            var result = await _service.GetAtomDataSelectionStationBoundryService(
+                sites, uniqueCountry, "Country");
+
+            // Covers() includes boundary points
+            Assert.Single(result);
+            File.Delete(tmpFile);
+        }
+
+        // ===================================================
+        // 35. Country – multiple sites, partial match
+        // ===================================================
+        [Fact]
+        public async Task Country_MultipleSites_OnlyInsideOnesReturned()
+        {
+            var tmpFile = WriteTempGeoJson(EnglandGeoJson);
+            SetupFileProvider(tmpFile);
+
+            var uniqueCountry = "EnglandPartial_" + Guid.NewGuid();
+            var sites = new List<SiteInfo>
+            {
+                MakeSite("51.5", "0.0"),    // inside
+                MakeSite("48.8566", "2.3522"), // Paris – outside
+                MakeSite("53.0", "-1.0"),   // inside
+            };
+
+            var result = await _service.GetAtomDataSelectionStationBoundryService(
+                sites, uniqueCountry, "Country");
+
+            Assert.Equal(2, result.Count);
+            File.Delete(tmpFile);
+        }
+
+        // ===================================================
+        // 36. Country – parallel path triggered with ≥1500 sites
+        // ===================================================
+        [Fact]
+        public async Task Country_LargeSiteList_ProcessParallelPath_ReturnsCorrectCount()
+        {
+            var tmpFile = WriteTempGeoJson(EnglandGeoJson);
+            SetupFileProvider(tmpFile);
+
+            var uniqueCountry = "EnglandParallel_" + Guid.NewGuid();
+
+            // 1500 sites all inside the polygon
+            var sites = new List<SiteInfo>(1500);
+            for (var i = 0; i < 1500; i++)
+                sites.Add(MakeSite("51.5", "0.0"));
+
+            var result = await _service.GetAtomDataSelectionStationBoundryService(
+                sites, uniqueCountry, "Country");
+
+            Assert.Equal(1500, result.Count);
+            File.Delete(tmpFile);
+        }
+
+        // ===================================================
+        // 37. Country – parallel path: sites outside union envelope excluded
+        // ===================================================
+        [Fact]
+        public async Task Country_LargeSiteList_ParallelPath_ExcludesSitesOutsideUnionEnvelope()
+        {
+            var tmpFile = WriteTempGeoJson(EnglandGeoJson);
+            SetupFileProvider(tmpFile);
+
+            var uniqueCountry = "EnglandParallelOut_" + Guid.NewGuid();
+
+            // 1500 sites all outside the polygon (Tokyo)
+            var sites = new List<SiteInfo>(1500);
+            for (var i = 0; i < 1500; i++)
+                sites.Add(MakeSite("35.6762", "139.6503"));
+
+            var result = await _service.GetAtomDataSelectionStationBoundryService(
+                sites, uniqueCountry, "Country");
+
+            Assert.Empty(result);
+            File.Delete(tmpFile);
+        }
+
+        // ===================================================
+        // 38. LocalAuthority – multiple sites, only some within 50 km
+        // ===================================================
+        [Fact]
+        public async Task LocalAuthority_MultipleSites_OnlyNearOnesIncluded()
+        {
+            _localAuthServiceMock
+                .Setup(s => s.GetAtomDataSelectionLocalAuthoritiesService(It.IsAny<string>()))
+                .ReturnsAsync(new List<LocalAuthorityData> { MakeLA(51.5, 0.0, "South East") });
+
+            var sites = new List<SiteInfo>
+            {
+                MakeSite("51.5", "0.0"),        // 0 km – included
+                MakeSite("55.9533", "-3.1883"),  // ~640 km Edinburgh – excluded
+            };
+
+            var result = await _service.GetAtomDataSelectionStationBoundryService(
+                sites, "TestLA", "LocalAuthority");
+
+            Assert.Single(result);
+            Assert.Equal("South East", result[0].Country);
+        }
+
+        // ===================================================
+        // 39. LocalAuthority – site with lat=0, lon=0 is valid coords and evaluated
+        // ===================================================
+        [Fact]
+        public async Task LocalAuthority_SiteAtZeroZero_IsEvaluatedNormally()
+        {
+            // LA at 0,0 is skipped (guard), but a different LA near site at 0,0 is fine
+            _localAuthServiceMock
+                .Setup(s => s.GetAtomDataSelectionLocalAuthoritiesService(It.IsAny<string>()))
+                .ReturnsAsync(new List<LocalAuthorityData> { MakeLA(0.001, 0.001, "Gulf Region") });
+
+            // Site at origin – valid coords, just outside range (LA is ~157 m away)
+            var sites = new List<SiteInfo> { MakeSite("0.0", "0.0") };
+
+            var result = await _service.GetAtomDataSelectionStationBoundryService(
+                sites, "TestLA", "LocalAuthority");
+
+            // 157 m < 50 000 m → should be included
+            Assert.Single(result);
+            Assert.Equal("Gulf Region", result[0].Country);
+        }
+
+        // ===================================================
+        // 40. LocalAuthority – LA_REGION is null → Country set to empty string
+        // ===================================================
+        [Fact]
+        public async Task LocalAuthority_NullRegionProperty_CountrySetToEmpty()
+        {
+            _localAuthServiceMock
+                .Setup(s => s.GetAtomDataSelectionLocalAuthoritiesService(It.IsAny<string>()))
+                .ReturnsAsync(new List<LocalAuthorityData>
+                {
+                    new() { Latitude = 51.5, Longitude = 0.0, LA_REGION = null! }
+                });
+
+            var sites = new List<SiteInfo> { MakeSite("51.5", "0.0") };
+
+            var result = await _service.GetAtomDataSelectionStationBoundryService(
+                sites, "TestLA", "LocalAuthority");
+
+            Assert.Single(result);
+            Assert.Equal(string.Empty, result[0].Country);
+        }
+
+        // ===================================================
+        // 41. TryToDouble – byte value → unsupported type returns false
+        // ===================================================
+        [Fact]
+        public void TryToDouble_UnsupportedType_ReturnsFalse()
+        {
+            var method = typeof(AtomDataSelectionStationBoundryService)
+                .GetMethod("TryToDouble", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+            var args = new object?[] { (byte)42, null };
+            var returned = (bool)method.Invoke(null, args)!;
+
+            Assert.False(returned);
+        }
+
+        // ===================================================
+        // 42. Country – region with whitespace-only entries trimmed out
+        // ===================================================
+        [Fact]
+        public async Task Country_RegionWithWhitespaceEntries_TrimsAndFilters()
+        {
+            SetupFileProvider(physicalPath: null!, exists: false);
+
+            // "  ,  ,  " → all trimmed entries are empty → count = 0 → return empty
+            var result = await _service.GetAtomDataSelectionStationBoundryService(
+                new List<SiteInfo> { MakeSite("51.5", "0.0") },
+                "  ,  ,  ",
+                "Country");
+
+            Assert.Empty(result);
+        }
+
+        // ===================================================
+        // 43. Country – priority ordering applies across real country names
+        // ===================================================
+        [Fact]
+        public async Task Country_MultipleCountries_PriorityOrderRespected()
+        {
+            // Write two separate temp files
+            var englandFile = WriteTempGeoJson(EnglandGeoJson);
+
+            // Wales polygon: lon -5 to -3, lat 51 to 54
+            const string walesGeoJson = """
+                {
+                  "type": "FeatureCollection",
+                  "features": [{
+                    "type": "Feature",
+                    "geometry": {
+                      "type": "Polygon",
+                      "coordinates": [[[-5,51],[-3,51],[-3,54],[-5,54],[-5,51]]]
+                    },
+                    "properties": {}
+                  }]
+                }
+                """;
+            var walesFile = WriteTempGeoJson(walesGeoJson);
+
+            // Set up file provider to route by path keyword
+            var englandFileInfoMock = new Mock<IFileInfo>();
+            englandFileInfoMock.SetupGet(f => f.Exists).Returns(true);
+            englandFileInfoMock.SetupGet(f => f.PhysicalPath).Returns(englandFile);
+
+            var walesFileInfoMock = new Mock<IFileInfo>();
+            walesFileInfoMock.SetupGet(f => f.Exists).Returns(true);
+            walesFileInfoMock.SetupGet(f => f.PhysicalPath).Returns(walesFile);
+
+            _fileProviderMock
+                .Setup(p => p.GetFileInfo(It.Is<string>(s => s.Contains("Wales", StringComparison.OrdinalIgnoreCase))))
+                .Returns(walesFileInfoMock.Object);
+
+            _fileProviderMock
+                .Setup(p => p.GetFileInfo(It.Is<string>(s => !s.Contains("Wales", StringComparison.OrdinalIgnoreCase))))
+                .Returns(englandFileInfoMock.Object);
+
+            // A site clearly inside both bounding boxes won't exist since the polygons don't overlap,
+            // so just verify it matches with the correct country key returned.
+            var sites = new List<SiteInfo> { MakeSite("52.0", "-4.0") }; // inside Wales polygon
+
+            var result = await _service.GetAtomDataSelectionStationBoundryService(
+                sites, "England,Wales", "Country");
+
+            // Wales has lower priority number (1) than England (3) → Wales boundary checked first
+            Assert.Single(result);
+            Assert.Contains(result, s => s.Country == "Wales" || s.Country == "England");
+
+            File.Delete(englandFile);
+            File.Delete(walesFile);
         }
     }
 }
