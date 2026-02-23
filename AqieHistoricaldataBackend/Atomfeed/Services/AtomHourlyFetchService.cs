@@ -67,7 +67,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var xml = new XmlDocument();
                 xml.Load(stream);
                 var json = Newtonsoft.Json.JsonConvert.SerializeXmlNode(xml);
-                return JObject.Parse(json)["gml:FeatureCollection"]["gml:featureMember"] as JArray;
+                return JObject.Parse(json)["gml:FeatureCollection"]["gml:featureMember"] as JArray ?? new JArray();
             }
             catch (HttpRequestException ex)
             {

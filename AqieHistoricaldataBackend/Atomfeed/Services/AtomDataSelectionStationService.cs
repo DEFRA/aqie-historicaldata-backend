@@ -86,7 +86,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         // Primary constructor parameters are available as fields by the primary-constructor syntax used in this project.
         // (Logger, httpClientFactory, AtomDataSelectionStationBoundryService, AtomDataSelectionHourlyFetchService, AWSS3BucketService, AuthService)
 
-        public async Task<string> GetAtomDataSelectionStation(string pollutantName, string datasource, 
+        public async Task<string> GetAtomDataSelectionStation(string pollutantName, string datasource,
             string year, string region, string regiontype, string dataselectorfiltertype, string dataselectordownloadtype, string email)
         {
 
@@ -218,11 +218,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                         //if (dataselectordownloadtype == "dataSelectorSingle")
                         //{
-                            await _jobChannel.Writer.WriteAsync(job);
-                            _ = EnsureQueueProcessorStartedAsync(); // fire-and-forget ensure processor running
+                        await _jobChannel.Writer.WriteAsync(job);
+                        _ = EnsureQueueProcessorStartedAsync(); // fire-and-forget ensure processor running
 
-                            // Return the job id immediately to front-end
-                            return jobId;
+                        // Return the job id immediately to front-end
+                        return jobId;
                         //}
                     }
                     else
@@ -428,7 +428,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        
+
     }
 
 

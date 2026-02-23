@@ -10,7 +10,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionHourlyFetchService(ILogger<HistoryexceedenceService> Logger,
     IHttpClientFactory httpClientFactory) : IAtomDataSelectionHourlyFetchService
     {
-        public async Task<List<FinalData>> GetAtomDataSelectionHourlyFetchService(List<SiteInfo> filtered_station_pollutant, string pollutantName, string filteryear)
+        public async Task<List<FinalData>> GetAtomDataSelectionHourlyFetchService(List<SiteInfo> filteredstationpollutant, string pollutantName, string filteryear)
         {
             try
             {
@@ -28,7 +28,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 // Use a named variable (not discard '_') to guarantee the call is emitted by the compiler.
                 var eagerClient = httpClientFactory.CreateClient("Atomfeed");
 
-                var siteYearPairs = filtered_station_pollutant
+                var siteYearPairs = filteredstationpollutant
                                     .SelectMany(siteinfo => years.Select(year => new { siteinfo, year }));
 
                 await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 5 }, async (pair, ct) =>

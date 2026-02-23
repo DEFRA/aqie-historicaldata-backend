@@ -155,7 +155,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public DateTime? UpdatedAt { get; set; }
         }
 
-      
+
         public enum JobStatusEnum
         {
             Pending,
@@ -193,7 +193,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string Region { get; set; }
             [BsonElement("regiontype")]
             public string Regiontype { get; set; }
-            
+
             [BsonElement("dataselectorfiltertype")]
             public string Dataselectorfiltertype { get; set; }
             [BsonElement("dataselectordownloadtype")]

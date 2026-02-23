@@ -236,7 +236,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         };
 
         public async Task<List<SiteInfo>> GetAtomDataSelectionStationBoundryService(
-            List<SiteInfo> filtered_station_pollutant,
+            List<SiteInfo> filteredstationpollutant,
             string region,
             string regiontype)
         {
@@ -273,12 +273,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         return new List<SiteInfo>();
 
                     // Heuristic: parallelize on big batches
-                    bool useParallel = filtered_station_pollutant.Count >= 1500 &&
+                    bool useParallel = filteredstationpollutant.Count >= 1500 &&
                                        Environment.ProcessorCount > 1;
 
                     var result = useParallel
-                        ? ProcessParallel(filtered_station_pollutant, boundaries)
-                        : ProcessSequential(filtered_station_pollutant, boundaries);
+                        ? ProcessParallel(filteredstationpollutant, boundaries)
+                        : ProcessSequential(filteredstationpollutant, boundaries);
 
                     return await Task.FromResult(result).ConfigureAwait(false);
                 }
@@ -311,9 +311,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     // Proximity filter using indexed candidate selection + Haversine
                     const double maxDistanceMeters = 50_000d;
 
-                    var filtered = new List<SiteInfo>(capacity: Math.Min(2048, filtered_station_pollutant.Count));
+                    var filtered = new List<SiteInfo>(capacity: Math.Min(2048, filteredstationpollutant.Count));
 
-                    foreach (var site in filtered_station_pollutant)
+                    foreach (var site in filteredstationpollutant)
                     {
                         if (!TryParseLatLon(site.Latitude, site.Longitude, out double lat, out double lon))
                             continue;
