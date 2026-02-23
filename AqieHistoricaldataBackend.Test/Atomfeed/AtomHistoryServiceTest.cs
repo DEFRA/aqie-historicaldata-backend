@@ -1,259 +1,264 @@
-//using Xunit;
-//using Moq;
-//using Moq.Protected;
-//using System.Net;
-//using System.Net.Http;
-//using System.Threading.Tasks;
-//using Microsoft.Extensions.Logging;
-//using AqieHistoricaldataBackend.Atomfeed.Services;
-//using AqieHistoricaldataBackend.Atomfeed.Models;
-//using AqieHistoricaldataBackend.Utils.Http;
-//using System;
-//using System.Collections.Generic;
-//using System.Threading;
-//using System.Net.Http.Headers;
-//using AtomModel = AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
-//using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
+using Xunit;
+using Moq;
+using Moq.Protected;
+using System.Net;
+using System.Net.Http;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using AqieHistoricaldataBackend.Atomfeed.Services;
+using AqieHistoricaldataBackend.Atomfeed.Models;
+using AqieHistoricaldataBackend.Utils.Http;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Net.Http.Headers;
+using AtomModel = AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
+using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
-//public class AtomHistoryServiceTests
-//{
-//    private readonly Mock<ILogger<AtomHistoryService>> _loggerMock = new();
-//    private readonly Mock<IHttpClientFactory> _httpClientFactoryMock = new();
-//    private readonly Mock<IAtomHourlyFetchService> _hourlyServiceMock = new();
-//    private readonly Mock<IAtomDailyFetchService> _dailyServiceMock = new();
-//    private readonly Mock<IAtomAnnualFetchService> _annualServiceMock = new();
-//    private readonly Mock<IAWSS3BucketService> _s3ServiceMock = new();
-//    private readonly Mock<IHistoryexceedenceService> _exceedenceServiceMock = new();
-//    private readonly Mock<IAtomDataSelectionService> _dataSelectionServiceMock = new();
-//    private AtomHistoryService CreateService(HttpClient client = null)
-//    {
-//        if (client != null)
-//        {
-//            _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Returns(client);
-//        }
+public class AtomHistoryServiceTests
+{
+    private readonly Mock<ILogger<AtomHistoryService>> _loggerMock = new();
+    private readonly Mock<IHttpClientFactory> _httpClientFactoryMock = new();
+    private readonly Mock<IAtomHourlyFetchService> _hourlyServiceMock = new();
+    private readonly Mock<IAtomDailyFetchService> _dailyServiceMock = new();
+    private readonly Mock<IAtomAnnualFetchService> _annualServiceMock = new();
+    private readonly Mock<IAWSS3BucketService> _s3ServiceMock = new();
+    private readonly Mock<IHistoryexceedenceService> _exceedenceServiceMock = new();
+    private readonly Mock<IAtomDataSelectionService> _dataSelectionServiceMock = new();
+    private readonly Mock<IAtomDataSelectionJobStatus> _dataSelectionJobStatusMock = new();
+    private readonly Mock<IAtomDataSelectionEmailJobService> _dataSelectionEmailJobServiceMock = new();
 
-//        return new AtomHistoryService(
-//            _loggerMock.Object,
-//            _httpClientFactoryMock.Object,
-//            _hourlyServiceMock.Object,
-//            _dailyServiceMock.Object,
-//            _annualServiceMock.Object,
-//            _s3ServiceMock.Object
-//            //_exceedenceServiceMock.Object,
-//            //_dataSelectionServiceMock.Object
-//        );
-//    }
+    private AtomHistoryService CreateService(HttpClient client = null)
+    {
+        if (client != null)
+        {
+            _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Returns(client);
+        }
 
-//    [Fact]
-//    public async Task AtomHealthcheck_ReturnsError_WhenExceptionThrown()
-//    {
-//        _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Throws(new Exception("fail"));
-//        var service = CreateService();
+        return new AtomHistoryService(
+            _loggerMock.Object,
+            _httpClientFactoryMock.Object,
+            _hourlyServiceMock.Object,
+            _dailyServiceMock.Object,
+            _annualServiceMock.Object,
+            _s3ServiceMock.Object,
+            _dataSelectionServiceMock.Object,
+            _dataSelectionJobStatusMock.Object,
+            _dataSelectionEmailJobServiceMock.Object,
+            _exceedenceServiceMock.Object
+        );
+    }
 
-//        var result = await service.AtomHealthcheck();
+    [Fact]
+    public async Task AtomHealthcheck_ReturnsError_WhenExceptionThrown()
+    {
+        _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Throws(new Exception("fail"));
+        var service = CreateService();
 
-//        Assert.Equal("Error", result);
-//    }
+        var result = await service.AtomHealthcheck();
 
-//    [Fact]
-//    public async Task GetAtomHourlydata_ReturnsHourlyUrl()
-//    {
-//        var data = new AtomModel.QueryStringData { SiteId = "site", Year = "2023", DownloadPollutant = "NO2", DownloadPollutantType = "Hourly" };
-//        var finalData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
+        Assert.Equal("Error", result);
+    }
 
-//        _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(finalData);
-//        _s3ServiceMock.Setup(s => s.writecsvtoawss3bucket(finalData, data, "Hourly")).ReturnsAsync("url");
+    [Fact]
+    public async Task GetAtomHourlydata_ReturnsHourlyUrl()
+    {
+        var data = new AtomModel.QueryStringData { SiteId = "site", Year = "2023", DownloadPollutant = "NO2", DownloadPollutantType = "Hourly" };
+        var finalData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
 
-//        var service = CreateService();
-//        var result = await service.GetAtomHourlydata(data);
+        _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(finalData);
+        _s3ServiceMock.Setup(s => s.writecsvtoawss3bucket(finalData, data, "Hourly")).ReturnsAsync("url");
 
-//        Assert.Equal("url", result);
-//    }
+        var service = CreateService();
+        var result = await service.GetAtomHourlydata(data);
 
-//    [Fact]
-//    public async Task GetAtomHourlydata_ReturnsDailyUrl()
-//    {
-//        var data = new AtomModel.QueryStringData { SiteId = "site", Year = "2023", DownloadPollutant = "NO2", DownloadPollutantType = "Daily" };
-//        var hourlyData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
-//        var dailyData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
+        Assert.Equal("url", result);
+    }
 
-//        _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(hourlyData);
-//        _dailyServiceMock.Setup(s => s.GetAtomDailydatafetch(hourlyData, data)).ReturnsAsync(dailyData);
-//        _s3ServiceMock.Setup(s => s.writecsvtoawss3bucket(dailyData, data, "Daily")).ReturnsAsync("daily-url");
+    [Fact]
+    public async Task GetAtomHourlydata_ReturnsDailyUrl()
+    {
+        var data = new AtomModel.QueryStringData { SiteId = "site", Year = "2023", DownloadPollutant = "NO2", DownloadPollutantType = "Daily" };
+        var hourlyData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
+        var dailyData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
 
-//        var service = CreateService();
-//        var result = await service.GetAtomHourlydata(data);
+        _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(hourlyData);
+        _dailyServiceMock.Setup(s => s.GetAtomDailydatafetch(hourlyData, data)).ReturnsAsync(dailyData);
+        _s3ServiceMock.Setup(s => s.writecsvtoawss3bucket(dailyData, data, "Daily")).ReturnsAsync("daily-url");
 
-//        Assert.Equal("daily-url", result);
-//    }
+        var service = CreateService();
+        var result = await service.GetAtomHourlydata(data);
 
-//    [Fact]
-//    public async Task GetAtomHourlydata_ReturnsAnnualUrl()
-//    {
-//        var data = new AtomModel.QueryStringData { SiteId = "site", Year = "2023", DownloadPollutant = "NO2", DownloadPollutantType = "Annual" };
-//        var hourlyData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
-//        var annualData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
+        Assert.Equal("daily-url", result);
+    }
 
-//        _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(hourlyData);
-//        _annualServiceMock.Setup(s => s.GetAtomAnnualdatafetch(hourlyData, data)).ReturnsAsync(annualData);
-//        _s3ServiceMock.Setup(s => s.writecsvtoawss3bucket(annualData, data, "Annual")).ReturnsAsync("annual-url");
+    [Fact]
+    public async Task GetAtomHourlydata_ReturnsAnnualUrl()
+    {
+        var data = new AtomModel.QueryStringData { SiteId = "site", Year = "2023", DownloadPollutant = "NO2", DownloadPollutantType = "Annual" };
+        var hourlyData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
+        var annualData = new List<AtomHistoryModel.FinalData> { new AtomHistoryModel.FinalData() };
 
-//        var service = CreateService();
-//        var result = await service.GetAtomHourlydata(data);
+        _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(hourlyData);
+        _annualServiceMock.Setup(s => s.GetAtomAnnualdatafetch(hourlyData, data)).ReturnsAsync(annualData);
+        _s3ServiceMock.Setup(s => s.writecsvtoawss3bucket(annualData, data, "Annual")).ReturnsAsync("annual-url");
 
-//        Assert.Equal("annual-url", result);
-//    }
+        var service = CreateService();
+        var result = await service.GetAtomHourlydata(data);
 
-//    [Fact]
-//    public async Task GetAtomHourlydata_ReturnsEmpty_WhenExceptionThrown()
-//    {
-//        var data = new AtomModel.QueryStringData { SiteId = "site", Year = "2023", DownloadPollutant = "NO2", DownloadPollutantType = "Hourly" };
-//        _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-//            .ThrowsAsync(new Exception("fail"));
+        Assert.Equal("annual-url", result);
+    }
 
-//        var service = CreateService();
-//        var result = await service.GetAtomHourlydata(data);
+    [Fact]
+    public async Task GetAtomHourlydata_ReturnsEmpty_WhenExceptionThrown()
+    {
+        var data = new AtomModel.QueryStringData { SiteId = "site", Year = "2023", DownloadPollutant = "NO2", DownloadPollutantType = "Hourly" };
+        _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ThrowsAsync(new Exception("fail"));
 
-//        Assert.Equal(string.Empty, result);
-//    }
+        var service = CreateService();
+        var result = await service.GetAtomHourlydata(data);
 
-//    [Fact]
-//    public void CallApi_LogsSuccess_WhenSuccessful()
-//    {
-//        var handlerMock = new Mock<HttpMessageHandler>();
-//        handlerMock.Protected()
-//            .Setup<Task<HttpResponseMessage>>("SendAsync",
-//                ItExpr.IsAny<HttpRequestMessage>(),
-//                ItExpr.IsAny<CancellationToken>())
-//            .ReturnsAsync(new HttpResponseMessage
-//            {
-//                StatusCode = HttpStatusCode.OK,
-//                Content = new StringContent("Success")
-//            });
+        Assert.Equal(string.Empty, result);
+    }
 
-//        var client = new HttpClient(handlerMock.Object);
-//        var service = CreateService(client);
+    [Fact]
+    public void CallApi_LogsSuccess_WhenSuccessful()
+    {
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content = new StringContent("Success")
+            });
 
-//        service.CallApi();
+        var client = new HttpClient(handlerMock.Object);
+        var service = CreateService(client);
 
-//        _loggerMock.Verify(
-//                     x => x.Log(
-//                     LogLevel.Error,
-//                     It.IsAny<EventId>(),
-//                     It.Is<It.IsAnyType>((v, t) => true),
-//                     It.IsAny<Exception>(),
-//                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-//                     Times.AtLeastOnce);
-//    }
+        service.CallApi();
 
-//    [Fact]
-//    public void CallApi_LogsError_WhenFailed()
-//    {
-//        var handlerMock = new Mock<HttpMessageHandler>();
-//        handlerMock.Protected()
-//            .Setup<Task<HttpResponseMessage>>("SendAsync",
-//                ItExpr.IsAny<HttpRequestMessage>(),
-//                ItExpr.IsAny<CancellationToken>())
-//            .ReturnsAsync(new HttpResponseMessage
-//            {
-//                StatusCode = HttpStatusCode.InternalServerError,
-//                Content = new StringContent("Error")
-//            });
+        _loggerMock.Verify(
+                     x => x.Log(
+                     LogLevel.Error,
+                     It.IsAny<EventId>(),
+                     It.Is<It.IsAnyType>((v, t) => true),
+                     It.IsAny<Exception>(),
+                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                     Times.AtLeastOnce);
+    }
 
-//        var client = new HttpClient(handlerMock.Object);
-//        var service = CreateService(client);
+    [Fact]
+    public void CallApi_LogsError_WhenFailed()
+    {
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.InternalServerError,
+                Content = new StringContent("Error")
+            });
 
-//        service.CallApi();
+        var client = new HttpClient(handlerMock.Object);
+        var service = CreateService(client);
 
-//        _loggerMock.Verify(
-//                     x => x.Log(
-//                     LogLevel.Error,
-//                     It.IsAny<EventId>(),
-//                     It.Is<It.IsAnyType>((v, t) => true),
-//                     It.IsAny<Exception>(),
-//                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-//                     Times.AtLeastOnce);
-//    }
+        service.CallApi();
 
-//    [Fact]
-//    public void CallApi_HandlesHttpRequestException()
-//    {
-//        _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Throws(new HttpRequestException("fail"));
-//        var service = CreateService();
+        _loggerMock.Verify(
+                     x => x.Log(
+                     LogLevel.Error,
+                     It.IsAny<EventId>(),
+                     It.Is<It.IsAnyType>((v, t) => true),
+                     It.IsAny<Exception>(),
+                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                     Times.AtLeastOnce);
+    }
 
-//        service.CallApi();
+    [Fact]
+    public void CallApi_HandlesHttpRequestException()
+    {
+        _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Throws(new HttpRequestException("fail"));
+        var service = CreateService();
 
-//        _loggerMock.Verify(
-//            x => x.Log(
-//                LogLevel.Error,
-//                It.IsAny<EventId>(),
-//                It.Is<It.IsAnyType>((v, t) => true),
-//                It.IsAny<Exception>(),
-//                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-//            Times.AtLeastOnce);
-//    }
+        service.CallApi();
 
-//    [Fact]
-//    public void CallApi_HandlesGeneralException()
-//    {
-//        _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Throws(new Exception("fail"));
-//        var service = CreateService();
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => true),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
+    }
 
-//        service.CallApi();
+    [Fact]
+    public void CallApi_HandlesGeneralException()
+    {
+        _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Throws(new Exception("fail"));
+        var service = CreateService();
 
-//        _loggerMock.Verify(
-//            x => x.Log(
-//                LogLevel.Error,
-//                It.IsAny<EventId>(),
-//                It.Is<It.IsAnyType>((v, t) => true),
-//                It.IsAny<Exception>(),
-//                It.IsAny<Func<It.IsAnyType, Exception?, string>>()), 
-//            Times.AtLeastOnce);
-//    }
+        service.CallApi();
 
-//    [Fact]
-//    public async Task GetHistoryexceedencedata_ReturnsData_WhenSuccessful()
-//    {
-//        var data = new AtomModel.QueryStringData();
-//        _exceedenceServiceMock.Setup(s => s.GetHistoryexceedencedata(data)).ReturnsAsync("result");
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => true),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
+    }
 
-//        var service = CreateService();
-//        var result = await service.GetHistoryexceedencedata(data);
+    [Fact]
+    public async Task GetHistoryexceedencedata_ReturnsData_WhenSuccessful()
+    {
+        var data = new AtomModel.QueryStringData();
+        _exceedenceServiceMock.Setup(s => s.GetHistoryexceedencedata(data)).ReturnsAsync("result");
 
-//        Assert.Equal("result", result);
-//    }
+        var service = CreateService();
+        var result = await service.GetHistoryexceedencedata(data);
 
-//    [Fact]
-//    public async Task GetHistoryexceedencedata_ReturnsFailure_WhenExceptionThrown()
-//    {
-//        var data = new AtomModel.QueryStringData();
-//        _exceedenceServiceMock.Setup(s => s.GetHistoryexceedencedata(data)).ThrowsAsync(new Exception("fail"));
+        Assert.Equal("result", result);
+    }
 
-//        var service = CreateService();
-//        var result = await service.GetHistoryexceedencedata(data);
+    [Fact]
+    public async Task GetHistoryexceedencedata_ReturnsFailure_WhenExceptionThrown()
+    {
+        var data = new AtomModel.QueryStringData();
+        _exceedenceServiceMock.Setup(s => s.GetHistoryexceedencedata(data)).ThrowsAsync(new Exception("fail"));
 
-//        Assert.Equal("Failure", result);
-//    }
-    
-//    [Fact]
-//    public async Task AtomHealthcheck_ReturnsErrorAndLogs_WhenHttpFails()
-//    {
-//        // Arrange
-//        _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Throws(new Exception("fail"));
-//        var service = CreateService();
+        var service = CreateService();
+        var result = await service.GetHistoryexceedencedata(data);
 
-//        // Act
-//        var result = await service.AtomHealthcheck();
+        Assert.Equal("Failure", result);
+    }
 
-//        // Assert
-//        Assert.Equal("Error", result);
-//        _loggerMock.Verify(
-//            x => x.Log(
-//                LogLevel.Error,
-//                It.IsAny<EventId>(),
-//                It.Is<It.IsAnyType>((v, t) => true),
-//                It.IsAny<Exception>(),
-//                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-//            Times.AtLeastOnce);
-//    }
-//}
+    [Fact]
+    public async Task AtomHealthcheck_ReturnsErrorAndLogs_WhenHttpFails()
+    {
+        // Arrange
+        _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Throws(new Exception("fail"));
+        var service = CreateService();
+
+        // Act
+        var result = await service.AtomHealthcheck();
+
+        // Assert
+        Assert.Equal("Error", result);
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => true),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
+    }
+}
