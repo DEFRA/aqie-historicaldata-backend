@@ -68,6 +68,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 Logger.LogError("Error in Atom GetAtomDataSelectionJobStatus {Error}", ex.StackTrace);
                 return null;
             }
-        }      
+        }
     }
 }
