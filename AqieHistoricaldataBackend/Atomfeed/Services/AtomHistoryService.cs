@@ -47,7 +47,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         IAtomDataSelectionEmailJobService AtomDataSelectionEmailJobService,
         IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService
     {
-        [ExcludeFromCodeCoverage]
+        
         public async Task<string> AtomHealthcheck()
         {
             try
@@ -112,7 +112,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return PresignedUrl;
         }
 
-        [ExcludeFromCodeCoverage]
+       
         public void CallApi()
         {
             try
