@@ -46,30 +46,30 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         IAtomDataSelectionEmailJobService AtomDataSelectionEmailJobService,
         IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService
     {
-        //public async Task<string> AtomHealthcheck()
-        //{
-        //    try
-        //    {
-        //        var client = httpClientFactory.CreateClient("Atomfeed");
-        //        var Atomresponse = await client.GetAsync("data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml");
-        //        Atomresponse.EnsureSuccessStatusCode();
-        //        var data = await Atomresponse.Content.ReadAsStringAsync();
+        public async Task<string> AtomHealthcheck()
+        {
+            try
+            {
+                var client = httpClientFactory.CreateClient("Atomfeed");
+                var Atomresponse = await client.GetAsync("data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml");
+                Atomresponse.EnsureSuccessStatusCode();
+                var data = await Atomresponse.Content.ReadAsStringAsync();
 
-        //        // Schedule a recurring job.
-        //        RecurringJob.AddOrUpdate(
-        //            "call-api-job",
-        //            () => CallApi(),
-        //            Cron.Minutely); // Schedule to run every minute
+                // Schedule a recurring job.
+                RecurringJob.AddOrUpdate(
+                    "call-api-job",
+                    () => CallApi(),
+                    Cron.Minutely); // Schedule to run every minute
 
-        //        return data;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        logger.LogError("Error AtomHealthcheck Info message {Error}", ex.Message);
-        //        logger.LogError("Error AtomHealthcheck Info stacktrace {Error}", ex.StackTrace);
-        //        return "Error";
-        //    }
-        //}
+                return data;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError("Error AtomHealthcheck Info message {Error}", ex.Message);
+                logger.LogError("Error AtomHealthcheck Info stacktrace {Error}", ex.StackTrace);
+                return "Error";
+            }
+        }
 
 
         public async Task<string> GetAtomHourlydata(QueryStringData data)
@@ -110,27 +110,27 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return PresignedUrl;
         }
 
-        //public void CallApi()
-        //{
-        //    try
-        //    {
-        //        var client = httpClientFactory.CreateClient("Atomfeed");
-        //        var response = client.GetAsync("some-endpoint").Result;
+        public void CallApi()
+        {
+            try
+            {
+                var client = httpClientFactory.CreateClient("Atomfeed");
+                var response = client.GetAsync("data/atom-dls/observations/auto/GB_FixedObservations_2019_CLL2.xml").Result;
 
-        //        if (!response.IsSuccessStatusCode)
-        //        {
-        //            logger.LogError("API call failed with status code: {StatusCode}", response.StatusCode);
-        //        }
-        //    }
-        //    catch (HttpRequestException ex)
-        //    {
-        //        logger.LogError(ex, "HttpRequestException occurred while calling API.");
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        logger.LogError(ex, "An unexpected error occurred while calling API.");
-        //    }
-        //}
+                if (!response.IsSuccessStatusCode)
+                {
+                    logger.LogError("API call failed with status code: {StatusCode}", response.StatusCode);
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                logger.LogError(ex, "HttpRequestException occurred while calling API.");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "An unexpected error occurred while calling API.");
+            }
+        }
 
         public async Task<dynamic> GetHistoryexceedencedata(QueryStringData data)
         {

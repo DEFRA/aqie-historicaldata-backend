@@ -47,19 +47,22 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
             var response = await client.PostAsync("api/login_check", content);
 
-            // Do not throw here — allow caller to handle null token or log details.
             if (!response.IsSuccessStatusCode) return null;
 
             var body = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(body);
 
-            // Try common token property names
-            if (doc.RootElement.TryGetProperty("token", out var token)) return token.GetString();
-            if (doc.RootElement.TryGetProperty("access_token", out var accessToken)) return accessToken.GetString();
-            if (doc.RootElement.TryGetProperty("jwt", out var jwt)) return jwt.GetString();
+            // Check for plain string root BEFORE attempting any property access
+            if (doc.RootElement.ValueKind == JsonValueKind.String)
+                return doc.RootElement.GetString();
 
-            // Fallback: if root is a string
-            if (doc.RootElement.ValueKind == JsonValueKind.String) return doc.RootElement.GetString();
+            // Only access properties when root is an Object
+            if (doc.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                if (doc.RootElement.TryGetProperty("token", out var token)) return token.GetString();
+                if (doc.RootElement.TryGetProperty("access_token", out var accessToken)) return accessToken.GetString();
+                if (doc.RootElement.TryGetProperty("jwt", out var jwt)) return jwt.GetString();
+            }
 
             return null;
         }

@@ -1,16 +1,9 @@
-using Hangfire.MemoryStorage.Database;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using NetTopologySuite.Index.HPRtree;
-using NetTopologySuite.Utilities;
 using ProjNet.CoordinateSystems;
 using ProjNet.CoordinateSystems.Transformations;
-using RTools_NTS.Util;
-using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
-using static System.Net.Mime.MediaTypeNames;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 using Newtonsoft.Json;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
@@ -37,13 +30,15 @@ IHttpClientFactory httpClientFactory) : IAtomDataSelectionLocalAuthoritiesServic
 
                 var localauthorities = $"/xapi/getLocalAuthorities/json";
                 var localauthoritiesresponse = await laClient.GetStringAsync(localauthorities);
-                
+
                 // Deserialize the local authorities response
                 var allLocalAuthorities = JsonConvert.DeserializeObject<LocalAuthoritiesRoot>(localauthoritiesresponse);
-                
-                // Create a dictionary for quick region lookup by LA_ID
+
+                // Create a dictionary for quick region lookup by LA_ID, handling duplicate keys safely
                 var regionLookup = allLocalAuthorities?.data?
-                    .ToDictionary(la => la.LA_ID, la => la.LA_REGION) ?? new Dictionary<int, string>();
+                    .GroupBy(la => la.LA_ID)
+                    .ToDictionary(g => g.Key, g => g.Last().LA_REGION)
+                    ?? new Dictionary<int, string>();
 
                 foreach (var laId in selectedlocalAuthorityId)
                 {
@@ -88,7 +83,7 @@ IHttpClientFactory httpClientFactory) : IAtomDataSelectionLocalAuthoritiesServic
 
                             la.Latitude = point[1];
                             la.Longitude = point[0];
-                            
+
                             // Set the region from the lookup dictionary
                             if (regionLookup.TryGetValue(la.LA_ID, out var laRegion))
                             {
@@ -108,13 +103,12 @@ IHttpClientFactory httpClientFactory) : IAtomDataSelectionLocalAuthoritiesServic
             }
         }
     }
-    
+
     // Define model class matching your JSON structure
     public class LocalAuthority
     {
         public string? Id { get; set; }
         public string? Name { get; set; }
-        // Add other properties as needed based on actual JSON response
     }
 
     public class Root
@@ -160,6 +154,7 @@ IHttpClientFactory httpClientFactory) : IAtomDataSelectionLocalAuthoritiesServic
         public int result { get; set; }
         public int result_code { get; set; }
     }
+
     public class LocalAuthoritiesRoot
     {
         public List<LocalAuthorityData> data { get; set; }

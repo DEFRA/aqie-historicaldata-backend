@@ -11,16 +11,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 var dailyAverage = await AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
                 //To get the daily average
-                var annualAverage = dailyAverage.GroupBy(x => new
-                {
-                    ReportDate = Convert.ToDateTime(x.ReportDate).Year.ToString(),
-                    x.DailyPollutantName,
-                    x.DailyVerification
-                })
-                                    .Select(x =>
+                var annualAverage = dailyAverage
+                    .Where(x => x.ReportDate != null && DateTime.TryParse(x.ReportDate, out _))
+                    .GroupBy(x => new
+                    {
+                        ReportDate = Convert.ToDateTime(x.ReportDate).Year.ToString(),
+                        x.DailyPollutantName,
+                        x.DailyVerification
+                    })
+                                            .Select(x =>
                                     {
-                                        var validTotals = x.Where(y => Convert.ToDecimal(y.Total) != 0).ToList();
-                                        decimal averageTotal = validTotals.Any() ? validTotals.Average(y => Convert.ToDecimal(y.Total)) : 0;
+                                        var validTotals = x.Where(y => Convert.ToDecimal(y.Total) != 0).ToList();                                        
                                         return new FinalData
                                         {
                                             ReportDate = x.Key.ReportDate,
