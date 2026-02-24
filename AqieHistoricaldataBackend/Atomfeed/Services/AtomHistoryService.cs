@@ -45,7 +45,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         IAWSS3BucketService AWSS3BucketService, IAtomDataSelectionService AtomDataSelectionService,
         IAtomDataSelectionJobStatus AtomDataSelectionJobStatus,
         IAtomDataSelectionEmailJobService AtomDataSelectionEmailJobService,
-        IHistoryexceedenceService HistoryexceedenceService) : IAtomHistoryService
+        IHistoryexceedenceService HistoryexceedenceService,
+        IAtomDataSelectionPresignedUrlMail AtomDataSelectionPresignedUrlMail) : IAtomHistoryService
     {
         
         public async Task<string> AtomHealthcheck()
@@ -191,6 +192,21 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 logger.LogError("Error in Atom GetatomDataSelectiondata {Error}", ex.Message);
                 logger.LogError("Error in Atom GetatomDataSelectiondata {Error}", ex.StackTrace);
+                return "Failure";
+            }
+        }
+
+        public async Task<string> GetAtomDataSelectionPresignedUrlMail(QueryStringData data)
+        {
+            try
+            {
+                var presignedUrlresult = await AtomDataSelectionPresignedUrlMail.GetPresignedUrlMail(data.jobId);
+                return presignedUrlresult;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError("Error in Atom GetPresignedUrlMail {Error}", ex.Message);
+                logger.LogError("Error in Atom GetPresignedUrlMail {Error}", ex.StackTrace);
                 return "Failure";
             }
         }

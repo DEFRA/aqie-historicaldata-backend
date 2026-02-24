@@ -183,6 +183,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAuthService, AuthService>();
     builder.Services.AddSingleton<IAtomDataSelectionJobStatus, AtomDataSelectionJobStatus>();
     builder.Services.AddSingleton<IAtomDataSelectionEmailJobService, AtomDataSelectionEmailJobService>();
+    builder.Services.AddSingleton<IAtomDataSelectionPresignedUrlMail, AtomDataSelectionPresignedUrlMail>();
     //builder.Services.AddSingleton<IEmailService, AtomDataSelectionEmailJobService.EmailService>();
     builder.Services.AddHostedService<AtomDataSelectionEmailJobHostedService>();
 }

@@ -88,6 +88,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         public async Task<string> GetAtomDataSelectionStation(string pollutantName, string datasource,
             string year, string region, string regiontype, string dataselectorfiltertype, string dataselectordownloadtype, string email)
+            //string JobId)
         {
 
             try
@@ -102,6 +103,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     dataselectorfiltertype = dataselectorfiltertype,
                     dataselectordownloadtype = dataselectordownloadtype,
                     email = email
+                    //jobId = JobId
                 };
 
                 //For CDP

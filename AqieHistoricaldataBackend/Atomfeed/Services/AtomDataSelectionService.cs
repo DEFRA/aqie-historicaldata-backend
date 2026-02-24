@@ -18,10 +18,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 string dataselectorfiltertype = data.dataselectorfiltertype;
                 string dataselectordownloadtype = data.dataselectordownloadtype;
                 string email = data.email;
-
+                //string JobId = data.jobId;
                 var data1 = data;
                 //var stationresultcountData = await AtomDataSelectionStationService.GetAtomDataSelectionStation(data);
-                var stationresultcountData = await AtomDataSelectionStationService.GetAtomDataSelectionStation(pollutantName, datasource, year, region, regiontype, dataselectorfiltertype, dataselectordownloadtype, email);
+                var stationresultcountData = await AtomDataSelectionStationService.GetAtomDataSelectionStation(pollutantName, datasource, year, region, regiontype, dataselectorfiltertype, dataselectordownloadtype, email);//, JobId);
                 return stationresultcountData;
             }
             catch (Exception ex)
