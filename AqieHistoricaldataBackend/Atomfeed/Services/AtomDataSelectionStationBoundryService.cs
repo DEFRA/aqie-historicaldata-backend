@@ -308,8 +308,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                     Logger.LogInformation("Built STRtree for {Count} local authority points for region {Region}", laCount, region);
 
-                    // Proximity filter using indexed candidate selection + Haversine
-                    const double maxDistanceMeters = 50_000d;
+                    // Proximity filter using indexed candidate selection + Haversine, 1 mile = 1609.344 meters
+                    const double maxDistanceMeters = 8046d;
 
                     var filtered = new List<SiteInfo>(capacity: Math.Min(2048, filteredstationpollutant.Count));
 
