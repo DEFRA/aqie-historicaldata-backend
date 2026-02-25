@@ -86,6 +86,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
+
+
+
                 Logger.LogInformation("ProcessPendingEmailJobsAsync entered.");
                 var jobCollection = MongoDbClientFactory.GetCollection<eMailJobDocument>("aqie_csvemailexport_jobs");
 
@@ -131,8 +134,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         {
                             Logger.LogInformation("Job {JobId} already claimed by another process.", job.JobId);
                             continue;
-                        }
-
+                        }                   
 
                         var resultUrl = await AtomDataSelectionStationService.GetAtomDataSelectionStation(
                             job.PollutantName,
@@ -156,7 +158,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         );
 
                         Logger.LogInformation("Document CreatedAt value: {CreatedAt}", job.CreatedAt);
-                        string ms = Getmilisecond(job.CreatedAt.ToString());
+                        var ms = Getmilisecond(job.CreatedAt);
                         if (ms == null)
                         {
                             continue;
@@ -269,15 +271,20 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        private string Getmilisecond(string createdAt)
+        private string Getmilisecond(DateTime createdAt)
         {
             try
             {
-                var currentTime = DateTime.UtcNow;
-                // Parse the string to DateTime
-                var createdAtDateTime = DateTime.Parse(createdAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
-                var timeDifference = currentTime - createdAtDateTime;
-                return timeDifference.TotalMilliseconds.ToString();
+                if (createdAt.Kind != DateTimeKind.Utc)
+                    createdAt = DateTime.SpecifyKind(createdAt, DateTimeKind.Utc);
+
+                return new DateTimeOffset(createdAt).ToUnixTimeMilliseconds().ToString();
+
+                //var currentTime = DateTime.UtcNow;
+                //// Parse the string to DateTime
+                //var createdAtDateTime = DateTime.Parse(createdAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
+                //var timeDifference = currentTime - createdAtDateTime;
+                //return timeDifference.TotalMilliseconds.ToString();
             }
             catch (Exception ex)
             {
