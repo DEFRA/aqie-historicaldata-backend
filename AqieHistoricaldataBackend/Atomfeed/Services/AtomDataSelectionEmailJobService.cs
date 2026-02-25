@@ -3,12 +3,14 @@ using AqieHistoricaldataBackend.Utils.Mongo;
 using Elastic.CommonSchema;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using MongoDB.Driver;
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Net.Mail;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
@@ -29,8 +31,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     {
         //private readonly IEmailService _emailService = emailService;
         //private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
-        // MongoDB collection for job documents
-        private IMongoCollection<eMailJobDocument>? _jobCollection;
         public async Task<string> GetAtomemailjobDataSelection(QueryStringData data)
         {
             try
@@ -143,7 +143,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             job.Dataselectorfiltertype,
                             job.Dataselectordownloadtype,
                             job.Email
-                            //job.JobId
                         );
 
                         Logger.LogInformation("ProcessPendingEmailJobsAsync presigned url {ResultUrl}", resultUrl);
@@ -156,7 +155,44 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             cancellationToken: stoppingToken
                         );
 
+                        Logger.LogInformation("Document CreatedAt value: {CreatedAt}", job.CreatedAt);
+                        string ms = Getmilisecond(job.CreatedAt.ToString());
+                        if (ms == null)
+                        {
+                            continue;
+                        }
 
+                        Logger.LogInformation("MailService method started {Email},{ResultUrl}", job.Email, resultUrl);
+                        var mailResult = await MailService(job.Email, job.JobId + "/" + ms);
+                        Logger.LogInformation("MailService method status response {MailResult}", mailResult);
+
+                        if (mailResult == "Success")
+                        {
+                            var update = Builders<eMailJobDocument>.Update
+                                .Set(j => j.ResultUrl, resultUrl)
+                                .Set(j => j.Status, JobStatusEnum.Completed)
+                                .Set(j => j.MailSent, true)
+                                .Set(j => j.UpdatedAt, DateTime.UtcNow);
+                            await jobCollection.UpdateOneAsync(
+                                Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, job.JobId),
+                                update,
+                                cancellationToken: stoppingToken
+                            );
+                        }
+                        else
+                        {
+                            var update = Builders<eMailJobDocument>.Update
+                                .Set(j => j.ResultUrl, resultUrl)
+                                .Set(j => j.Status, JobStatusEnum.Failed)
+                                .Set(j => j.MailSent, null)
+                                .Set(j => j.ErrorReason, mailResult)
+                                .Set(j => j.UpdatedAt, DateTime.UtcNow);
+                            await jobCollection.UpdateOneAsync(
+                                Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, job.JobId),
+                                update,
+                                cancellationToken: stoppingToken
+                            );
+                        }
                     }
                     catch (Exception exJob)
                     {
@@ -179,24 +215,91 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
+        public async Task<string> MailService(string email, string frameurl)
+        {
+            try
+            {
+                Logger.LogInformation("MailService enterted.");
 
+                using var client = new HttpClient
+                {
+                    BaseAddress = new Uri(Environment.GetEnvironmentVariable("NOTIFY_BASEADDRESS"))
+                };
 
+                // Ensure the URL doesn't have leading slash if BaseAddress has trailing slash
+                var url = Environment.GetEnvironmentVariable("NOTIFY_URL");
 
+                var notificationRequest = new
+                {
+                    emailAddress = email,
+                    templateId = Environment.GetEnvironmentVariable("EMAIL_TEMPLATEID"),
+                    personalisation = new
+                    {
+                        datalink = Environment.GetEnvironmentVariable("EMAIL_BASEADDRESS") + frameurl
+                    }
+                };
 
-            //public class EmailService : IEmailService
-            //{
-            //    public async Task SendEmailAsync(string to, string subject, string body)
-            //    {
-            //        var smtpClient = new SmtpClient("smtp.yourserver.com")
-            //        {
-            //            Port = 587,
-            //            Credentials = new NetworkCredential("yourusername", "yourpassword"),
-            //            EnableSsl = true,
-            //        };
+                Logger.LogInformation("Sending notification to {BaseAddress}{Url}", client.BaseAddress, url);
 
-            //        var mailMessage = new MailMessage("from@yourdomain.com", to, subject, body);
-            //        await smtpClient.SendMailAsync(mailMessage);
-            //    }
-            //}
+                var response = await client.PostAsJsonAsync(url, notificationRequest);
+
+                // Log the status code to help diagnose the issue
+                Logger.LogInformation("Response status: {StatusCode}", response.StatusCode);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    Logger.LogInformation("Email notification sent successfully");
+                    return "Success";
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Logger.LogError("Failed to send email notification to {Email}. Status: {StatusCode}, Error: {Error}",
+                        email, response.StatusCode, errorContent);
+                    //return "Failure";
+                    return errorContent;
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error in mailservice: {Error}", ex.Message);
+                //return "Failure";
+                return ex.Message;
+            }
         }
+
+        private string Getmilisecond(string createdAt)
+        {
+            try
+            {
+                var currentTime = DateTime.UtcNow;
+                // Parse the string to DateTime
+                var createdAtDateTime = DateTime.Parse(createdAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
+                var timeDifference = currentTime - createdAtDateTime;
+                return timeDifference.TotalMilliseconds.ToString();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error in Getmilisecond: {Error}", ex.Message);
+                return null;
+            }
+        }
+
+        //public class EmailService : IEmailService
+        //{
+        //    public async Task SendEmailAsync(string to, string subject, string body)
+        //    {
+        //        var smtpClient = new SmtpClient("smtp.yourserver.com")
+        //        {
+        //            Port = 587,
+        //            Credentials = new NetworkCredential("yourusername", "yourpassword"),
+        //            EnableSsl = true,
+        //        };
+
+        //        var mailMessage = new MailMessage("from@yourdomain.com", to, subject, body);
+        //        await smtpClient.SendMailAsync(mailMessage);
+        //    }
+        //}
+    }
 }
