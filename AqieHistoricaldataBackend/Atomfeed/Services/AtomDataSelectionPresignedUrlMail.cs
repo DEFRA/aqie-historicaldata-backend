@@ -47,13 +47,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var filter = Builders<eMailJobDocument>.Filter.Eq(d => d.JobId, jobId);
             var doc = await _jobCollection.Find(filter).FirstOrDefaultAsync();
             if (doc == null) return null;
+            Logger.LogInformation("Document CreatedAt value: {CreatedAt}", doc.CreatedAt);
             //string resultUrl = "";
             string s3Key = $"{doc.DataSource}_{doc.PollutantName}_{doc.Region}_{doc.Year}.zip";
             string resultUrl = await GetS3data(s3Key);
             if (resultUrl == null) return null;
 
             Logger.LogInformation("MailService method started {Email},{ResultUrl}", doc.Email, resultUrl);
-            Logger.LogInformation("Document CreatedAt value: {CreatedAt}", doc.CreatedAt);
+            
             string ms =  Getmilisecond(doc.CreatedAt.ToString());
             if (ms == null) return null;
             var mailResult = await MailService(doc.Email, doc.JobId + "/"+ ms);
