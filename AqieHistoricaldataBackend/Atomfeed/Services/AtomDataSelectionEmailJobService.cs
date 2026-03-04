@@ -22,15 +22,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     //}
     public class AtomDataSelectionEmailJobService(
         ILogger<HistoryexceedenceService> Logger,
-        IAtomHourlyFetchService AtomHourlyFetchService,
         IMongoDbClientFactory MongoDbClientFactory,
-        IAtomDataSelectionStationService AtomDataSelectionStationService,
-        //IEmailService emailService,
-        IHttpClientFactory httpClientFactory
+        IAtomDataSelectionStationService AtomDataSelectionStationService
     ) : IAtomDataSelectionEmailJobService
     {
-        //private readonly IEmailService _emailService = emailService;
-        //private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
         public async Task<string> GetAtomemailjobDataSelection(QueryStringData data)
         {
             try
@@ -258,7 +253,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     var errorContent = await response.Content.ReadAsStringAsync();
                     Logger.LogError("Failed to send email notification to {Email}. Status: {StatusCode}, Error: {Error}",
                         email, response.StatusCode, errorContent);
-                    //return "Failure";
                     return errorContent;
                 }
 
@@ -266,7 +260,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             catch (Exception ex)
             {
                 Logger.LogError("Error in mailservice: {Error}", ex.Message);
-                //return "Failure";
                 return ex.Message;
             }
         }
@@ -280,11 +273,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 return new DateTimeOffset(createdAt).ToUnixTimeMilliseconds().ToString();
 
-                //var currentTime = DateTime.UtcNow;
-                //// Parse the string to DateTime
-                //var createdAtDateTime = DateTime.Parse(createdAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
-                //var timeDifference = currentTime - createdAtDateTime;
-                //return timeDifference.TotalMilliseconds.ToString();
             }
             catch (Exception ex)
             {
@@ -292,21 +280,5 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return null;
             }
         }
-
-        //public class EmailService : IEmailService
-        //{
-        //    public async Task SendEmailAsync(string to, string subject, string body)
-        //    {
-        //        var smtpClient = new SmtpClient("smtp.yourserver.com")
-        //        {
-        //            Port = 587,
-        //            Credentials = new NetworkCredential("yourusername", "yourpassword"),
-        //            EnableSsl = true,
-        //        };
-
-        //        var mailMessage = new MailMessage("from@yourdomain.com", to, subject, body);
-        //        await smtpClient.SendMailAsync(mailMessage);
-        //    }
-        //}
     }
 }

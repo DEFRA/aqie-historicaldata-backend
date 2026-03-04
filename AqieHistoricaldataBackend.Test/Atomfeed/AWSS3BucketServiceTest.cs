@@ -55,8 +55,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var data = new QueryStringData
             {
-                SiteName = "Site1", DownloadPollutant = "NO2",
-                DownloadPollutantType = "Type1", Year = "2023"
+                SiteName = "Site1",
+                DownloadPollutant = "NO2",
+                DownloadPollutantType = "Type1",
+                Year = "2023"
             };
             _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(It.IsAny<List<FinalData>>(), data))
                        .ReturnsAsync(SampleCsvBytes);
@@ -71,8 +73,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var data = new QueryStringData
             {
-                SiteName = "S", DownloadPollutant = "O3",
-                DownloadPollutantType = "T", Year = "2022"
+                SiteName = "S",
+                DownloadPollutant = "O3",
+                DownloadPollutantType = "T",
+                Year = "2022"
             };
             _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(It.IsAny<List<FinalData>>(), data))
                        .ReturnsAsync(SampleCsvBytes);
@@ -89,8 +93,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var finalList = new List<FinalData>();
             var data = new QueryStringData
             {
-                SiteName = "Site", DownloadPollutant = "PM10",
-                DownloadPollutantType = "Hourly", Year = "2023"
+                SiteName = "Site",
+                DownloadPollutant = "PM10",
+                DownloadPollutantType = "Hourly",
+                Year = "2023"
             };
             _dailyMock.Setup(x => x.dailyatomfeedexport_csv(finalList, data))
                       .Returns(SampleCsvBytes);
@@ -107,8 +113,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var finalList = new List<FinalData>();
             var data = new QueryStringData
             {
-                SiteName = "Site", DownloadPollutant = "PM2.5",
-                DownloadPollutantType = "Annual", Year = "2021"
+                SiteName = "Site",
+                DownloadPollutant = "PM2.5",
+                DownloadPollutantType = "Annual",
+                Year = "2021"
             };
             _annualMock.Setup(x => x.annualatomfeedexport_csv(finalList, data))
                        .ReturnsAsync(SampleCsvBytes);
@@ -125,8 +133,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var finalList = new List<FinalData>();
             var data = new QueryStringData
             {
-                SiteName = "MySite", DownloadPollutant = "SO2",
-                DownloadPollutantType = "MyType", Year = "2020"
+                SiteName = "MySite",
+                DownloadPollutant = "SO2",
+                DownloadPollutantType = "MyType",
+                Year = "2020"
             };
             _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(It.IsAny<List<FinalData>>(), data))
                        .ReturnsAsync(SampleCsvBytes);
@@ -143,8 +153,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var data = new QueryStringData
             {
-                SiteName = "S", DownloadPollutant = "NO2",
-                DownloadPollutantType = "T", Year = "2023"
+                SiteName = "S",
+                DownloadPollutant = "NO2",
+                DownloadPollutantType = "T",
+                Year = "2023"
             };
             _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(It.IsAny<List<FinalData>>(), data))
                        .ReturnsAsync(SampleCsvBytes);
@@ -166,8 +178,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             {
                 dataselectorfiltertype = "dataSelectorHourly",
                 dataselectordownloadtype = "dataSelectorSingle",
-                dataSource = "DS1", pollutantName = "NO2",
-                Region = "London", Year = "2023"
+                dataSource = "DS1",
+                pollutantName = "NO2",
+                Region = "London",
+                Year = "2023"
             };
             _dataSelectionHourlyMock
                 .Setup(x => x.dataSelectionHourlyAtomFeedExportCSV(finalList, data))
@@ -188,8 +202,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             {
                 dataselectorfiltertype = "dataSelectorHourly",
                 dataselectordownloadtype = "dataSelectorSingle",
-                dataSource = "DS1", pollutantName = "PM10",
-                Region = "North", Year = "2022"
+                dataSource = "DS1",
+                pollutantName = "PM10",
+                Region = "North",
+                Year = "2022"
             };
             _dailyMock.Setup(x => x.dailyatomfeedexport_csv(finalList, data))
                       .Returns(SampleCsvBytes);
@@ -208,8 +224,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             {
                 dataselectorfiltertype = "dataSelectorHourly",
                 dataselectordownloadtype = "dataSelectorSingle",
-                dataSource = "DS2", pollutantName = "O3",
-                Region = "South", Year = "2021"
+                dataSource = "DS2",
+                pollutantName = "O3",
+                Region = "South",
+                Year = "2021"
             };
             _annualMock.Setup(x => x.annualatomfeedexport_csv(finalList, data))
                        .ReturnsAsync(SampleCsvBytes);
@@ -228,8 +246,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             {
                 dataselectorfiltertype = "dataSelectorHourly",
                 dataselectordownloadtype = "dataSelectorMultiple",
-                dataSource = "DS3", pollutantName = "SO2",
-                Region = "East", Year = "2023"
+                dataSource = "DS3",
+                pollutantName = "SO2",
+                Region = "East",
+                Year = "2023"
             };
             _dataSelectionHourlyMock
                 .Setup(x => x.dataSelectionHourlyAtomFeedExportCSV(finalList, data))
@@ -250,8 +270,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             {
                 dataselectorfiltertype = "dataSelectorHourly",
                 dataselectordownloadtype = "dataSelectorSingle",
-                dataSource = "MySource", pollutantName = "NO2",
-                Region = "London", Year = "2023"
+                dataSource = "MySource",
+                pollutantName = "NO2",
+                Region = "London",
+                Year = "2023"
             };
             _dataSelectionHourlyMock
                 .Setup(x => x.dataSelectionHourlyAtomFeedExportCSV(finalList, data))
@@ -271,8 +293,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             {
                 dataselectorfiltertype = "dataSelectorHourly",
                 dataselectordownloadtype = "dataSelectorSingle",
-                dataSource = "DS", pollutantName = "PM2.5",
-                Region = "West", Year = "2022"
+                dataSource = "DS",
+                pollutantName = "PM2.5",
+                Region = "West",
+                Year = "2022"
             };
             _dataSelectionHourlyMock
                 .Setup(x => x.dataSelectionHourlyAtomFeedExportCSV(It.IsAny<List<FinalData>>(), data))
@@ -339,8 +363,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var data = new QueryStringData
             {
-                SiteName = "S", DownloadPollutant = "NO2",
-                DownloadPollutantType = "T", Year = "2023"
+                SiteName = "S",
+                DownloadPollutant = "NO2",
+                DownloadPollutantType = "T",
+                Year = "2023"
             };
             _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(It.IsAny<List<FinalData>>(), data))
                        .ThrowsAsync(new Exception("hourly export failed"));
@@ -355,8 +381,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var data = new QueryStringData
             {
-                SiteName = "S", DownloadPollutant = "PM10",
-                DownloadPollutantType = "T", Year = "2023"
+                SiteName = "S",
+                DownloadPollutant = "PM10",
+                DownloadPollutantType = "T",
+                Year = "2023"
             };
             _dailyMock.Setup(x => x.dailyatomfeedexport_csv(It.IsAny<List<FinalData>>(), data))
                       .Throws(new Exception("daily export failed"));
@@ -371,8 +399,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var data = new QueryStringData
             {
-                SiteName = "S", DownloadPollutant = "PM2.5",
-                DownloadPollutantType = "T", Year = "2023"
+                SiteName = "S",
+                DownloadPollutant = "PM2.5",
+                DownloadPollutantType = "T",
+                Year = "2023"
             };
             _annualMock.Setup(x => x.annualatomfeedexport_csv(It.IsAny<List<FinalData>>(), data))
                        .ThrowsAsync(new Exception("annual export failed"));
@@ -387,8 +417,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var data = new QueryStringData
             {
-                SiteName = "S", DownloadPollutant = "NO2",
-                DownloadPollutantType = "T", Year = "2023"
+                SiteName = "S",
+                DownloadPollutant = "NO2",
+                DownloadPollutantType = "T",
+                Year = "2023"
             };
             _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(It.IsAny<List<FinalData>>(), data))
                        .ReturnsAsync(SampleCsvBytes);
@@ -406,8 +438,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var data = new QueryStringData
             {
-                SiteName = "S", DownloadPollutant = "NO2",
-                DownloadPollutantType = "T", Year = "2023"
+                SiteName = "S",
+                DownloadPollutant = "NO2",
+                DownloadPollutantType = "T",
+                Year = "2023"
             };
             _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(It.IsAny<List<FinalData>>(), data))
                        .ReturnsAsync(SampleCsvBytes);
@@ -427,8 +461,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             {
                 dataselectorfiltertype = "dataSelectorHourly",
                 dataselectordownloadtype = "dataSelectorSingle",
-                dataSource = "DS", pollutantName = "NO2",
-                Region = "London", Year = "2023"
+                dataSource = "DS",
+                pollutantName = "NO2",
+                Region = "London",
+                Year = "2023"
             };
             _dataSelectionHourlyMock
                 .Setup(x => x.dataSelectionHourlyAtomFeedExportCSV(It.IsAny<List<FinalData>>(), data))
@@ -446,8 +482,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var data = new QueryStringData
             {
-                SiteName = "S", DownloadPollutant = "NO2",
-                DownloadPollutantType = "T", Year = "2023"
+                SiteName = "S",
+                DownloadPollutant = "NO2",
+                DownloadPollutantType = "T",
+                Year = "2023"
             };
             _hourlyMock.Setup(x => x.hourlyatomfeedexport_csv(It.IsAny<List<FinalData>>(), data))
                        .ThrowsAsync(new Exception("test error"));
