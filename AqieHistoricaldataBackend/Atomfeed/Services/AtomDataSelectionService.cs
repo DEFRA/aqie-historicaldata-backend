@@ -3,7 +3,6 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AtomDataSelectionService(ILogger<HistoryexceedenceService> Logger,
-    IAtomHourlyFetchService AtomHourlyFetchService, 
     IAtomDataSelectionStationService AtomDataSelectionStationService) : IAtomDataSelectionService
     {
         public async Task<string> GetatomDataSelectiondata(QueryStringData data)
