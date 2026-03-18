@@ -105,7 +105,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             _service = new AtomDataSelectionStationBoundryService(
                 _loggerMock.Object,
                 _localAuthServiceMock.Object,
-                _httpClientFactoryMock.Object,
                 _envMock.Object);
         }
 

@@ -31,7 +31,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 // ensure index on JobId for quick lookup
                 var indexKeys = Builders<eMailJobDocument>.IndexKeys.Ascending(j => j.JobId);
-                jobCollection.Indexes.CreateOne(new CreateIndexModel<eMailJobDocument>(indexKeys));
+                await jobCollection.Indexes.CreateOneAsync(new CreateIndexModel<eMailJobDocument>(indexKeys));
 
                 // create GUID and persist job in MongoDB as Pending, then enqueue background work
                 var jobId = Guid.NewGuid().ToString("N");
@@ -39,19 +39,19 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var jobDoc = new eMailJobDocument
                 {
                     JobId = jobId,
-                    PollutantName = data.pollutantName,
-                    DataSource = data.dataSource,
-                    Year = data.Year,
-                    Region = data.Region,
-                    Regiontype = data.regiontype,
-                    Dataselectorfiltertype = data.dataselectorfiltertype,
-                    Dataselectordownloadtype = data.dataselectordownloadtype,
+                    PollutantName = data.pollutantName ?? string.Empty,
+                    DataSource = data.dataSource ?? string.Empty,
+                    Year = data.Year ?? string.Empty,
+                    Region = data.Region ?? string.Empty,
+                    Regiontype = data.regiontype ?? string.Empty,
+                    Dataselectorfiltertype = data.dataselectorfiltertype ?? string.Empty,
+                    Dataselectordownloadtype = data.dataselectordownloadtype ?? string.Empty,
                     Status = JobStatusEnum.Pending,
                     StartTime = null,
                     EndTime = null,
-                    ErrorReason = null,
-                    ResultUrl = null,
-                    Email = data.email,
+                    ErrorReason = string.Empty,
+                    ResultUrl = string.Empty,
+                    Email = data.email ?? string.Empty,
                     MailSent = null,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = null
@@ -209,9 +209,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 Logger.LogInformation("MailService enterted.");
 
+                var notifyBaseAddress = Environment.GetEnvironmentVariable("NOTIFY_BASEADDRESS");
+                if (string.IsNullOrEmpty(notifyBaseAddress))
+                {
+                    Logger.LogError("NOTIFY_BASEADDRESS environment variable is not set");
+                    return "Configuration error: NOTIFY_BASEADDRESS not set";
+                }
+
                 using var client = new HttpClient
                 {
-                    BaseAddress = new Uri(Environment.GetEnvironmentVariable("NOTIFY_BASEADDRESS"))
+                    BaseAddress = new Uri(notifyBaseAddress)
                 };
 
                 // Ensure the URL doesn't have leading slash if BaseAddress has trailing slash
@@ -255,7 +262,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        private string Getmilisecond(DateTime createdAt)
+        private string? Getmilisecond(DateTime createdAt)
         {
             try
             {

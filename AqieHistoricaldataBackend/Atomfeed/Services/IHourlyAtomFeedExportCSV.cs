@@ -3,7 +3,7 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public interface IHourlyAtomFeedExportCSV
+    public interface IHourlyAtomFeedExportCsv
     {
         [ExcludeFromCodeCoverage]
         Task<byte[]> hourlyatomfeedexport_csv(List<FinalData> Final_list, QueryStringData data);

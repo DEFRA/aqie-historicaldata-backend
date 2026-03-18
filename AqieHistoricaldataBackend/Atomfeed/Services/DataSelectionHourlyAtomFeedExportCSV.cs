@@ -11,7 +11,7 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
 
-    public class DataSelectionHourlyAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger) : IDataSelectionHourlyAtomFeedExportCSV
+    public class DataSelectionHourlyAtomFeedExportCsv(ILogger<HourlyAtomFeedExportCsv> logger) : IDataSelectionHourlyAtomFeedExportCsv
     {
         public async Task<byte[]> dataSelectionHourlyAtomFeedExportCSV(List<FinalData> Final_list, QueryStringData data)
         {

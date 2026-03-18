@@ -6,17 +6,15 @@ using static AqieHistoricaldataBackend.Atomfeed.Services.AtomDataSelectionStatio
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AtomDataSelectionJobStatus(ILogger<HistoryexceedenceService> Logger,
-    IAtomHourlyFetchService AtomHourlyFetchService,
-    IAtomDataSelectionStationService AtomDataSelectionStationService,
     IMongoDbClientFactory MongoDbClientFactory) : IAtomDataSelectionJobStatus
     {
         // MongoDB collection for job documents
         private IMongoCollection<JobDocument>? _jobCollection;
-        public async Task<JobInfoDto?> GetAtomDataSelectionJobStatusdata(string jobId)
+        public async Task<JobInfoDto?> GetAtomDataSelectionJobStatusdata(string jobID)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(jobId)) return null;
+                if (string.IsNullOrWhiteSpace(jobID)) return null;
                 // Lazy-initialize the collection using the injected factory so _jobCollection won't be null
                 if (_jobCollection == null)
                 {
@@ -26,7 +24,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     try
                     {
                         var indexKeys = Builders<JobDocument>.IndexKeys.Ascending(j => j.JobId);
-                        _jobCollection.Indexes.CreateOne(new CreateIndexModel<JobDocument>(indexKeys));
+                        await _jobCollection.Indexes.CreateOneAsync(new CreateIndexModel<JobDocument>(indexKeys));
                     }
                     catch (Exception ix)
                     {
@@ -35,7 +33,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
                 }
 
-                var filter = Builders<JobDocument>.Filter.Eq(d => d.JobId, jobId);
+                var filter = Builders<JobDocument>.Filter.Eq(d => d.JobId, jobID);
                 var doc = await _jobCollection.Find(filter).FirstOrDefaultAsync();
                 if (doc == null) return null;
 

@@ -143,9 +143,9 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAtomAnnualFetchService, AtomAnnualFetchService>();
     builder.Services.AddSingleton<IAWSS3BucketService, AWSS3BucketService>();
     builder.Services.AddSingleton<IS3TransferUtility, S3TransferUtility>();    
-    builder.Services.AddSingleton<IHourlyAtomFeedExportCSV, HourlyAtomFeedExportCSV>();
-    builder.Services.AddSingleton<IDailyAtomFeedExportCSV, DailyAtomFeedExportCSV>();
-    builder.Services.AddSingleton<IAnnualAtomFeedExportCSV, AnnualAtomFeedExportCSV>();
+    builder.Services.AddSingleton<IHourlyAtomFeedExportCsv, HourlyAtomFeedExportCsv>();
+    builder.Services.AddSingleton<IDailyAtomFeedExportCsv, DailyAtomFeedExportCsv>();
+    builder.Services.AddSingleton<IAnnualAtomFeedExportCsv, AnnualAtomFeedExportCsv>();
     builder.Services.AddSingleton<IAWSPreSignedURLService, AWSPreSignedURLService>();
     builder.Services.AddSingleton<IHistoryexceedenceService, HistoryexceedenceService>();
     builder.Services.AddSingleton<IAtomDataSelectionService, AtomDataSelectionService>();
@@ -153,7 +153,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAtomDataSelectionStationBoundryService, AtomDataSelectionStationBoundryService>();
     builder.Services.AddSingleton<IAtomDataSelectionLocalAuthoritiesService, AtomDataSelectionLocalAuthoritiesService>();
     builder.Services.AddSingleton<IAtomDataSelectionHourlyFetchService, AtomDataSelectionHourlyFetchService>();
-    builder.Services.AddSingleton<IDataSelectionHourlyAtomFeedExportCSV, DataSelectionHourlyAtomFeedExportCSV>();
+    builder.Services.AddSingleton<IDataSelectionHourlyAtomFeedExportCsv, DataSelectionHourlyAtomFeedExportCsv>();
     builder.Services.AddSingleton<IAuthService, AuthService>();
     builder.Services.AddSingleton<IAtomDataSelectionJobStatus, AtomDataSelectionJobStatus>();
     builder.Services.AddSingleton<IAtomDataSelectionEmailJobService, AtomDataSelectionEmailJobService>();

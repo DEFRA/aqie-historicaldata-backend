@@ -11,13 +11,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 {
     public class AWSPreSignedURLServiceTest
     {
-        private readonly Mock<ILogger<HourlyAtomFeedExportCSV>> _mockLogger;
+        private readonly Mock<ILogger<HourlyAtomFeedExportCsv>> _mockLogger;
         private readonly Mock<IAmazonS3> _mockS3Client;
         private readonly AWSPreSignedURLService _service;
 
         public AWSPreSignedURLServiceTest()
         {
-            _mockLogger = new Mock<ILogger<HourlyAtomFeedExportCSV>>();
+            _mockLogger = new Mock<ILogger<HourlyAtomFeedExportCsv>>();
             _mockS3Client = new Mock<IAmazonS3>();
             _service = new AWSPreSignedURLService(_mockLogger.Object, _mockS3Client.Object);
         }

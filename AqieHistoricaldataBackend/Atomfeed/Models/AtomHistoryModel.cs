@@ -10,9 +10,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
         {
             public required string PollutantName { get; set; }
             public required string PollutantMasterUrl { get; set; }
-            public string stationCode { get; set; }
-            public string polygon { get; set; }
-            public string year { get; set; }
+            public string? stationCode { get; set; }
+            public string? polygon { get; set; }
+            public string? year { get; set; }
         }
 
         public class FinalData
@@ -24,7 +24,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? Value { get; set; }
             public string? PollutantName { get; set; }
             public string? ReportDate { get; set; }
-            public decimal Total { get; set; }
+            public decimal? Total { get; set; }
             public string? DailyVerification { get; set; }
             public string? DailyValidity { get; set; }
             public string? DailyValue { get; set; }
@@ -90,9 +90,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
         }
         public class PollutantInfo
         {
-            public string Name { get; set; }
-            public string StartDate { get; set; }
-            public string EndDate { get; set; }
+            public string? Name { get; set; }
+            public string? StartDate { get; set; }
+            public string? EndDate { get; set; }
         }
 
         public class SiteInfo
@@ -104,22 +104,22 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? ZoneRegion { get; init; }
             public string? Latitude { get; init; }
             public string? Longitude { get; init; }
-            public List<PollutantInfo> Pollutants { get; set; } = new List<PollutantInfo>();
-            public string Country { get; set; }
+            public List<PollutantInfo>? Pollutants { get; set; } = new List<PollutantInfo>();
+            public string? Country { get; set; }
         }
         public class SiteInfoWithCountry
         {
-            public SiteInfo Site { get; set; }
-            public string Country { get; set; }
+            public SiteInfo? Site { get; set; }
+            public string? Country { get; set; }
         }
         public sealed class JobItem
         {
-            public string JobId { get; init; } = string.Empty;
-            public List<SiteInfo> StationData { get; init; } = new();
-            public string PollutantName { get; init; } = string.Empty;
-            public string Year { get; init; } = string.Empty;
-            public QueryStringData Data { get; init; } = new();
-            public string DownloadType { get; init; } = string.Empty;
+            public string? JobId { get; init; } = string.Empty;
+            public List<SiteInfo>? StationData { get; init; } = new();
+            public string? PollutantName { get; init; } = string.Empty;
+            public string? Year { get; init; } = string.Empty;
+            public QueryStringData? Data { get; init; } = new();
+            public string? DownloadType { get; init; } = string.Empty;
         }
 
         public sealed class JobDocument
@@ -164,8 +164,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
 
         public sealed record JobInfoDto
         {
-            public string JobId { get; init; } = string.Empty;
-            public string Status { get; init; } = string.Empty;
+            public string? JobId { get; init; } = string.Empty;
+            public string? Status { get; init; } = string.Empty;
             public string? ResultUrl { get; init; }
             public string? ErrorReason { get; init; }
             public DateTime? CreatedAt { get; init; }
@@ -182,20 +182,20 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             [BsonElement("jobId")]
             public string JobId { get; set; } = string.Empty;
             [BsonElement("pollutantName")]
-            public string PollutantName { get; set; }
+            public string PollutantName { get; set; } = string.Empty;
             [BsonElement("dataSource")]
-            public string DataSource { get; set; }
+            public string DataSource { get; set; } = string.Empty;
             [BsonElement("year")]
-            public string Year { get; set; }
+            public string Year { get; set; } = string.Empty;
             [BsonElement("region")]
-            public string Region { get; set; }
+            public string Region { get; set; } = string.Empty;
             [BsonElement("regiontype")]
-            public string Regiontype { get; set; }
+            public string Regiontype { get; set; } = string.Empty;
 
             [BsonElement("dataselectorfiltertype")]
-            public string Dataselectorfiltertype { get; set; }
+            public string Dataselectorfiltertype { get; set; } = string.Empty;
             [BsonElement("dataselectordownloadtype")]
-            public string Dataselectordownloadtype { get; set; }
+            public string Dataselectordownloadtype { get; set; } = string.Empty;
             [BsonElement("status")]
             public JobStatusEnum Status { get; set; }
             [BsonElement("startTime")]
@@ -203,11 +203,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             [BsonElement("endTime")]
             public DateTime? EndTime { get; set; }
             [BsonElement("errorReason")]
-            public string ErrorReason { get; set; }
+            public string ErrorReason { get; set; } = string.Empty;
             [BsonElement("resultUrl")]
-            public string ResultUrl { get; set; }
+            public string ResultUrl { get; set; } = string.Empty;
             [BsonElement("email")]
-            public string Email { get; set; }
+            public string Email { get; set; } = string.Empty;
             [BsonElement("mailSent")]
             public bool? MailSent { get; set; }
             [BsonElement("createdAt")]
@@ -226,25 +226,25 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
 
         public class Root
         {
-            public Filters filters { get; set; }
-            public Pagination pagination { get; set; }
-            public List<DataItem> data { get; set; }
-            public string region { get; set; }
-            public List<Info> info { get; set; }
+            public Filters? filters { get; set; }
+            public Pagination? pagination { get; set; }
+            public List<DataItem>? data { get; set; }
+            public string? region { get; set; }
+            public List<Info>? info { get; set; }
         }
 
         public class Filters
         {
-            public string search_terms { get; set; }
-            public int search_year { get; set; }
-            public string items_per_page { get; set; }
+            public string? search_terms { get; set; }
+            public int? search_year { get; set; }
+            public string? items_per_page { get; set; }
         }
 
         public class Pagination
         {
-            public int totalRows { get; set; }
-            public int totalPages { get; set; }
-            public string pagenum { get; set; }
+            public int? totalRows { get; set; }
+            public int? totalPages { get; set; }
+            public string? pagenum { get; set; }
         }
 
         public class DataItem
@@ -253,7 +253,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public int LA_ID { get; set; }
 
             [JsonProperty("Unique ID")]
-            public string Unique_ID { get; set; }
+            public string? Unique_ID { get; set; }
 
             [JsonProperty("X OS Grid Reference")]
             public int X_OS_Grid_Reference { get; set; }
@@ -264,13 +264,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
 
         public class Info
         {
-            public int result { get; set; }
-            public int result_code { get; set; }
+            public int? result { get; set; }
+            public int? result_code { get; set; }
         }
 
         public class LocalAuthoritiesRoot
         {
-            public List<LocalAuthorityData> data { get; set; }
+            public List<LocalAuthorityData>? data { get; set; }
         }
 
         public class LocalAuthorityData
@@ -279,10 +279,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public int LA_ID { get; set; }
 
             [JsonProperty("LA ONS ID")]
-            public string LA_ONS_ID { get; set; }
+            public string? LA_ONS_ID { get; set; }
 
             [JsonProperty("Unique ID")]
-            public string Unique_ID { get; set; }
+            public string? Unique_ID { get; set; }
 
             [JsonProperty("X OS Grid Reference")]
             public int X_OS_Grid_Reference { get; set; }
@@ -291,7 +291,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public int Y_OS_Grid_Reference { get; set; }
 
             [JsonProperty("Region")]
-            public string LA_REGION { get; set; }
+            public string? LA_REGION { get; set; }
 
             // Add converted coordinates
             public double Latitude { get; set; }

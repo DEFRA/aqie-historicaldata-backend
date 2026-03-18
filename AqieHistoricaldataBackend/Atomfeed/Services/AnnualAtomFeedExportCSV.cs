@@ -2,7 +2,7 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AnnualAtomFeedExportCSV(ILogger<HourlyAtomFeedExportCSV> logger) : IAnnualAtomFeedExportCSV
+    public class AnnualAtomFeedExportCsv(ILogger<HourlyAtomFeedExportCsv> logger) : IAnnualAtomFeedExportCsv
     {
         public async Task<byte[]> annualatomfeedexport_csv(List<FinalData> Final_list, QueryStringData data)
         {
@@ -49,13 +49,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             writer.WriteLine();
         }
-        private void WriteGroupedData(StreamWriter writer, List<PivotPollutant> groupedData, List<string> pollutants)
+        private static void WriteGroupedData(StreamWriter writer, List<PivotPollutant> groupedData, List<string> pollutants)
         {
             foreach (var item in groupedData)
             {
                 int year = Convert.ToInt32(item.Date);
-                DateTime startDate = new DateTime(year, 1, 1);
-                DateTime endDate = (year == DateTime.Now.Year) ? DateTime.Now.Date : new DateTime(year, 12, 31);
+                DateTime startDate = new DateTime(year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                DateTime endDate = (year == DateTime.UtcNow.Year)
+                    ? DateTime.UtcNow.Date
+                    : new DateTime(year, 12, 31, 0, 0, 0, DateTimeKind.Utc);
                 string dateRange = $"{startDate:dd/MM/yyyy} to {endDate:dd/MM/yyyy}";
 
                 writer.Write(dateRange);

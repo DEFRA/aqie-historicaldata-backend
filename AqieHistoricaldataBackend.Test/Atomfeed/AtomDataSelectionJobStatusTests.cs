@@ -15,8 +15,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
     public class AtomDataSelectionJobStatusTests
     {
         private readonly Mock<ILogger<HistoryexceedenceService>> _loggerMock;
-        private readonly Mock<IAtomHourlyFetchService> _hourlyFetchServiceMock;
-        private readonly Mock<IAtomDataSelectionStationService> _stationServiceMock;
         private readonly Mock<IMongoDbClientFactory> _mongoFactoryMock;
         private readonly Mock<IMongoCollection<JobDocument>> _collectionMock;
         private readonly Mock<IMongoIndexManager<JobDocument>> _indexManagerMock;
@@ -25,8 +23,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public AtomDataSelectionJobStatusTests()
         {
             _loggerMock = new Mock<ILogger<HistoryexceedenceService>>();
-            _hourlyFetchServiceMock = new Mock<IAtomHourlyFetchService>();
-            _stationServiceMock = new Mock<IAtomDataSelectionStationService>();
             _mongoFactoryMock = new Mock<IMongoDbClientFactory>();
             _collectionMock = new Mock<IMongoCollection<JobDocument>>();
             _indexManagerMock = new Mock<IMongoIndexManager<JobDocument>>();
@@ -42,8 +38,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             _sut = new AtomDataSelectionJobStatus(
                 _loggerMock.Object,
-                _hourlyFetchServiceMock.Object,
-                _stationServiceMock.Object,
                 _mongoFactoryMock.Object);
         }
 
@@ -255,7 +249,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             await _sut.GetAtomDataSelectionJobStatusdata("abc123");
 
             _indexManagerMock.Verify(
-                i => i.CreateOne(
+                i => i.CreateOneAsync(
                     It.IsAny<CreateIndexModel<JobDocument>>(),
                     It.IsAny<CreateOneIndexOptions>(),
                     It.IsAny<CancellationToken>()),
@@ -266,11 +260,11 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetAtomDataSelectionJobStatusdata_ContinuesAndReturnsDto_WhenIndexCreationThrows()
         {
             _indexManagerMock
-                .Setup(i => i.CreateOne(
+                .Setup(i => i.CreateOneAsync(
                     It.IsAny<CreateIndexModel<JobDocument>>(),
                     It.IsAny<CreateOneIndexOptions>(),
                     It.IsAny<CancellationToken>()))
-                .Throws(new MongoException("Index already exists"));
+                .ThrowsAsync(new MongoException("Index already exists"));
 
             SetupFindReturns(BuildJobDocument());
 
@@ -284,11 +278,11 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetAtomDataSelectionJobStatusdata_LogsWarning_WhenIndexCreationThrows()
         {
             _indexManagerMock
-                .Setup(i => i.CreateOne(
+                .Setup(i => i.CreateOneAsync(
                     It.IsAny<CreateIndexModel<JobDocument>>(),
                     It.IsAny<CreateOneIndexOptions>(),
                     It.IsAny<CancellationToken>()))
-                .Throws(new MongoException("Index conflict"));
+                .ThrowsAsync(new MongoException("Index conflict"));
 
             SetupFindReturns(BuildJobDocument());
 

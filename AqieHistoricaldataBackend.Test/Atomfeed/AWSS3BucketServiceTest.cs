@@ -13,12 +13,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
     public class AWSS3BucketServiceTests
     {
         private readonly Mock<ILogger<AWSS3BucketService>> _loggerMock = new();
-        private readonly Mock<IHourlyAtomFeedExportCSV> _hourlyMock = new();
-        private readonly Mock<IDailyAtomFeedExportCSV> _dailyMock = new();
-        private readonly Mock<IAnnualAtomFeedExportCSV> _annualMock = new();
+        private readonly Mock<IHourlyAtomFeedExportCsv> _hourlyMock = new();
+        private readonly Mock<IDailyAtomFeedExportCsv> _dailyMock = new();
+        private readonly Mock<IAnnualAtomFeedExportCsv> _annualMock = new();
         private readonly Mock<IAWSPreSignedURLService> _presignedUrlMock = new();
         private readonly Mock<IS3TransferUtility> _s3TransferUtilityMock = new();
-        private readonly Mock<IDataSelectionHourlyAtomFeedExportCSV> _dataSelectionHourlyMock = new();
+        private readonly Mock<IDataSelectionHourlyAtomFeedExportCsv> _dataSelectionHourlyMock = new();
 
         private static readonly byte[] SampleCsvBytes = new byte[] { 1, 2, 3 };
         private const string PresignedUrl = "https://presigned.url/file";

@@ -15,13 +15,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 {
     public class HourlyAtomFeedExportCSVTests
     {
-        private readonly Mock<ILogger<HourlyAtomFeedExportCSV>> _mockLogger;
-        private readonly HourlyAtomFeedExportCSV _service;
+        private readonly Mock<ILogger<HourlyAtomFeedExportCsv>> _mockLogger;
+        private readonly HourlyAtomFeedExportCsv _service;
 
         public HourlyAtomFeedExportCSVTests()
         {
-            _mockLogger = new Mock<ILogger<HourlyAtomFeedExportCSV>>();
-            _service = new HourlyAtomFeedExportCSV(_mockLogger.Object);
+            _mockLogger = new Mock<ILogger<HourlyAtomFeedExportCsv>>();
+            _service = new HourlyAtomFeedExportCsv(_mockLogger.Object);
         }
 
         private QueryStringData GetSampleQueryData() => new()
