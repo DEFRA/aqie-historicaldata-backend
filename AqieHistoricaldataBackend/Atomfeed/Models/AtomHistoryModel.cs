@@ -1,5 +1,6 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
+using Newtonsoft.Json;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Models
 {
@@ -103,9 +104,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? ZoneRegion { get; init; }
             public string? Latitude { get; init; }
             public string? Longitude { get; init; }
-            //public string? Name { get; init; }
-            //public string? StartDate { get; init; }
-            //public string? EndDate { get; init; }
             public List<PollutantInfo> Pollutants { get; set; } = new List<PollutantInfo>();
             public string Country { get; set; }
         }
@@ -216,6 +214,88 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public DateTime CreatedAt { get; set; }
             [BsonElement("updatedAt")]
             public DateTime? UpdatedAt { get; set; }
+        }
+
+
+        // Define model class matching your JSON structure
+        public class LocalAuthority
+        {
+            public string? Id { get; set; }
+            public string? Name { get; set; }
+        }
+
+        public class Root
+        {
+            public Filters filters { get; set; }
+            public Pagination pagination { get; set; }
+            public List<DataItem> data { get; set; }
+            public string region { get; set; }
+            public List<Info> info { get; set; }
+        }
+
+        public class Filters
+        {
+            public string search_terms { get; set; }
+            public int search_year { get; set; }
+            public string items_per_page { get; set; }
+        }
+
+        public class Pagination
+        {
+            public int totalRows { get; set; }
+            public int totalPages { get; set; }
+            public string pagenum { get; set; }
+        }
+
+        public class DataItem
+        {
+            [JsonProperty("LA ID")]
+            public int LA_ID { get; set; }
+
+            [JsonProperty("Unique ID")]
+            public string Unique_ID { get; set; }
+
+            [JsonProperty("X OS Grid Reference")]
+            public int X_OS_Grid_Reference { get; set; }
+
+            [JsonProperty("Y OS Grid Reference")]
+            public int Y_OS_Grid_Reference { get; set; }
+        }
+
+        public class Info
+        {
+            public int result { get; set; }
+            public int result_code { get; set; }
+        }
+
+        public class LocalAuthoritiesRoot
+        {
+            public List<LocalAuthorityData> data { get; set; }
+        }
+
+        public class LocalAuthorityData
+        {
+            [JsonProperty("LA ID")]
+            public int LA_ID { get; set; }
+
+            [JsonProperty("LA ONS ID")]
+            public string LA_ONS_ID { get; set; }
+
+            [JsonProperty("Unique ID")]
+            public string Unique_ID { get; set; }
+
+            [JsonProperty("X OS Grid Reference")]
+            public int X_OS_Grid_Reference { get; set; }
+
+            [JsonProperty("Y OS Grid Reference")]
+            public int Y_OS_Grid_Reference { get; set; }
+
+            [JsonProperty("Region")]
+            public string LA_REGION { get; set; }
+
+            // Add converted coordinates
+            public double Latitude { get; set; }
+            public double Longitude { get; set; }
         }
     }
 }

@@ -45,23 +45,11 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddHttpContextAccessor();
     builder.Host.UseSerilog(CdpLogging.Configuration);
     
-    // Default HTTP Client
-    //builder.Services
-    //    .AddHttpClient("DefaultClient")
-    //    .AddHeaderPropagation();
-
     // Proxy HTTP Client
     builder.Services.AddTransient<ProxyHttpMessageHandler>();
     builder.Services
         .AddHttpClient("proxy")
         .ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
-
-    //builder.Services.AddHttpClient("Atomfeed", httpClient =>
-    //{
-    //    httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/");
-
-    //}).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
-
 
     builder.Services.AddHttpClient("Atomfeed", httpClient =>
     {
@@ -76,7 +64,6 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
                 System.Net.DecompressionMethods.Deflate
         };
     });
-
 
     builder.Services.AddHttpClient("RicardoNewAPI", httpClient =>
     {
@@ -124,16 +111,6 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
         };
     });
 
-    //builder.Services.AddHttpClient("sendnotification", httpClient =>
-    //{
-
-    //    httpClient.BaseAddress = new Uri(
-    //        "https://ephemeral-protected.api." +
-    //        (System.Environment.GetEnvironmentVariable("Environment") ?? "dev") +
-    //        ".cdp-int.defra.cloud/"
-    //    );
-    //}).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
-
     // Propagate trace header.
     builder.Services.AddHeaderPropagation(options =>
     {
@@ -144,9 +121,6 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
         }
     });
 
-    // Add Hangfire services.
-    //builder.Services.AddHangfire(config => config.UseMemoryStorage());
-    //builder.Services.AddHangfireServer();
     // Register AWS SDK services
     builder.Services.AddAWSService<IAmazonS3>();
     if(builder.Environment.IsDevelopment())
@@ -184,7 +158,6 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAtomDataSelectionJobStatus, AtomDataSelectionJobStatus>();
     builder.Services.AddSingleton<IAtomDataSelectionEmailJobService, AtomDataSelectionEmailJobService>();
     builder.Services.AddSingleton<IAtomDataSelectionPresignedUrlMail, AtomDataSelectionPresignedUrlMail>();
-    //builder.Services.AddSingleton<IEmailService, AtomDataSelectionEmailJobService.EmailService>();
     builder.Services.AddHostedService<AtomDataSelectionEmailJobHostedService>();
 }
 
@@ -198,6 +171,5 @@ static WebApplication SetupApplication(WebApplication app)
     // Example module, remove before deploying!
     app.UseExampleEndpoints();
     app.UseServiceAtomHistoryEndpoints();
-    //app.UseHangfireDashboard("/hangfire");
     return app;
 }
