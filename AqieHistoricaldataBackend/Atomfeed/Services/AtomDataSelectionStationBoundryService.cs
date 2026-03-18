@@ -24,7 +24,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionStationBoundryService(
         ILogger<AtomDataSelectionStationBoundryService> Logger,
         IAtomDataSelectionLocalAuthoritiesService AtomDataSelectionLocalAuthoritiesService,
-        IHttpClientFactory httpClientFactory,
         IHostEnvironment env // uses ContentRoot to resolve files reliably
     ) : IAtomDataSelectionStationBoundryService
     {
@@ -171,7 +170,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     if (geoms.Count == 1)
                         return geoms[0];
 
-                    return UnaryUnionOp.Union(geoms);
+                    var union = UnaryUnionOp.Union(geoms);
+                    if (union is not null)
+                        return union;
+                    
+                    throw new InvalidDataException($"Failed to union geometries from: {fullPath}");
                 }
             }
             catch (Exception ex)
@@ -200,7 +203,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         /// </summary>
         private static Geometry FixIfInvalid(Geometry geom, ILogger logger)
         {
-            if (geom is null || geom.IsValid)
+            if (geom.IsValid)
                 return geom;
 
             // 1) Try NetTopologySuite.Geometries.Utilities.GeometryFixer.Fix
@@ -298,7 +301,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         if (la is null) continue;
                         if (!TryToDouble(la.Latitude, out var laLat)) continue;
                         if (!TryToDouble(la.Longitude, out var laLon)) continue;
-                        if (laLat == 0 && laLon == 0) continue;
+                        if (Math.Abs(laLat) < 1e-9 && Math.Abs(laLon) < 1e-9) continue;
 
                         var p = s_geometryFactory.CreatePoint(new Coordinate(laLon, laLat));
                         str.Insert(new Envelope(p.Coordinate), (p, la));
@@ -323,8 +326,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         double cosLat = Math.Cos(lat * Math.PI / 180d);
                         double degLon = maxDistanceMeters / (111_320d * Math.Max(1e-6, cosLat));
 
-                        var env = new Envelope(lon - degLon, lon + degLon, lat - degLat, lat + degLat);
-                        var candidates = str.Query(env);
+                        var queryEnvelope = new Envelope(lon - degLon, lon + degLon, lat - degLat, lat + degLat);
+                        var candidates = str.Query(queryEnvelope);
 
                         object? closestLA = null;
                         double minDistance = double.MaxValue;

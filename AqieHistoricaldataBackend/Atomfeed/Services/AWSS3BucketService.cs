@@ -24,10 +24,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
     }
 
-    public class AWSS3BucketService(ILogger<AWSS3BucketService> logger, IHourlyAtomFeedExportCSV hourlyAtomFeedExportCSV,
-        IDailyAtomFeedExportCSV dailyAtomFeedExportCSV, IAnnualAtomFeedExportCSV annualAtomFeedExportCSV,
+    public class AWSS3BucketService(ILogger<AWSS3BucketService> logger, IHourlyAtomFeedExportCsv hourlyAtomFeedExportCsv,
+        IDailyAtomFeedExportCsv dailyAtomFeedExportCsv, IAnnualAtomFeedExportCsv annualAtomFeedExportCsv,
         IAWSPreSignedURLService awsPreSignedURLService, IS3TransferUtility s3TransferUtility,
-        IDataSelectionHourlyAtomFeedExportCSV DataSelectionHourlyAtomFeedExportCSV) : IAWSS3BucketService
+        IDataSelectionHourlyAtomFeedExportCsv DataSelectionHourlyAtomFeedExportCsv) : IAWSS3BucketService
     {
         private readonly IS3TransferUtility s3TransferUtility = s3TransferUtility;
 
@@ -88,9 +88,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             return downloadType switch
             {
-                "Daily" => dailyAtomFeedExportCSV.dailyatomfeedexport_csv(finalList, data),
-                "Annual" => await annualAtomFeedExportCSV.annualatomfeedexport_csv(finalList, data),
-                _ => await hourlyAtomFeedExportCSV.hourlyatomfeedexport_csv(finalList, data)
+                "Daily" => dailyAtomFeedExportCsv.dailyatomfeedexport_csv(finalList, data),
+                "Annual" => await annualAtomFeedExportCsv.annualatomfeedexport_csv(finalList, data),
+                _ => await hourlyAtomFeedExportCsv.hourlyatomfeedexport_csv(finalList, data)
             };
         }
 
@@ -98,9 +98,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             return downloadType switch
             {
-                "Daily" => dailyAtomFeedExportCSV.dailyatomfeedexport_csv(finalList, data),
-                "Annual" => await annualAtomFeedExportCSV.annualatomfeedexport_csv(finalList, data),
-                _ => await DataSelectionHourlyAtomFeedExportCSV.dataSelectionHourlyAtomFeedExportCSV(finalList, data)
+                "Daily" => dailyAtomFeedExportCsv.dailyatomfeedexport_csv(finalList, data),
+                "Annual" => await annualAtomFeedExportCsv.annualatomfeedexport_csv(finalList, data),
+                _ => await DataSelectionHourlyAtomFeedExportCsv.dataSelectionHourlyAtomFeedExportCSV(finalList, data)
             };
         }
 

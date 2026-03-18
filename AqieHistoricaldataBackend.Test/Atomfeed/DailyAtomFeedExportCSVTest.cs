@@ -9,13 +9,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 {
     public class DailyAtomFeedExportCSVTests
     {
-        private readonly Mock<ILogger<HourlyAtomFeedExportCSV>> _mockLogger;
-        private readonly DailyAtomFeedExportCSV _service;
+        private readonly Mock<ILogger<HourlyAtomFeedExportCsv>> _mockLogger;
+        private readonly DailyAtomFeedExportCsv _service;
 
         public DailyAtomFeedExportCSVTests()
         {
-            _mockLogger = new Mock<ILogger<HourlyAtomFeedExportCSV>>();
-            _service = new DailyAtomFeedExportCSV(_mockLogger.Object);
+            _mockLogger = new Mock<ILogger<HourlyAtomFeedExportCsv>>();
+            _service = new DailyAtomFeedExportCsv(_mockLogger.Object);
         }
 
         private QueryStringData GetSampleQueryData() => new()
@@ -92,7 +92,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public void ExportCSV_ReturnsFallbackByte_OnException()
         {
-            var faultyService = new DailyAtomFeedExportCSV(_mockLogger.Object);
+            var faultyService = new DailyAtomFeedExportCsv(_mockLogger.Object);
 
             var result = faultyService.dailyatomfeedexport_csv(null, null);
 
