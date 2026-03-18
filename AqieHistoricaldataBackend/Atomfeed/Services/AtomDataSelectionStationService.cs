@@ -186,7 +186,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                         // ensure index on JobId for quick lookup
                         var indexKeys = Builders<JobDocument>.IndexKeys.Ascending(j => j.JobId);
-                        _jobCollection.Indexes.CreateOne(new CreateIndexModel<JobDocument>(indexKeys));
+                        await _jobCollection.Indexes.CreateOneAsync(new CreateIndexModel<JobDocument>(indexKeys));
 
                         // create GUID and persist job in MongoDB as Pending, then enqueue background work
                         var jobId = Guid.NewGuid().ToString("N");

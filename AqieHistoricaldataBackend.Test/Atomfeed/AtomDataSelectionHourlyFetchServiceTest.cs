@@ -253,7 +253,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task GetAtomDataSelectionHourlyFetchService_OuterCatch_ReturnsEmptyList_WhenFactoryThrows()
         {
-            // Arrange – factory throws synchronously when CreateClient is called
+            // Arrange – factory throws synchronously when CreateClient is called inside FetchAtomFeedAsync.
+            // This is caught by the Parallel.ForEachAsync inner catch, which logs "Error processing site ...".
             _httpClientFactoryMock
                 .Setup(f => f.CreateClient(It.IsAny<string>()))
                 .Throws(new Exception("Factory exploded"));
@@ -271,8 +272,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 x => x.Log(
                     LogLevel.Error,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("GetAtomDataSelectionHourlyFetchService")),
-                    It.IsAny<Exception>(),
+                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Error processing site")),
+                    It.IsAny<Exception?>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.AtLeastOnce);
         }
@@ -580,23 +581,22 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public void ProcessAtomData_ReturnsEmpty_WhenFeaturesIsNull()
         {
-            var result = InvokeProcessAtomData(null!, BuildPollutants(), DefaultSite, "2024");
+            var result = InvokeProcessAtomData(null!, BuildPollutants(), DefaultSite);
             Assert.Empty(result);
         }
 
         [Fact]
         public void ProcessAtomData_ReturnsEmpty_WhenFeaturesIsEmptyJArray()
         {
-            var result = InvokeProcessAtomData(new JArray(), BuildPollutants(), DefaultSite, "2024");
+            var result = InvokeProcessAtomData(new JArray(), BuildPollutants(), DefaultSite);
             Assert.Empty(result);
         }
 
         [Fact]
         public void ProcessAtomData_ReturnsEmpty_WhenOnlyHeaderMemberPresent()
         {
-            // Only index 0 (header) — the loop starts at i=1 so nothing is processed
             var features = new JArray { new JObject() };
-            var result = InvokeProcessAtomData(features, BuildPollutants(), DefaultSite, "2024");
+            var result = InvokeProcessAtomData(features, BuildPollutants(), DefaultSite);
             Assert.Empty(result);
         }
 
@@ -607,12 +607,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             {
                 ["om:OM_Observation"] = new JObject
                 {
-                    ["om:observedProperty"] = new JObject()    // no @xlink:href
+                    ["om:observedProperty"] = new JObject()
                 }
             };
             var features = new JArray { new JObject(), feature };
 
-            var result = InvokeProcessAtomData(features, BuildPollutants(), DefaultSite, "2024");
+            var result = InvokeProcessAtomData(features, BuildPollutants(), DefaultSite);
             Assert.Empty(result);
         }
 
@@ -624,7 +624,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 "2024-01-01T00:00,2024-01-01T01:00,1,1,50");
 
             var features = new JArray { new JObject(), feature };
-            var result = InvokeProcessAtomData(features, BuildPollutants(), DefaultSite, "2024");
+            var result = InvokeProcessAtomData(features, BuildPollutants(), DefaultSite);
             Assert.Empty(result);
         }
 
@@ -636,7 +636,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 "2024-01-01T00:00,2024-01-01T01:00,1,1,50");
 
             var features = new JArray { new JObject(), feature };
-            var result = InvokeProcessAtomData(features, BuildPollutants(), DefaultSite, "2024");
+            var result = InvokeProcessAtomData(features, BuildPollutants(), DefaultSite);
 
             Assert.Single(result);
             Assert.Equal("Nitrogen dioxide", result[0].PollutantName);
@@ -647,10 +647,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var feature = BuildFeatureMember(
                 "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/8",
-                ""); // empty values
+                "");
 
             var features = new JArray { new JObject(), feature };
-            var result = InvokeProcessAtomData(features, BuildPollutants(), DefaultSite, "2024");
+            var result = InvokeProcessAtomData(features, BuildPollutants(), DefaultSite);
             Assert.Empty(result);
         }
 
@@ -665,7 +665,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 "2024-01-01T01:00,2024-01-01T02:00,1,1,60");
 
             var features = new JArray { new JObject(), feature1, feature2 };
-            var result = InvokeProcessAtomData(features, BuildPollutants(), DefaultSite, "2024");
+            var result = InvokeProcessAtomData(features, BuildPollutants(), DefaultSite);
 
             Assert.Equal(2, result.Count);
         }
@@ -762,11 +762,11 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             return (List<PollutantDetails>)method.Invoke(_service, new object[] { filter })!;
         }
 
-        private List<FinalData> InvokeProcessAtomData(JArray features, List<PollutantDetails> pollutants, SiteInfo site, string year)
+        private List<FinalData> InvokeProcessAtomData(JArray features, List<PollutantDetails> pollutants, SiteInfo site)
         {
             var method = typeof(AtomDataSelectionHourlyFetchService)
                 .GetMethod("ProcessAtomData", BindingFlags.NonPublic | BindingFlags.Instance)!;
-            return (List<FinalData>)method.Invoke(_service, new object?[] { features, pollutants, site, year })!;
+            return (List<FinalData>)method.Invoke(_service, new object?[] { features, pollutants, site })!;
         }
 
         private List<FinalData> InvokeExtractFinalData(string values, string pollutantName, SiteInfo site)

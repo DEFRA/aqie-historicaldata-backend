@@ -159,11 +159,11 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetPresignedUrlMail_LogsWarning_WhenIndexCreationFails()
         {
             _indexManagerMock
-                .Setup(i => i.CreateOne(
+                .Setup(i => i.CreateOneAsync(
                     It.IsAny<CreateIndexModel<eMailJobDocument>>(),
                     It.IsAny<CreateOneIndexOptions>(),
                     It.IsAny<CancellationToken>()))
-                .Throws(new Exception("Index creation failed"));
+                .ThrowsAsync(new Exception("Index creation failed"));
 
             SetupFindReturns(null);
 

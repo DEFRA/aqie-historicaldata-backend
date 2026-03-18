@@ -19,7 +19,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 WriteCsvHeader(writer, data, stationfetchdate);
                 WriteCsvColumnHeaders(writer, distinctPollutants);
                 WriteCsvRows(writer, groupedData, distinctPollutants);
-                writer.Flush();
+                await writer.FlushAsync();
                 return memoryStream.ToArray();
             }
             catch (Exception ex)

@@ -35,7 +35,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     try
                     {
                         var indexKeys = Builders<eMailJobDocument>.IndexKeys.Ascending(j => j.JobId);
-                        _jobCollection.Indexes.CreateOne(new CreateIndexModel<eMailJobDocument>(indexKeys));
+                        await _jobCollection.Indexes.CreateOneAsync(new CreateIndexModel<eMailJobDocument>(indexKeys));
                     }
                     catch (Exception ix)
                     {
@@ -65,15 +65,19 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Error in GetPresignedUrlMail for JobId: {JobId}", jobId);
-                var update = Builders<eMailJobDocument>.Update
-                            .Set(j => j.ResultUrl, null)
-                            .Set(j => j.Status, JobStatusEnum.Failed)
-                            .Set(j => j.MailSent, null)
-                            .Set(j => j.ErrorReason, ex.Message);
-                await _jobCollection.UpdateOneAsync(
-                    Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, jobId),
-                    update
-                );
+                
+                if (_jobCollection != null)
+                {
+                    var update = Builders<eMailJobDocument>.Update
+                                .Set(j => j.ResultUrl, null)
+                                .Set(j => j.Status, JobStatusEnum.Failed)
+                                .Set(j => j.MailSent, null)
+                                .Set(j => j.ErrorReason, ex.Message);
+                    await _jobCollection.UpdateOneAsync(
+                        Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, jobId),
+                        update
+                    );
+                }
                 return null;
             }
         }
@@ -82,10 +86,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             // Pull the object from S3 using the key stored in doc.ResultUrl
             string bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME");
+            Logger.LogInformation("Fetching S3 object. Bucket: {BucketName}, Key: {S3Key}", bucketName, s3Key);
 
             try
             {
-                Logger.LogInformation("Fetching S3 object. Bucket: {BucketName}, Key: {S3Key}", bucketName, s3Key);
 
                 Logger.LogInformation("S3 bucket GetPresignedUrlMail start {Datetime}", DateTime.Now);
                 var url = await awsPreSignedURLService.GeneratePreSignedURL(bucketName, s3Key, 604800);
