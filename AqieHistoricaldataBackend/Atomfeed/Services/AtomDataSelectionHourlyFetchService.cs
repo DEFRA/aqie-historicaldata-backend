@@ -4,7 +4,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Xml;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
-
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AtomDataSelectionHourlyFetchService(ILogger<HistoryexceedenceService> Logger,
@@ -15,24 +14,20 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 List<FinalData> Final_list1 = new List<FinalData>();
-
                 var years = filteryear.Split(',');
                 var stopwatch = Stopwatch.StartNew();
                 Logger.LogInformation("Fetch and processing started in {ElapsedSeconds} seconds.", stopwatch.Elapsed.TotalSeconds);
                 var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
                 var resultsBag = new ConcurrentBag<FinalData>();
-
-                var eagerClient = httpClientFactory.CreateClient("Atomfeed");
-
+               
                 var siteYearPairs = filteredstationpollutant
                                     .SelectMany(siteinfo => years.Select(year => new { siteinfo, year }));
-
                 await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 5 }, async (pair, ct) =>
                 {
                     try
                     {
                         var atomJsonCollection = await FetchAtomFeedAsync(pair.siteinfo.LocalSiteId, pair.year);
-                        var result = ProcessAtomData(atomJsonCollection, pollutantsToDisplay, pair.siteinfo, pair.year);
+                        var result = ProcessAtomData(atomJsonCollection, pollutantsToDisplay, pair.siteinfo);
                         foreach (var item in result)
                             resultsBag.Add(item);
                     }
@@ -44,15 +39,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         await File.AppendAllTextAsync("error_log.txt", $"{DateTime.Now}: {errorMessage}{Environment.NewLine}", ct);
                     }
                 });
-
                 Final_list1.AddRange(resultsBag);
-
                 stopwatch.Stop();
                 Console.WriteLine($"Fetch and processing completed in {stopwatch.Elapsed.TotalSeconds} seconds.");
                 Logger.LogInformation("Fetch and processing completed in {ElapsedSeconds} seconds.", stopwatch.Elapsed.TotalSeconds);
-
                 var formattedDuration = stopwatch.Elapsed.ToString(@"hh\:mm\:ss");
-                File.AppendAllText("fetch_duration_log.txt", $"Fetch completed at {DateTime.Now} - Duration: {formattedDuration}{Environment.NewLine}");
+                await File.AppendAllTextAsync("fetch_duration_log.txt", $"Fetch completed at {DateTime.Now} - Duration: {formattedDuration}{Environment.NewLine}");
 
                 return Final_list1;
             }
@@ -63,7 +55,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return new List<FinalData>();
             }
         }
-
         private async Task<JArray> FetchAtomFeedAsync(string siteID, string year)
         {
             if (string.IsNullOrWhiteSpace(siteID) || string.IsNullOrWhiteSpace(year))
@@ -71,34 +62,28 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 Logger.LogWarning("Invalid FetchAtomFeedAsync siteID or year: siteID='{SiteID}', year='{Year}'", siteID, year);
                 return new JArray();
             }
-
             var client = httpClientFactory.CreateClient("Atomfeed");
             var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
             try
             {
                 var response = await client.GetAsync(url);
-
                 // Check for 404 before any other status handling
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
                     Logger.LogWarning("Atom feed not found (404) for URL: {Url} (siteID: {SiteID}, year: {Year})", url, siteID, year);
                     return new JArray();
                 }
-
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
                     Logger.LogWarning("HTTP {StatusCode} when fetching Atom feed for site {SiteID} year {Year}. Response: {Response}",
                         (int)response.StatusCode, siteID, year, errorContent);
-
                     if (response.StatusCode == System.Net.HttpStatusCode.PreconditionRequired)
                     {
                         Logger.LogError("Server returned 428 Precondition Required. Check if User-Agent, cookies, or other headers are needed.");
                     }
-
                     return new JArray();
                 }
-
                 var stream = await response.Content.ReadAsStreamAsync();
                 var xml = new XmlDocument();
                 xml.Load(stream);
@@ -117,11 +102,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error FetchAtomFeedAsync fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex);
+                Logger.LogError("Error FetchAtomFeedAsync fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex.Message);
                 return new JArray();
             }
         }
-
         private List<PollutantDetails> GetPollutantsToDisplay(string filter)
         {
             var allPollutants = new List<PollutantDetails>
@@ -135,28 +119,22 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 new PollutantDetails { PollutantName = "Carbon monoxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/10" },
                 new PollutantDetails { PollutantName = "Nitric oxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/38" }
             };
-
             // Split and normalize the filter string
             var filterList = filter.Split(',')
                                    .Select(f => f.Trim())
                                    .ToList();
-
             // Filter using case-insensitive comparison
             var filtered = allPollutants
                 .Where(p => filterList.Contains(p.PollutantName, StringComparer.OrdinalIgnoreCase))
                 .ToList();
-
             // Return filtered list if any match, otherwise return all
             return filtered.Any() ? filtered : allPollutants;
         }
-
-        private List<FinalData> ProcessAtomData(JArray features, List<PollutantDetails> pollutants, SiteInfo siteinfo, string year)
+        private List<FinalData> ProcessAtomData(JArray features, List<PollutantDetails> pollutants, SiteInfo siteinfo)
         {
             var finalList = new List<FinalData>();
-
             if (features == null || features.Count == 0)
                 return new List<FinalData>();
-
             for (int i = 1; i < features.Count; i++)
             {
                 try
@@ -165,7 +143,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     var href = feature["om:OM_Observation"]?["om:observedProperty"]?["@xlink:href"]?.ToString();
                     string cleanedUrl = href?.Replace("http://", "");
                     if (string.IsNullOrEmpty(href)) continue;
-
                     var match = pollutants.FirstOrDefault(p => p.PollutantMasterUrl == cleanedUrl);
                     if (match != null)
                     {
@@ -178,13 +155,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError("Error processing ProcessAtomData feature member: {Error}", ex);
+                    Logger.LogError("Error processing ProcessAtomData feature member: {Error}", ex.Message);
                 }
             }
-
             return finalList;
         }
-
         private List<FinalData> ExtractFinalData(string values, string pollutantName, SiteInfo siteinfo)
         {
             return values.Replace("\r\n", "").Trim().Split("@@")

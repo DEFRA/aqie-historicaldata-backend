@@ -16,7 +16,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     Expires = DateTime.UtcNow.AddSeconds(duration)
                 };
 
-                string url = s3Client.GetPreSignedURL(request);
+                string url = await s3Client.GetPreSignedURLAsync(request);
                 return url;
             }
             catch (AmazonS3Exception ex)

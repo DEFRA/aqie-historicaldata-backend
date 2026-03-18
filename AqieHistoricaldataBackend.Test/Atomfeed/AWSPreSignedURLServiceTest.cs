@@ -27,8 +27,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             // Arrange
             string expectedUrl = "https://example.com/presigned-url";
-            _mockS3Client.Setup(s => s.GetPreSignedURL(It.IsAny<GetPreSignedUrlRequest>()))
-                         .Returns(expectedUrl);
+            _mockS3Client.Setup(s => s.GetPreSignedURLAsync(It.IsAny<GetPreSignedUrlRequest>()))
+                         .ReturnsAsync(expectedUrl);
 
             // Act
             var result = await _service.GeneratePreSignedURL("bucket", "key", 60);
@@ -43,8 +43,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             // Arrange
             var s3Exception = new AmazonS3Exception("S3 error");
-            _mockS3Client.Setup(s => s.GetPreSignedURL(It.IsAny<GetPreSignedUrlRequest>()))
-                         .Throws(s3Exception);
+            _mockS3Client.Setup(s => s.GetPreSignedURLAsync(It.IsAny<GetPreSignedUrlRequest>()))
+                         .ThrowsAsync(s3Exception);
 
             // Act
             var result = await _service.GeneratePreSignedURL("bucket", "key", 60);
@@ -66,8 +66,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             // Arrange
             var ex = new Exception("Generic error");
-            _mockS3Client.Setup(s => s.GetPreSignedURL(It.IsAny<GetPreSignedUrlRequest>()))
-                         .Throws(ex);
+            _mockS3Client.Setup(s => s.GetPreSignedURLAsync(It.IsAny<GetPreSignedUrlRequest>()))
+                         .ThrowsAsync(ex);
 
             // Act
             var result = await _service.GeneratePreSignedURL("bucket", "key", 60);
@@ -97,20 +97,20 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             // Success
             string expectedUrl = "https://example.com/presigned-url";
-            _mockS3Client.Setup(s => s.GetPreSignedURL(It.IsAny<GetPreSignedUrlRequest>()))
-                         .Returns(expectedUrl);
+            _mockS3Client.Setup(s => s.GetPreSignedURLAsync(It.IsAny<GetPreSignedUrlRequest>()))
+                         .ReturnsAsync(expectedUrl);
             var resultSuccess = await _service.GeneratePreSignedURL("bucket", "key", 60);
             Assert.Equal(expectedUrl, resultSuccess);
 
             // AmazonS3Exception
-            _mockS3Client.Setup(s => s.GetPreSignedURL(It.IsAny<GetPreSignedUrlRequest>()))
-                         .Throws(new AmazonS3Exception("S3 error"));
+            _mockS3Client.Setup(s => s.GetPreSignedURLAsync(It.IsAny<GetPreSignedUrlRequest>()))
+                         .ThrowsAsync(new AmazonS3Exception("S3 error"));
             var resultS3Error = await _service.GeneratePreSignedURL("bucket", "key", 60);
             Assert.Equal("error", resultS3Error);
 
             // Generic Exception
-            _mockS3Client.Setup(s => s.GetPreSignedURL(It.IsAny<GetPreSignedUrlRequest>()))
-                         .Throws(new Exception("Generic error"));
+            _mockS3Client.Setup(s => s.GetPreSignedURLAsync(It.IsAny<GetPreSignedUrlRequest>()))
+                         .ThrowsAsync(new Exception("Generic error"));
             var resultGenericError = await _service.GeneratePreSignedURL("bucket", "key", 60);
             Assert.Equal("error", resultGenericError);
         }

@@ -18,7 +18,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 WritePollutantHeaders(writer, distinctPollutants);
                 WriteGroupedData(writer, groupedData, distinctPollutants);
 
-                writer.Flush();
+                await writer.FlushAsync();
                 return memoryStream.ToArray();
             }
             catch (Exception ex)

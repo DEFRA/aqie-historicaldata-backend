@@ -76,7 +76,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError("Error fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex);
+                logger.LogError("Error fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex.Message);
                 return new JArray();
             }
         }
@@ -106,7 +106,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError("Error processing ProcessAtomData feature member: {Error}", ex);
+                    logger.LogError("Error processing ProcessAtomData feature member: {Error}", ex.Message);
                 }
             }
 
