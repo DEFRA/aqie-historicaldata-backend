@@ -5,17 +5,6 @@ using static AqieHistoricaldataBackend.Atomfeed.Services.AtomDataSelectionStatio
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    //public sealed record JobInfoDto
-    //{
-    //    public string JobId { get; init; } = string.Empty;
-    //    public string Status { get; init; } = string.Empty;
-    //    public string? ResultUrl { get; init; }
-    //    public string? ErrorReason { get; init; }
-    //    public DateTime? CreatedAt { get; init; }
-    //    public DateTime? UpdatedAt { get; init; }
-    //    public DateTime? StartTime { get; init; }
-    //    public DateTime? EndTime { get; init; }
-    //}
     public class AtomDataSelectionJobStatus(ILogger<HistoryexceedenceService> Logger,
     IAtomHourlyFetchService AtomHourlyFetchService,
     IAtomDataSelectionStationService AtomDataSelectionStationService,

@@ -148,7 +148,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 .Select(g => new
                 {
                     PollutantName = g.Key,
-                    //ValidCount = g.Count(),
                     DataCapturePercentage =
                         ((double)g.Select(p => DateTime.Parse(p.StartTime)).Distinct().Count() / totalPossibleDataPoints) * 100
                 })
@@ -174,10 +173,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         hourlyCount = h.HourlyexceedancesCount,
                         dailyCount = d.dailyexceedancesCount,
                         annualcount = p.DataCapturePercentage > 74 ? a.Total + "" : "-",
-                        //annualcount = p.DataCapturePercentage > 74 ? a.Total + "" : "-",
-                        //annualcount = Math.Round(p.DataCapturePercentage),
                         dataVerifiedTag = verifiedTag,
-                        dataCapturePercentage = Math.Round(p.DataCapturePercentage) // + "%"
+                        dataCapturePercentage = Math.Round(p.DataCapturePercentage)
                     }).ToList<dynamic>();
         }
     }

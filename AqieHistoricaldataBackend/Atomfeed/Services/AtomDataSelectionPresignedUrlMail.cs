@@ -17,8 +17,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                         IAWSPreSignedURLService awsPreSignedURLService
                                         ) : IAtomDataSelectionPresignedUrlMail
     {
-        //private readonly IEmailService _emailService = emailService;
-        //private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+
         // MongoDB collection for job documents
         private IMongoCollection<eMailJobDocument>? _jobCollection;
         public async Task<string> GetPresignedUrlMail(string jobId)
@@ -50,7 +49,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 if (doc == null) return null;
 
                 Logger.LogInformation("Document CreatedAt value: {CreatedAt}", doc.CreatedAt);
-                //string resultUrl = "";
+
                 string s3Key = $"{doc.DataSource}_{doc.PollutantName}_{doc.Region}_{doc.Year}.zip";
                 string resultUrl = await GetS3data(s3Key);
                 if (resultUrl == null) return null;

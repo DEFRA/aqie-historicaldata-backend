@@ -16,10 +16,6 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    //public interface IEmailService
-    //{
-    //    Task SendEmailAsync(string to, string subject, string body);
-    //}
     public class AtomDataSelectionEmailJobService(
         ILogger<HistoryexceedenceService> Logger,
         IMongoDbClientFactory MongoDbClientFactory,
@@ -30,9 +26,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                //for local
-                //ProcessPendingEmailJobsAsync();
-                // Declare _jobCollection as a local variable
+
                 var jobCollection = MongoDbClientFactory.GetCollection<eMailJobDocument>("aqie_csvemailexport_jobs");
 
                 // ensure index on JobId for quick lookup
@@ -74,9 +68,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        // Change the parameter type of ProcessPendingEmailJobsAsync from string to CancellationToken
-        //public async Task ProcessPendingEmailJobsAsync(CancellationToken stoppingToken)
-        //public async Task ProcessPendingEmailJobsAsync()
         public async Task ProcessPendingEmailJobsAsync(CancellationToken stoppingToken)
         {
             try

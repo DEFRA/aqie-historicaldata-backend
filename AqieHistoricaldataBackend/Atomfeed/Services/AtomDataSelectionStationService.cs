@@ -103,7 +103,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     dataselectorfiltertype = dataselectorfiltertype,
                     dataselectordownloadtype = dataselectordownloadtype,
                     email = email
-                    //jobId = JobId
                 };
 
                 //For CDP
@@ -200,8 +199,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             EndTime = null,
                             ErrorReason = null,
                             ResultUrl = null,
-                            //email = email,
-                            //mailSent = null,
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
                         };
@@ -218,18 +215,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             DownloadType = dataselectordownloadtype
                         };
 
-                        //if (dataselectordownloadtype == "dataSelectorSingle")
-                        //{
                         await _jobChannel.Writer.WriteAsync(job);
                         _ = EnsureQueueProcessorStartedAsync(); // fire-and-forget ensure processor running
 
                         // Return the job id immediately to front-end
                         return jobId;
-                        //}
+
                     }
                     else
                     {
-                        // dataselectordownloadtype == "dataSelectorMultiple"
                         // 1) generate csv bytes in background by fetching hourly data
                         Logger.LogInformation("Mail job strated generating CSV data");
                         var csvData = await AtomDataSelectionHourlyFetchService.GetAtomDataSelectionHourlyFetchService(stationData, pollutantName, year);
@@ -238,7 +232,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         Logger.LogInformation("Mail job presigned strated writecsvtoawss3bucket");
                         var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, queryStringData, dataselectordownloadtype);
                         Logger.LogInformation("Mail job presigned completed writecsvtoawss3bucket");
-                        //var presignedUrl = "test";
+
                         return presignedUrl;
                     }
                 }

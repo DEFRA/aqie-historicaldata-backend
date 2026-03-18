@@ -22,10 +22,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
                 var resultsBag = new ConcurrentBag<FinalData>();
 
-                // Eagerly validate factory before entering the parallel loop so that
-                // factory failures propagate to the outer catch, which logs
-                // "Error in GetAtomDataSelectionHourlyFetchService".
-                // Use a named variable (not discard '_') to guarantee the call is emitted by the compiler.
                 var eagerClient = httpClientFactory.CreateClient("Atomfeed");
 
                 var siteYearPairs = filteredstationpollutant
