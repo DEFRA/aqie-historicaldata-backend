@@ -108,7 +108,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var filterpollutantyear = FilterSitesByYearRanges(filteredSites, year);
 
                 var stationData = await atomDataSelectionServices.StationBoundry.GetAtomDataSelectionStationBoundryService(filterpollutantyear, region, regiontype);
-                var stationcountresult = stationData.Count();
+                var stationcountresult = stationData.Count;
 
                 if (dataselectorfiltertype == "dataSelectorCount")
                 {
@@ -125,7 +125,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             catch (Exception ex)
             {
                 Logger.LogError("Error in GetAtomDataSelectionStation {Error}", ex.Message);
-                Logger.LogError("Error in GetAtomDataSelectionStation {Error}", ex.StackTrace);
                 return "Failure";
             }
         }
@@ -143,7 +142,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return ParseSiteMeta(responsebody);
         }
 
-        private List<SiteInfo> FilterSitesByPollutants(List<SiteInfo> sites, string pollutantName)
+        private static List<SiteInfo> FilterSitesByPollutants(List<SiteInfo> sites, string pollutantName)
         {
             var mappedPollutants = GetMappedPollutants(pollutantName, includeUnknowns: true);
 
@@ -162,13 +161,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             .Any(tp => p.Name.Contains(tp, StringComparison.OrdinalIgnoreCase)))
                         .ToList()
                 })
-                .Where(site => site.Pollutants.Any())
+                .Where(site => site.Pollutants?.Any() == true)
                 .GroupBy(site => site.LocalSiteId)
                 .Select(g => g.First())
                 .ToList();
         }
 
-        private List<SiteInfo> FilterSitesByYearRanges(List<SiteInfo> sites, string year)
+        private static List<SiteInfo> FilterSitesByYearRanges(List<SiteInfo> sites, string year)
         {
             var yearRanges = ParseYearRanges(year);
 
@@ -179,12 +178,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 .ToList();
         }
 
-        private List<(DateTime Start, DateTime End)> ParseYearRanges(string year)
+        private static List<(DateTime Start, DateTime End)> ParseYearRanges(string year)
         {
             var yearInts = year.Split(',')
                 .Select(y => int.TryParse(y, out int val) ? val : (int?)null)
                 .Where(y => y.HasValue)
-                .Select(y => y.Value)
+                .Select(y => y!.Value)
                 .ToList();
 
             return yearInts
@@ -194,7 +193,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 .ToList();
         }
 
-        private bool IsPollutantInYearRange(PollutantInfo pollutant, List<(DateTime Start, DateTime End)> yearRanges)
+        private static bool IsPollutantInYearRange(PollutantInfo pollutant, List<(DateTime Start, DateTime End)> yearRanges)
         {
             if (!DateTime.TryParseExact(pollutant.StartDate, "dd/MM/yyyy",
                     System.Globalization.CultureInfo.InvariantCulture,
@@ -444,11 +443,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 try
                 {
                     // 1) generate csv bytes in background by fetching hourly data
-                    var csvData = await atomDataSelectionServices.HourlyFetch.GetAtomDataSelectionHourlyFetchService(job.StationData, job.PollutantName, job.Year);
+                    var csvData = await atomDataSelectionServices.HourlyFetch.GetAtomDataSelectionHourlyFetchService(job.StationData!, job.PollutantName!, job.Year!);
                     Logger.LogInformation("ProcessQueueAsync Background job {JobId} generated CSV data of count {Count}", job.JobId, csvData.Count);
 
                     // 2) write CSV to S3 and get presigned url
-                    var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, job.Data, job.DownloadType);
+                    var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, job.Data!, job.DownloadType!);
 
                     // 3) update job as completed with ResultUrl
                     var updateCompleted = Builders<JobDocument>.Update

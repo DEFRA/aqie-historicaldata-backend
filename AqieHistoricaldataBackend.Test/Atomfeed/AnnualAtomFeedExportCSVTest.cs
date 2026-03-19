@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -176,7 +175,7 @@ namespace AqieHistoricaldataBackend.Tests
         {
             var finalList = new List<FinalData>
         {
-            new FinalData { ReportDate = "2023", AnnualPollutantName = null, Total = 0, AnnualVerification = null }
+            new FinalData { ReportDate = "2023", AnnualPollutantName = "PM10", Total = 0, AnnualVerification = null }
         };
 
             var result = await _service.annualatomfeedexport_csv(finalList, GetSampleQueryData());

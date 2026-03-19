@@ -9,7 +9,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 var groupedData = GroupFinalData(Final_list);
-                var distinctPollutants = Final_list.Select(s => s.AnnualPollutantName).Distinct().OrderBy(m => m).ToList();
+                var distinctPollutants = Final_list
+                    .Select(s => s.AnnualPollutantName)
+                    .Where(x => x != null)
+                    .Select(x => x!)
+                    .Distinct()
+                    .OrderBy(m => m)
+                    .ToList();
 
                 using var memoryStream = new MemoryStream();
                 using var writer = new StreamWriter(memoryStream);
@@ -24,7 +30,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             catch (Exception ex)
             {
                 logger.LogError("Annual download CSV error: {Error}", ex.Message);
-                logger.LogError("Stacktrace: {Error}", ex.StackTrace);
                 return new byte[] { 0x20 };
             }
         }
@@ -64,7 +69,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 foreach (var pollutant in pollutants)
                 {
-                    var sub = item.SubPollutant.FirstOrDefault(s => s.PollutantName == pollutant);
+                    var sub = item.SubPollutant?.FirstOrDefault(s => s.PollutantName == pollutant);
                     writer.Write($",{sub?.PollutantValue ?? ""},{sub?.Verification ?? ""}");
                 }
                 writer.WriteLine();
@@ -76,7 +81,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             "PM2.5" => "PM2.5 particulate matter (Hourly measured)",
             _ => pollutant
         };
-        private List<PivotPollutant> GroupFinalData(List<FinalData> finalList)
+        private static List<PivotPollutant> GroupFinalData(List<FinalData> finalList)
         {
             return finalList.GroupBy(x => x.ReportDate)
                 .Select(y => new PivotPollutant
@@ -90,7 +95,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }).ToList()
                 }).ToList();
         }
-        private static string MapVerification(string code) => code switch
+        private static string MapVerification(string? code) => code switch
         {
             "1" => "V",
             "2" => "P",
