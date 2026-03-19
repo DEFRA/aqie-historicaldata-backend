@@ -24,16 +24,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionStationBoundryService(
         ILogger<AtomDataSelectionStationBoundryService> Logger,
         IAtomDataSelectionLocalAuthoritiesService AtomDataSelectionLocalAuthoritiesService,
-        IHostEnvironment env // uses ContentRoot to resolve files reliably
+        IHostEnvironment env
     ) : IAtomDataSelectionStationBoundryService
     {
         private readonly IHostEnvironment _env = env;
 
-        // Single GeometryFactory to reduce allocations
         private static readonly GeometryFactory s_geometryFactory =
             NtsGeometryServices.Instance.CreateGeometryFactory(srid: 4326);
 
-        // Prepared boundary + envelope for fast checks
         private sealed class Boundary
         {
             public string Name { get; }
@@ -50,11 +48,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        // Country → Lazy<Boundary> for lock-free, idempotent loading
         private static readonly ConcurrentDictionary<string, Lazy<Boundary>> CountryBoundariesLazy =
             new(StringComparer.OrdinalIgnoreCase);
 
-        // Case-insensitive mapping of country to relative GeoJSON path
         private static readonly IReadOnlyDictionary<string, string> GeoJsonPaths =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -70,22 +66,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         /// <summary>
         /// Load (or get cached) prepared boundary for a country.
         /// Uses Lazy<T> to ensure single-load and lock-free reads.
-        /// Resolves the file via the known GeoJsonPaths dictionary first,
-        /// then falls back to using the country name itself as the relative path
-        /// so that the ContentRootFileProvider can resolve test-injected paths.
         /// </summary>
         private Boundary GetOrLoadBoundary(string country, ILogger logger) =>
             CountryBoundariesLazy.GetOrAdd(country, c => new Lazy<Boundary>(() =>
             {
-                // Prefer the well-known relative path; fall back to country name as path
-                // so that tests wiring up IFileProvider with arbitrary keys still resolve.
                 var relPath = GetGeoJsonPath(c) ?? c;
 
                 logger.LogInformation("Attempting to load GeoJSON for country: {Country}, relative path: {RelPath}", c, relPath);
 
                 string? fullPath = null;
 
-                // Try ContentRootFileProvider (works in most hosting scenarios and in tests)
                 var fileInfo = _env.ContentRootFileProvider.GetFileInfo(relPath);
                 logger.LogInformation("fileInfo path: {fileInfo}", fileInfo);
                 if (fileInfo.Exists && !string.IsNullOrEmpty(fileInfo.PhysicalPath))
@@ -104,10 +94,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 logger.LogInformation("Successfully resolved GeoJSON file: {Path}", fullPath);
                 var geom = LoadGeometryFromGeoJsonFullPath(fullPath, logger);
 
-                // Fix invalid geometry only if needed
                 geom = FixIfInvalid(geom, logger);
 
-                // Optional: small simplification tolerance (degrees) to speed up PIP
                 var simplified = TopologyPreservingSimplifier.Simplify(geom, 1e-4);
 
                 return new Boundary(c, simplified);
@@ -142,47 +130,60 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
 
         /// <summary>
-        /// Read GeoJSON robustly from a full path:
-        /// 1) Try FeatureCollection, Union geometries if multiple
-        /// 2) Fall back to reading a single Geometry
+        /// Read GeoJSON robustly from a full path.
         /// </summary>
         private static Geometry LoadGeometryFromGeoJsonFullPath(string fullPath, ILogger logger)
         {
             var geoJsonText = File.ReadAllText(fullPath);
             var reader = new GeoJsonReader();
 
-            // Try FeatureCollection
+            var geom = TryReadAsFeatureCollection(reader, geoJsonText, fullPath, logger);
+            if (geom is not null)
+                return geom;
+
+            geom = TryReadAsSingleGeometry(reader, geoJsonText, fullPath, logger);
+            if (geom is not null)
+                return geom;
+
+            throw new InvalidDataException($"Unsupported or invalid GeoJSON at: {fullPath}");
+        }
+
+        private static Geometry? TryReadAsFeatureCollection(GeoJsonReader reader, string geoJsonText, string fullPath, ILogger logger)
+        {
             try
             {
                 var fc = reader.Read<FeatureCollection>(geoJsonText);
-                if (fc is not null && fc.Count > 0)
+                if (fc is null || fc.Count == 0)
+                    return null;
+
+                var geoms = new List<Geometry>(fc.Count);
+                foreach (var f in fc)
                 {
-                    var geoms = new List<Geometry>(fc.Count);
-                    foreach (var f in fc)
-                    {
-                        if (f?.Geometry is not null)
-                            geoms.Add(f.Geometry);
-                    }
-
-                    if (geoms.Count == 0)
-                        throw new InvalidDataException($"No geometries in FeatureCollection: {fullPath}");
-
-                    if (geoms.Count == 1)
-                        return geoms[0];
-
-                    var union = UnaryUnionOp.Union(geoms);
-                    if (union is not null)
-                        return union;
-                    
-                    throw new InvalidDataException($"Failed to union geometries from: {fullPath}");
+                    if (f?.Geometry is not null)
+                        geoms.Add(f.Geometry);
                 }
+
+                if (geoms.Count == 0)
+                    throw new InvalidDataException($"No geometries in FeatureCollection: {fullPath}");
+
+                if (geoms.Count == 1)
+                    return geoms[0];
+
+                var union = UnaryUnionOp.Union(geoms);
+                if (union is not null)
+                    return union;
+
+                throw new InvalidDataException($"Failed to union geometries from: {fullPath}");
             }
             catch (Exception ex)
             {
                 logger.LogDebug(ex, "FeatureCollection read failed; trying single Geometry for {Path}", fullPath);
+                return null;
             }
+        }
 
-            // Try as single Geometry (Polygon / MultiPolygon)
+        private static Geometry? TryReadAsSingleGeometry(GeoJsonReader reader, string geoJsonText, string fullPath, ILogger logger)
+        {
             try
             {
                 var geom = reader.Read<Geometry>(geoJsonText);
@@ -194,26 +195,23 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 logger.LogError(ex, "Failed to read geometry from GeoJSON at {Path}", fullPath);
             }
 
-            throw new InvalidDataException($"Unsupported or invalid GeoJSON at: {fullPath}");
+            return null;
         }
 
         /// <summary>
-        /// Try robust ways to fix invalid geometry without taking a hard dependency
-        /// on a specific GeometryFixer namespace or version.
+        /// Try robust ways to fix invalid geometry.
         /// </summary>
         private static Geometry FixIfInvalid(Geometry geom, ILogger logger)
         {
             if (geom.IsValid)
                 return geom;
 
-            // 1) Try NetTopologySuite.Geometries.Utilities.GeometryFixer.Fix
             try
             {
                 return NetTopologySuite.Geometries.Utilities.GeometryFixer.Fix(geom);
             }
             catch { /* ignore and try next */ }
 
-            // 2) Fallback: Buffer(0) often repairs polygon noding/self-intersection issues
             try
             {
                 var fixedByBuffer = geom.Buffer(0);
@@ -238,6 +236,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             _ => 4
         };
 
+        // ------------------------------
+        // Public entry point – thin dispatcher
+        // ------------------------------
+
         public async Task<List<SiteInfo>> GetAtomDataSelectionStationBoundryService(
             List<SiteInfo> filteredstationpollutant,
             string region,
@@ -246,128 +248,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 if (string.Equals(regiontype, "Country", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (string.IsNullOrWhiteSpace(region))
-                        return new List<SiteInfo>();
+                    return HandleCountryFilter(filteredstationpollutant, region);
 
-                    // Parse, distinct (case-insensitive), and sort by priority
-                    var selectedCountries =
-                        region.Split(',')
-                              .Select(s => s.Trim())
-                              .Where(s => !string.IsNullOrEmpty(s))
-                              .Distinct(StringComparer.OrdinalIgnoreCase)
-                              .OrderBy(c => CountryPriority(c))
-                              .ToList();
+                if (string.Equals(regiontype, "LocalAuthority", StringComparison.OrdinalIgnoreCase))
+                    return await HandleLocalAuthorityFilterAsync(filteredstationpollutant, region).ConfigureAwait(false);
 
-                    if (selectedCountries.Count == 0)
-                        return new List<SiteInfo>();
-
-                    // Load (or get cached) boundaries
-                    EnsureBoundariesLoaded(selectedCountries, Logger);
-
-                    // Build boundary list; skip failures without throwing
-                    var boundaries = selectedCountries
-                        .Select(c => TryGetOrLoadBoundary(c, Logger))
-                        .Where(b => b is not null)
-                        .Cast<Boundary>()
-                        .ToList();
-
-                    if (boundaries.Count == 0)
-                        return new List<SiteInfo>();
-
-                    // Heuristic: parallelize on big batches
-                    bool useParallel = filteredstationpollutant.Count >= 1500 &&
-                                       Environment.ProcessorCount > 1;
-
-                    var result = useParallel
-                        ? ProcessParallel(filteredstationpollutant, boundaries)
-                        : ProcessSequential(filteredstationpollutant, boundaries);
-
-                    return await Task.FromResult(result).ConfigureAwait(false);
-                }
-                else if (string.Equals(regiontype, "LocalAuthority", StringComparison.OrdinalIgnoreCase))
-                {
-                    var localAuthoritiesresult = await AtomDataSelectionLocalAuthoritiesService
-                        .GetAtomDataSelectionLocalAuthoritiesService(region);
-
-                    if (localAuthoritiesresult is null)
-                        return new List<SiteInfo>();
-
-                    // Build STRtree of LA points with their data
-                    var str = new STRtree<(Point Point, object LocalAuthority)>();
-                    int laCount = 0;
-                    foreach (var la in localAuthoritiesresult)
-                    {
-                        if (la is null) continue;
-                        if (!TryToDouble(la.Latitude, out var laLat)) continue;
-                        if (!TryToDouble(la.Longitude, out var laLon)) continue;
-                        if (Math.Abs(laLat) < 1e-9 && Math.Abs(laLon) < 1e-9) continue;
-
-                        var p = s_geometryFactory.CreatePoint(new Coordinate(laLon, laLat));
-                        str.Insert(new Envelope(p.Coordinate), (p, la));
-                        laCount++;
-                    }
-                    str.Build();
-
-                    Logger.LogInformation("Built STRtree for {Count} local authority points for region {Region}", laCount, region);
-
-                    // Proximity filter using indexed candidate selection + Haversine, 1 mile = 1609.344 meters
-                    const double maxDistanceMeters = 8046d;
-
-                    var filtered = new List<SiteInfo>(capacity: Math.Min(2048, filteredstationpollutant.Count));
-
-                    foreach (var site in filteredstationpollutant)
-                    {
-                        if (!TryParseLatLon(site.Latitude, site.Longitude, out double lat, out double lon))
-                            continue;
-
-                        // Compute conservative query envelope in degrees
-                        double degLat = maxDistanceMeters / 111_320d;
-                        double cosLat = Math.Cos(lat * Math.PI / 180d);
-                        double degLon = maxDistanceMeters / (111_320d * Math.Max(1e-6, cosLat));
-
-                        var queryEnvelope = new Envelope(lon - degLon, lon + degLon, lat - degLat, lat + degLat);
-                        var candidates = str.Query(queryEnvelope);
-
-                        object? closestLA = null;
-                        double minDistance = double.MaxValue;
-
-                        for (int i = 0; i < candidates.Count; i++)
-                        {
-                            var (pt, la) = candidates[i];
-                            double distance = HaversineMeters(lat, lon, pt.Y, pt.X);
-
-                            if (distance <= maxDistanceMeters && distance < minDistance)
-                            {
-                                minDistance = distance;
-                                closestLA = la;
-                            }
-                        }
-
-                        if (closestLA is not null)
-                        {
-                            // Extract LA_REGION from the local authority object
-                            var laRegionProp = closestLA.GetType().GetProperty("LA_REGION");
-                            if (laRegionProp is not null)
-                            {
-                                var laRegion = laRegionProp.GetValue(closestLA);
-                                var laRegionStr = laRegion?.ToString() ?? string.Empty;
-
-                                // Map "London" to "England"
-                                site.Country = string.Equals(laRegionStr, "London", StringComparison.OrdinalIgnoreCase)
-                                    ? "England"
-                                    : laRegionStr;
-                            }
-
-                            filtered.Add(site);
-                        }
-                    }
-
-                    Logger.LogInformation("Filtered {Count} stations near local authorities for region: {Region}", filtered.Count, region);
-                    return filtered;
-                }
-
-                // Unknown region type
                 return new List<SiteInfo>();
             }
             catch (Exception ex)
@@ -378,14 +263,165 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
 
         // ------------------------------
+        // Country branch
+        // ------------------------------
+
+        private List<SiteInfo> HandleCountryFilter(List<SiteInfo> sites, string region)
+        {
+            if (string.IsNullOrWhiteSpace(region))
+                return new List<SiteInfo>();
+
+            var selectedCountries = region.Split(',')
+                  .Select(s => s.Trim())
+                  .Where(s => !string.IsNullOrEmpty(s))
+                  .Distinct(StringComparer.OrdinalIgnoreCase)
+                  .OrderBy(CountryPriority)
+                  .ToList();
+
+            if (selectedCountries.Count == 0)
+                return new List<SiteInfo>();
+
+            EnsureBoundariesLoaded(selectedCountries, Logger);
+
+            var boundaries = selectedCountries
+                .Select(c => TryGetOrLoadBoundary(c, Logger))
+                .Where(b => b is not null)
+                .Cast<Boundary>()
+                .ToList();
+
+            if (boundaries.Count == 0)
+                return new List<SiteInfo>();
+
+            bool useParallel = sites.Count >= 1500 && Environment.ProcessorCount > 1;
+            return useParallel
+                ? ProcessParallel(sites, boundaries)
+                : ProcessSequential(sites, boundaries);
+        }
+
+        // ------------------------------
+        // Local Authority branch
+        // ------------------------------
+
+        private async Task<List<SiteInfo>> HandleLocalAuthorityFilterAsync(List<SiteInfo> sites, string region)
+        {
+            var localAuthoritiesResult = await AtomDataSelectionLocalAuthoritiesService
+                .GetAtomDataSelectionLocalAuthoritiesService(region).ConfigureAwait(false);
+
+            if (localAuthoritiesResult is null)
+                return new List<SiteInfo>();
+
+            var (tree, laCount) = BuildLocalAuthorityTree(localAuthoritiesResult);
+            Logger.LogInformation("Built STRtree for {Count} local authority points for region {Region}", laCount, region);
+
+            const double maxDistanceMeters = 8046d;
+            var filtered = new List<SiteInfo>(capacity: Math.Min(2048, sites.Count));
+
+            foreach (var site in sites)
+            {
+                if (!TryParseLatLon(site.Latitude, site.Longitude, out double lat, out double lon))
+                    continue;
+
+                var closestLA = FindNearestLocalAuthority(tree, lat, lon, maxDistanceMeters);
+                if (closestLA is null)
+                    continue;
+
+                site.Country = string.Equals(closestLA.LA_REGION, "London", StringComparison.OrdinalIgnoreCase)
+                    ? "England"
+                    : closestLA.LA_REGION ?? string.Empty;
+
+                filtered.Add(site);
+            }
+
+            Logger.LogInformation("Filtered {Count} stations near local authorities for region: {Region}", filtered.Count, region);
+            return filtered;
+        }
+
+        private static (STRtree<(Point Point, LocalAuthorityData LocalAuthority)> Tree, int Count)
+            BuildLocalAuthorityTree(List<LocalAuthorityData> localAuthorities)
+        {
+            var str = new STRtree<(Point Point, LocalAuthorityData LocalAuthority)>();
+            int laCount = 0;
+
+            foreach (var la in localAuthorities)
+            {
+                if (la is null) continue;
+
+                double laLat = la.Latitude;
+                double laLon = la.Longitude;
+
+                if (Math.Abs(laLat) < 1e-9 && Math.Abs(laLon) < 1e-9) continue;
+
+                var p = s_geometryFactory.CreatePoint(new Coordinate(laLon, laLat));
+                str.Insert(new Envelope(p.Coordinate), (p, la));
+                laCount++;
+            }
+
+            str.Build();
+            return (str, laCount);
+        }
+
+        private static LocalAuthorityData? FindNearestLocalAuthority(
+            STRtree<(Point Point, LocalAuthorityData LocalAuthority)> tree,
+            double lat, double lon, double maxDistanceMeters)
+        {
+            double degLat = maxDistanceMeters / 111_320d;
+            double cosLat = Math.Cos(lat * Math.PI / 180d);
+            double degLon = maxDistanceMeters / (111_320d * Math.Max(1e-6, cosLat));
+
+            var queryEnvelope = new Envelope(lon - degLon, lon + degLon, lat - degLat, lat + degLat);
+            var candidates = tree.Query(queryEnvelope);
+
+            LocalAuthorityData? closestLA = null;
+            double minDistance = double.MaxValue;
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var (pt, la) = candidates[i];
+                double distance = HaversineMeters(lat, lon, pt.Y, pt.X);
+
+                if (distance <= maxDistanceMeters && distance < minDistance)
+                {
+                    minDistance = distance;
+                    closestLA = la;
+                }
+            }
+
+            return closestLA;
+        }
+
+        // ------------------------------
         // Processing helpers (Country)
         // ------------------------------
+
+        private static string? TryMatchSiteToCountry(SiteInfo site, List<Boundary> boundaries, Envelope unionEnv)
+        {
+            if (!TryParseLatLon(site.Latitude, site.Longitude, out double lat, out double lon))
+                return null;
+
+            if (!unionEnv.Contains(lon, lat))
+                return null;
+
+            Point? point = null;
+
+            for (int b = 0; b < boundaries.Count; b++)
+            {
+                var bd = boundaries[b];
+                if (!bd.Envelope.Contains(lon, lat))
+                    continue;
+
+                point ??= s_geometryFactory.CreatePoint(new Coordinate(lon, lat));
+
+                if (bd.Prepared.Covers(point))
+                    return bd.Name;
+            }
+
+            return null;
+        }
 
         private static List<SiteInfo> ProcessSequential(List<SiteInfo> sites, List<Boundary> boundaries)
         {
             var filtered = new List<SiteInfo>(sites.Count);
 
-            // Union envelope for cheap global rejection
             var unionEnv = new Envelope();
             for (int b = 0; b < boundaries.Count; b++)
                 unionEnv.ExpandToInclude(boundaries[b].Envelope);
@@ -393,30 +429,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             for (int i = 0; i < sites.Count; i++)
             {
                 var site = sites[i];
-                if (!TryParseLatLon(site.Latitude, site.Longitude, out double lat, out double lon))
-                    continue;
-
-                if (!unionEnv.Contains(lon, lat))
-                    continue;
-
-                Point? point = null; // lazy create only if at least one envelope hits
-
-                string? matchedCountry = null;
-                for (int b = 0; b < boundaries.Count; b++)
-                {
-                    var bd = boundaries[b];
-                    if (!bd.Envelope.Contains(lon, lat))
-                        continue;
-
-                    point ??= s_geometryFactory.CreatePoint(new Coordinate(lon, lat));
-
-                    // Note: Covers includes boundary points; use Contains for strictly inside
-                    if (bd.Prepared.Covers(point))
-                    {
-                        matchedCountry = bd.Name;
-                        break;
-                    }
-                }
+                var matchedCountry = TryMatchSiteToCountry(site, boundaries, unionEnv);
 
                 if (matchedCountry is not null)
                 {
@@ -430,12 +443,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         private static List<SiteInfo> ProcessParallel(List<SiteInfo> sites, List<Boundary> boundaries)
         {
-            // Precompute union envelope
             var unionEnv = new Envelope();
             for (int b = 0; b < boundaries.Count; b++)
                 unionEnv.ExpandToInclude(boundaries[b].Envelope);
 
-            // Collect results in thread-local buffers
             var results = new ConcurrentBag<List<SiteInfo>>();
 
             Parallel.ForEach(
@@ -446,28 +457,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     for (int i = range.Item1; i < range.Item2; i++)
                     {
                         var site = sites[i];
-                        if (!TryParseLatLon(site.Latitude, site.Longitude, out double lat, out double lon))
-                            continue;
-
-                        if (!unionEnv.Contains(lon, lat))
-                            continue;
-
-                        Point? point = null;
-                        string? matchedCountry = null;
-
-                        for (int b = 0; b < boundaries.Count; b++)
-                        {
-                            var bd = boundaries[b];
-                            if (!bd.Envelope.Contains(lon, lat))
-                                continue;
-
-                            point ??= s_geometryFactory.CreatePoint(new Coordinate(lon, lat));
-                            if (bd.Prepared.Covers(point))
-                            {
-                                matchedCountry = bd.Name;
-                                break;
-                            }
-                        }
+                        var matchedCountry = TryMatchSiteToCountry(site, boundaries, unionEnv);
 
                         if (matchedCountry is not null)
                         {
@@ -479,7 +469,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 },
                 local => results.Add(local));
 
-            // Flatten
             var total = 0;
             foreach (var l in results) total += l.Count;
 

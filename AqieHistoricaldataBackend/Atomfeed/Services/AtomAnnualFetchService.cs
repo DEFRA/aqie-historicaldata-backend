@@ -34,8 +34,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError("Error in Atom Annual feed fetch {Error}", ex.Message);
-                logger.LogError("Error in Atom Annual feed fetch {Error}", ex.StackTrace);
+                logger.LogError(ex, "Error in Atom Annual feed fetch {Error}", ex.Message);
                 List<FinalData> Final_list = new List<FinalData>();
                 return Final_list;
             }
