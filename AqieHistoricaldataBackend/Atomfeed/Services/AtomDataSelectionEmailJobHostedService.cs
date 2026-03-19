@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -15,7 +14,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         // Interval taken from environment variable (default = 45 minutes)
         private readonly TimeSpan _interval =
-            TimeSpan.FromMinutes(double.Parse(Environment.GetEnvironmentVariable("TIME_INTERVAL") ?? "45"));
+            TimeSpan.FromMinutes(double.Parse(
+                Environment.GetEnvironmentVariable("TIME_INTERVAL") ?? "45",
+                CultureInfo.InvariantCulture));
 
         // Ensures only one job runs at a time
         private readonly SemaphoreSlim _singleRunGate = new(1, 1);

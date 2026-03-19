@@ -224,8 +224,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         // ----------------------------------------------------------------
-        // Exception from daily service → returns empty list + logs both
-        // error messages (Message and StackTrace branches)
+        // Exception from daily service → returns empty list + logs error
         // ----------------------------------------------------------------
         [Fact]
         public async Task GetAtomAnnualdatafetch_ReturnsEmptyList_AndLogsError_WhenDailyServiceThrows()
@@ -249,7 +248,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     It.Is<It.IsAnyType>((v, t) => true),
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                Times.Exactly(2));
+                Times.Once);
         }
 
         // ----------------------------------------------------------------

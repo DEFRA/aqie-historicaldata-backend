@@ -350,6 +350,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task ExecuteAsync_ReleasesGate_EvenWhenJobThrows()
         {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var callCount = 0;
 
             _emailJobServiceMock
@@ -357,13 +358,19 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .Returns<CancellationToken>(_ =>
                 {
                     callCount++;
+                    // Signal as soon as the second call is observed
+                    if (callCount >= 2)
+                        tcs.TrySetResult();
                     // Always throw; the gate must still be released each time
                     throw new Exception("always fails");
                 });
 
             using var cts = new CancellationTokenSource();
             await _service.StartAsync(cts.Token);
-            await Task.Delay(150);
+
+            // Wait for 2 confirmed calls; 5 s timeout guards against infinite hang
+            await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+
             await cts.CancelAsync();
             await _service.StopAsync(CancellationToken.None);
 

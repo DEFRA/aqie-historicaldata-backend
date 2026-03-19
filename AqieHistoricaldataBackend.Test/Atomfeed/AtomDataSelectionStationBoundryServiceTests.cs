@@ -17,7 +17,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
     {
         private readonly Mock<ILogger<AtomDataSelectionStationBoundryService>> _loggerMock;
         private readonly Mock<IAtomDataSelectionLocalAuthoritiesService> _localAuthServiceMock;
-        private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
         private readonly Mock<IHostEnvironment> _envMock;
         private readonly Mock<IFileProvider> _fileProviderMock;
         private readonly AtomDataSelectionStationBoundryService _service;
@@ -96,7 +95,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             _loggerMock = new Mock<ILogger<AtomDataSelectionStationBoundryService>>();
             _localAuthServiceMock = new Mock<IAtomDataSelectionLocalAuthoritiesService>();
-            _httpClientFactoryMock = new Mock<IHttpClientFactory>();
             _fileProviderMock = new Mock<IFileProvider>();
             _envMock = new Mock<IHostEnvironment>();
             _envMock.SetupGet(e => e.ContentRootFileProvider).Returns(_fileProviderMock.Object);

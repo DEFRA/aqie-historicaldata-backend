@@ -112,6 +112,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         private readonly Mock<IAtomDataSelectionStationBoundryService> _boundaryServiceMock = new();
         private readonly Mock<IAtomDataSelectionLocalAuthoritiesService> _localAuthMock = new();
         private readonly Mock<IAtomDataSelectionHourlyFetchService> _hourlyFetchMock = new();
+        private readonly Mock<IAtomDataSelectionServices> _atomDataSelectionServicesMock = new();
         private readonly Mock<IAWSS3BucketService> _s3Mock = new();
         private readonly Mock<IAuthService> _authServiceMock = new();
         private readonly Mock<IMongoDbClientFactory> _mongoFactoryMock = new();
@@ -124,12 +125,14 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
         private AtomDataSelectionStationService CreateService()
         {
+            _atomDataSelectionServicesMock.Setup(a => a.StationBoundry).Returns(_boundaryServiceMock.Object);
+            _atomDataSelectionServicesMock.Setup(a => a.LocalAuthorities).Returns(_localAuthMock.Object);
+            _atomDataSelectionServicesMock.Setup(a => a.HourlyFetch).Returns(_hourlyFetchMock.Object);
+
             return new AtomDataSelectionStationService(
                 _loggerMock.Object,
                 _httpClientFactoryMock.Object,
-                _boundaryServiceMock.Object,
-                _localAuthMock.Object,
-                _hourlyFetchMock.Object,
+                _atomDataSelectionServicesMock.Object,
                 _s3Mock.Object,
                 _authServiceMock.Object,
                 _mongoFactoryMock.Object);

@@ -69,9 +69,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     }
     public class AtomDataSelectionStationService(ILogger<HistoryexceedenceService> Logger,
         IHttpClientFactory httpClientFactory,
-    IAtomDataSelectionStationBoundryService AtomDataSelectionStationBoundryService,
-    IAtomDataSelectionLocalAuthoritiesService AtomDataSelectionLocalAuthoritiesService,
-    IAtomDataSelectionHourlyFetchService AtomDataSelectionHourlyFetchService,
+    IAtomDataSelectionServices atomDataSelectionServices,
     IAWSS3BucketService AWSS3BucketService, IAuthService AuthService,
     IMongoDbClientFactory MongoDbClientFactory) : IAtomDataSelectionStationService
     {
@@ -84,13 +82,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         private readonly object _processorLock = new();
 
         // Primary constructor parameters are available as fields by the primary-constructor syntax used in this project.
-        // (Logger, httpClientFactory, AtomDataSelectionStationBoundryService, AtomDataSelectionHourlyFetchService, AWSS3BucketService, AuthService)
+        // (Logger, httpClientFactory, atomDataSelectionServices, AWSS3BucketService, AuthService)
 
         public async Task<string> GetAtomDataSelectionStation(string pollutantName, string datasource,
             string year, string region, string regiontype, string dataselectorfiltertype, string dataselectordownloadtype, string email)
-            //string JobId)
         {
-
             try
             {
                 var queryStringData = new AtomHistoryModel.QueryStringData
@@ -105,136 +101,23 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     email = email
                 };
 
-                //For CDP
                 var token = await GetRicardoToken();
+                var sitemetadatainfo = await FetchSiteMetadata(token);
+                
+                var filteredSites = FilterSitesByPollutants(sitemetadatainfo, pollutantName);
+                var filterpollutantyear = FilterSitesByYearRanges(filteredSites, year);
 
-                var client = httpClientFactory.CreateClient("RicardoNewAPI");
-                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-                var url = "api/site_meta_datas?with-closed=true&with-pollutants=1";
-                var response = await client.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-
-                string responsebody = await response.Content.ReadAsStringAsync();
-
-                var sitemetadatainfo = ParseSiteMeta(responsebody);
-
-                var mappedPollutants = GetMappedPollutants(pollutantName, includeUnknowns: true);
-
-                var filteredSites1 = sitemetadatainfo
-                    .Select(site => new SiteInfo
-                    {
-                        SiteName = site.SiteName,
-                        LocalSiteId = site.LocalSiteId,
-                        AreaType = site.AreaType,
-                        SiteType = site.SiteType,
-                        ZoneRegion = site.ZoneRegion,
-                        Latitude = site.Latitude,
-                        Longitude = site.Longitude,
-                        Pollutants = (site.Pollutants ?? new List<PollutantInfo>())
-                            .Where(p => p.Name != null && mappedPollutants
-                                .Any(tp => p.Name.Contains(tp, StringComparison.OrdinalIgnoreCase)))
-                            .ToList()
-                    })
-                    .Where(site => site.Pollutants.Any()) // Keep only sites that have matching pollutants
-                    .GroupBy(site => site.LocalSiteId)
-                    .Select(g => g.First()) // Ensure distinct by LocalSiteId
-                    .ToList();
-
-                // Parse years and create year ranges once
-                var yearInts = year.Split(',')
-                                   .Select(y => int.TryParse(y, out int val) ? val : (int?)null)
-                                   .Where(y => y.HasValue)
-                                   .Select(y => y.Value)
-                                   .ToList();
-
-                var yearRanges = yearInts
-                    .Select(y => new { Start = new DateTime(y, 1, 1), End = new DateTime(y, 12, 31) })
-                    .ToList();
-
-                // Filter sites based on pollutant date ranges intersecting with any year range
-                var filterpollutantyear = filteredSites1
-                    .Where(site =>
-                        site.Pollutants != null &&
-                        site.Pollutants.Any(p =>
-                        {
-                            if (!DateTime.TryParseExact(p.StartDate, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime startDate))
-                                return false;
-
-                            bool hasEndDate = DateTime.TryParseExact(p.EndDate, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime endDate);
-
-                            return yearRanges.Any(range =>
-                                hasEndDate
-                                    ? startDate <= range.End && endDate >= range.Start
-                                    : startDate <= range.End);
-                        }))
-                    .ToList();
-
-                var stationData = await AtomDataSelectionStationBoundryService.GetAtomDataSelectionStationBoundryService(filterpollutantyear, region, regiontype);
-                var stationcountresult = stationData.Count();
+                var stationData = await atomDataSelectionServices.StationBoundry.GetAtomDataSelectionStationBoundryService(filterpollutantyear, region, regiontype);
+                var stationcountresult = stationData.Count;
 
                 if (dataselectorfiltertype == "dataSelectorCount")
                 {
                     return stationcountresult.ToString();
                 }
-                else if (dataselectorfiltertype == "dataSelectorHourly")
+                
+                if (dataselectorfiltertype == "dataSelectorHourly")
                 {
-                    if (dataselectordownloadtype == "dataSelectorSingle")
-                    {
-
-                        _jobCollection = MongoDbClientFactory.GetCollection<JobDocument>("aqie_csvexport_jobs");
-
-                        // ensure index on JobId for quick lookup
-                        var indexKeys = Builders<JobDocument>.IndexKeys.Ascending(j => j.JobId);
-                        await _jobCollection.Indexes.CreateOneAsync(new CreateIndexModel<JobDocument>(indexKeys));
-
-                        // create GUID and persist job in MongoDB as Pending, then enqueue background work
-                        var jobId = Guid.NewGuid().ToString("N");
-
-                        var jobDoc = new JobDocument
-                        {
-                            JobId = jobId,
-                            Status = JobStatusEnum.Pending,
-                            StartTime = DateTime.UtcNow,
-                            EndTime = null,
-                            ErrorReason = null,
-                            ResultUrl = null,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-
-                        await _jobCollection.InsertOneAsync(jobDoc);
-
-                        var job = new JobItem
-                        {
-                            JobId = jobId,
-                            StationData = stationData,
-                            PollutantName = pollutantName,
-                            Year = year,
-                            Data = queryStringData,
-                            DownloadType = dataselectordownloadtype
-                        };
-
-                        await _jobChannel.Writer.WriteAsync(job);
-                        _ = EnsureQueueProcessorStartedAsync(); // fire-and-forget ensure processor running
-
-                        // Return the job id immediately to front-end
-                        return jobId;
-
-                    }
-                    else
-                    {
-                        // 1) generate csv bytes in background by fetching hourly data
-                        Logger.LogInformation("Mail job strated generating CSV data");
-                        var csvData = await AtomDataSelectionHourlyFetchService.GetAtomDataSelectionHourlyFetchService(stationData, pollutantName, year);
-                        Logger.LogInformation("Mail job completed generating CSV data of count {Count}", csvData.Count);
-                        // 2) write CSV to S3 and get presigned url
-                        Logger.LogInformation("Mail job presigned strated writecsvtoawss3bucket");
-                        var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, queryStringData, dataselectordownloadtype);
-                        Logger.LogInformation("Mail job presigned completed writecsvtoawss3bucket");
-
-                        return presignedUrl;
-                    }
+                    return await HandleHourlyDataSelection(stationData, pollutantName, year, queryStringData, dataselectordownloadtype);
                 }
 
                 return "Failure";
@@ -242,10 +125,154 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             catch (Exception ex)
             {
                 Logger.LogError("Error in GetAtomDataSelectionStation {Error}", ex.Message);
-                Logger.LogError("Error in GetAtomDataSelectionStation {Error}", ex.StackTrace);
                 return "Failure";
             }
+        }
 
+        private async Task<List<SiteInfo>> FetchSiteMetadata(string token)
+        {
+            var client = httpClientFactory.CreateClient("RicardoNewAPI");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var url = "api/site_meta_datas?with-closed=true&with-pollutants=1";
+            var response = await client.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+
+            string responsebody = await response.Content.ReadAsStringAsync();
+            return ParseSiteMeta(responsebody);
+        }
+
+        private static List<SiteInfo> FilterSitesByPollutants(List<SiteInfo> sites, string pollutantName)
+        {
+            var mappedPollutants = GetMappedPollutants(pollutantName, includeUnknowns: true);
+
+            return sites
+                .Select(site => new SiteInfo
+                {
+                    SiteName = site.SiteName,
+                    LocalSiteId = site.LocalSiteId,
+                    AreaType = site.AreaType,
+                    SiteType = site.SiteType,
+                    ZoneRegion = site.ZoneRegion,
+                    Latitude = site.Latitude,
+                    Longitude = site.Longitude,
+                    Pollutants = (site.Pollutants ?? new List<PollutantInfo>())
+                        .Where(p => p.Name != null && mappedPollutants
+                            .Any(tp => p.Name.Contains(tp, StringComparison.OrdinalIgnoreCase)))
+                        .ToList()
+                })
+                .Where(site => site.Pollutants?.Any() == true)
+                .GroupBy(site => site.LocalSiteId)
+                .Select(g => g.First())
+                .ToList();
+        }
+
+        private static List<SiteInfo> FilterSitesByYearRanges(List<SiteInfo> sites, string year)
+        {
+            var yearRanges = ParseYearRanges(year);
+
+            return sites
+                .Where(site =>
+                    site.Pollutants != null &&
+                    site.Pollutants.Any(p => IsPollutantInYearRange(p, yearRanges)))
+                .ToList();
+        }
+
+        private static List<(DateTime Start, DateTime End)> ParseYearRanges(string year)
+        {
+            var yearInts = year.Split(',')
+                .Select(y => int.TryParse(y, out int val) ? val : (int?)null)
+                .Where(y => y.HasValue)
+                .Select(y => y!.Value)
+                .ToList();
+
+            return yearInts
+                .Select(y => (
+                    Start: new DateTime(y, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    End: new DateTime(y, 12, 31, 0, 0, 0, DateTimeKind.Utc)))
+                .ToList();
+        }
+
+        private static bool IsPollutantInYearRange(PollutantInfo pollutant, List<(DateTime Start, DateTime End)> yearRanges)
+        {
+            if (!DateTime.TryParseExact(pollutant.StartDate, "dd/MM/yyyy",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out DateTime startDate))
+                return false;
+
+            bool hasEndDate = DateTime.TryParseExact(pollutant.EndDate, "dd/MM/yyyy",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out DateTime endDate);
+
+            return yearRanges.Any(range =>
+                hasEndDate
+                    ? startDate <= range.End && endDate >= range.Start
+                    : startDate <= range.End);
+        }
+
+        private async Task<string> HandleHourlyDataSelection(List<SiteInfo> stationData, string pollutantName, 
+            string year, QueryStringData queryStringData, string dataselectordownloadtype)
+        {
+            if (dataselectordownloadtype == "dataSelectorSingle")
+            {
+                return await CreateAndEnqueueJob(stationData, pollutantName, year, queryStringData, dataselectordownloadtype);
+            }
+            
+            return await ProcessEmailDownload(stationData, pollutantName, year, queryStringData, dataselectordownloadtype);
+        }
+
+        private async Task<string> CreateAndEnqueueJob(List<SiteInfo> stationData, string pollutantName, 
+            string year, QueryStringData queryStringData, string dataselectordownloadtype)
+        {
+            _jobCollection = MongoDbClientFactory.GetCollection<JobDocument>("aqie_csvexport_jobs");
+
+            var indexKeys = Builders<JobDocument>.IndexKeys.Ascending(j => j.JobId);
+            await _jobCollection.Indexes.CreateOneAsync(new CreateIndexModel<JobDocument>(indexKeys));
+
+            var jobId = Guid.NewGuid().ToString("N");
+
+            var jobDoc = new JobDocument
+            {
+                JobId = jobId,
+                Status = JobStatusEnum.Pending,
+                StartTime = DateTime.UtcNow,
+                EndTime = null,
+                ErrorReason = null,
+                ResultUrl = null,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await _jobCollection.InsertOneAsync(jobDoc);
+
+            var job = new JobItem
+            {
+                JobId = jobId,
+                StationData = stationData,
+                PollutantName = pollutantName,
+                Year = year,
+                Data = queryStringData,
+                DownloadType = dataselectordownloadtype
+            };
+
+            await _jobChannel.Writer.WriteAsync(job);
+            _ = EnsureQueueProcessorStartedAsync();
+
+            return jobId;
+        }
+
+        private async Task<string> ProcessEmailDownload(List<SiteInfo> stationData, string pollutantName, 
+            string year, QueryStringData queryStringData, string dataselectordownloadtype)
+        {
+            Logger.LogInformation("Mail job strated generating CSV data");
+            var csvData = await atomDataSelectionServices.HourlyFetch.GetAtomDataSelectionHourlyFetchService(stationData, pollutantName, year);
+            Logger.LogInformation("Mail job completed generating CSV data of count {Count}", csvData.Count);
+            
+            Logger.LogInformation("Mail job presigned strated writecsvtoawss3bucket");
+            var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, queryStringData, dataselectordownloadtype);
+            Logger.LogInformation("Mail job presigned completed writecsvtoawss3bucket");
+
+            return presignedUrl;
         }
         private static List<SiteInfo> ParseSiteMeta(string json)
         {
@@ -254,49 +281,72 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
             List<SiteInfo> siteList = new List<SiteInfo>();
 
-            // Fix: Get the "member" property as a JsonElement, then enumerate its array items
             if (root.TryGetProperty("member", out var memberElement) && memberElement.ValueKind == JsonValueKind.Array)
             {
                 foreach (var site in memberElement.EnumerateArray())
                 {
-                    var siteInfo = new SiteInfo
-                    {
-                        SiteName = site.TryGetProperty("siteName", out var siteNameEl) ? siteNameEl.ToString() : null,
-                        LocalSiteId = site.TryGetProperty("localSiteId", out var localSiteIdEl) ? localSiteIdEl.ToString() : null,
-                        AreaType = site.TryGetProperty("areaType", out var areaTypeEl) ? areaTypeEl.ToString() : null,
-                        SiteType = site.TryGetProperty("siteType", out var siteTypeEl) ? siteTypeEl.ToString() : null,
-                        ZoneRegion = site.TryGetProperty("governmentRegion", out var zoneRegionEl) ? zoneRegionEl.ToString() : null,
-                        Latitude = site.TryGetProperty("latitude", out var latitudeEl) ? latitudeEl.ToString() : null,
-                        Longitude = site.TryGetProperty("longitude", out var longitudeEl) ? longitudeEl.ToString() : null,
-                        Pollutants = new List<PollutantInfo>()
-                    };
-
-                    // Fix: Get "pollutantsMetaData" as a JsonElement and enumerate its properties
-                    if (site.TryGetProperty("pollutantsMetaData", out var pollutantsMetaDataEl) && pollutantsMetaDataEl.ValueKind == JsonValueKind.Object)
-                    {
-                        foreach (var pollutantProp in pollutantsMetaDataEl.EnumerateObject())
-                        {
-                            var data = pollutantProp.Value;
-                            var pollutantInfo = new PollutantInfo
-                            {
-                                Name = data.TryGetProperty("name", out var nameEl) ? nameEl.ToString() : null,
-                                StartDate = data.TryGetProperty("startDate", out var startDateEl) ? startDateEl.ToString() : null,
-                                EndDate = data.TryGetProperty("endDate", out var endDateEl) ? endDateEl.ToString() : null
-                            };
-                            siteInfo.Pollutants.Add(pollutantInfo);
-                        }
-                    }
-
+                    var siteInfo = ParseSingleSite(site);
                     siteList.Add(siteInfo);
                 }
             }
 
             return siteList;
         }
+
+        private static SiteInfo ParseSingleSite(JsonElement site)
+        {
+            var siteInfo = new SiteInfo
+            {
+                SiteName = site.TryGetProperty("siteName", out var siteNameEl) ? siteNameEl.ToString() : null,
+                LocalSiteId = site.TryGetProperty("localSiteId", out var localSiteIdEl) ? localSiteIdEl.ToString() : null,
+                AreaType = site.TryGetProperty("areaType", out var areaTypeEl) ? areaTypeEl.ToString() : null,
+                SiteType = site.TryGetProperty("siteType", out var siteTypeEl) ? siteTypeEl.ToString() : null,
+                ZoneRegion = site.TryGetProperty("governmentRegion", out var zoneRegionEl) ? zoneRegionEl.ToString() : null,
+                Latitude = site.TryGetProperty("latitude", out var latitudeEl) ? latitudeEl.ToString() : null,
+                Longitude = site.TryGetProperty("longitude", out var longitudeEl) ? longitudeEl.ToString() : null,
+                Pollutants = ParsePollutantsMetaData(site)
+            };
+
+            return siteInfo;
+        }
+
+        private static List<PollutantInfo> ParsePollutantsMetaData(JsonElement site)
+        {
+            var pollutants = new List<PollutantInfo>();
+
+            if (site.TryGetProperty("pollutantsMetaData", out var pollutantsMetaDataEl) && pollutantsMetaDataEl.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var pollutantProp in pollutantsMetaDataEl.EnumerateObject())
+                {
+                    var pollutantInfo = ParseSinglePollutant(pollutantProp.Value);
+                    pollutants.Add(pollutantInfo);
+                }
+            }
+
+            return pollutants;
+        }
+
+        private static PollutantInfo ParseSinglePollutant(JsonElement data)
+        {
+            return new PollutantInfo
+            {
+                Name = data.TryGetProperty("name", out var nameEl) ? nameEl.ToString() : null,
+                StartDate = data.TryGetProperty("startDate", out var startDateEl) ? startDateEl.ToString() : null,
+                EndDate = data.TryGetProperty("endDate", out var endDateEl) ? endDateEl.ToString() : null
+            };
+        }
+
         private async Task<string> GetRicardoToken()
         {
             var emailFromConfig = Environment.GetEnvironmentVariable("RICARDO_API_KEY");
             var passwordFromConfig = Environment.GetEnvironmentVariable("RICARDO_API_VALUE");
+
+            if (string.IsNullOrEmpty(emailFromConfig) || string.IsNullOrEmpty(passwordFromConfig))
+            {
+                Logger.LogError("GetRicardoToken Auth failed - credentials not found in environment variables");
+                return "Failure";
+            }
+
             var token = await AuthService.GetTokenAsync(emailFromConfig, passwordFromConfig);
             if (string.IsNullOrEmpty(token))
             {
@@ -393,12 +443,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 try
                 {
                     // 1) generate csv bytes in background by fetching hourly data
-                    var csvData = await AtomDataSelectionHourlyFetchService.GetAtomDataSelectionHourlyFetchService(job.StationData, job.PollutantName, job.Year);
+                    var csvData = await atomDataSelectionServices.HourlyFetch.GetAtomDataSelectionHourlyFetchService(job.StationData!, job.PollutantName!, job.Year!);
                     Logger.LogInformation("ProcessQueueAsync Background job {JobId} generated CSV data of count {Count}", job.JobId, csvData.Count);
 
                     // 2) write CSV to S3 and get presigned url
-                    var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, job.Data, job.DownloadType);
-                    //var presignedUrl = "test";
+                    var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, job.Data!, job.DownloadType!);
 
                     // 3) update job as completed with ResultUrl
                     var updateCompleted = Builders<JobDocument>.Update

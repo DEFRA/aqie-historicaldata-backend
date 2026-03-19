@@ -9,7 +9,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 var groupedData = GroupFinalData(Final_list);
-                var distinctPollutants = Final_list.Select(s => s.AnnualPollutantName).Distinct().OrderBy(m => m).ToList();
+                var distinctPollutants = Final_list
+                    .Select(s => s.AnnualPollutantName)
+                    .Where(x => x != null)
+                    .Select(x => x!)
+                    .Distinct()
+                    .OrderBy(m => m)
+                    .ToList();
 
                 using var memoryStream = new MemoryStream();
                 using var writer = new StreamWriter(memoryStream);
@@ -24,11 +30,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             catch (Exception ex)
             {
                 logger.LogError("Annual download CSV error: {Error}", ex.Message);
-                logger.LogError("Stacktrace: {Error}", ex.StackTrace);
                 return new byte[] { 0x20 };
             }
         }
-        private void WriteCsvHeader(StreamWriter writer, QueryStringData data)
+        private static void WriteCsvHeader(StreamWriter writer, QueryStringData data)
         {
             string stationfetchdate = Convert.ToDateTime(data.StationReadDate).ToString();
             writer.WriteLine($"Annual Average data from Defra on {stationfetchdate}");
@@ -39,7 +44,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             writer.WriteLine($"Longitude,{data.Longitude}");
             writer.WriteLine("Notes:,[1] All Data GMT hour ending;  [2] Some shorthand is used V = Verified P = Provisionally Verified N = Not Verified S = Suspect [3] Unit of measurement (for pollutants) = ugm-3");
         }
-        private void WritePollutantHeaders(StreamWriter writer, List<string> pollutants)
+        private static void WritePollutantHeaders(StreamWriter writer, List<string> pollutants)
         {
             writer.Write("Date");
             foreach (var pollutant in pollutants)
@@ -64,19 +69,19 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 foreach (var pollutant in pollutants)
                 {
-                    var sub = item.SubPollutant.FirstOrDefault(s => s.PollutantName == pollutant);
+                    var sub = item.SubPollutant?.FirstOrDefault(s => s.PollutantName == pollutant);
                     writer.Write($",{sub?.PollutantValue ?? ""},{sub?.Verification ?? ""}");
                 }
                 writer.WriteLine();
             }
         }
-        private string GetPollutantHeader(string pollutant) => pollutant switch
+        private static string GetPollutantHeader(string pollutant) => pollutant switch
         {
             "PM10" => "PM10 particulate matter (Hourly measured)",
             "PM2.5" => "PM2.5 particulate matter (Hourly measured)",
             _ => pollutant
         };
-        private List<PivotPollutant> GroupFinalData(List<FinalData> finalList)
+        private static List<PivotPollutant> GroupFinalData(List<FinalData> finalList)
         {
             return finalList.GroupBy(x => x.ReportDate)
                 .Select(y => new PivotPollutant
@@ -90,7 +95,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }).ToList()
                 }).ToList();
         }
-        private string MapVerification(string code) => code switch
+        private static string MapVerification(string? code) => code switch
         {
             "1" => "V",
             "2" => "P",
