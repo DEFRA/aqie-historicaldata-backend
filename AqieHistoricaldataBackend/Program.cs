@@ -149,10 +149,11 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAWSPreSignedURLService, AWSPreSignedURLService>();
     builder.Services.AddSingleton<IHistoryexceedenceService, HistoryexceedenceService>();
     builder.Services.AddSingleton<IAtomDataSelectionService, AtomDataSelectionService>();
-    builder.Services.AddSingleton<IAtomDataSelectionStationService, AtomDataSelectionStationService>();
     builder.Services.AddSingleton<IAtomDataSelectionStationBoundryService, AtomDataSelectionStationBoundryService>();
     builder.Services.AddSingleton<IAtomDataSelectionLocalAuthoritiesService, AtomDataSelectionLocalAuthoritiesService>();
     builder.Services.AddSingleton<IAtomDataSelectionHourlyFetchService, AtomDataSelectionHourlyFetchService>();
+    builder.Services.AddSingleton<IAtomDataSelectionServices, AtomDataSelectionServices>();
+    builder.Services.AddSingleton<IAtomDataSelectionStationService, AtomDataSelectionStationService>();
     builder.Services.AddSingleton<IDataSelectionHourlyAtomFeedExportCsv, DataSelectionHourlyAtomFeedExportCsv>();
     builder.Services.AddSingleton<IAuthService, AuthService>();
     builder.Services.AddSingleton<IAtomDataSelectionJobStatus, AtomDataSelectionJobStatus>();
