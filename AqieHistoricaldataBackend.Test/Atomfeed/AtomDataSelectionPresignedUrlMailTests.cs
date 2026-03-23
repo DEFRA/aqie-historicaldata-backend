@@ -17,7 +17,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
     {
         private readonly Mock<ILogger<HistoryexceedenceService>> _loggerMock;
         private readonly Mock<IMongoDbClientFactory> _mongoFactoryMock;
-        private readonly Mock<IAWSPreSignedURLService> _awsPreSignedURLServiceMock;
+        private readonly Mock<IAwsPreSignedUrLService> _AwsPreSignedUrLServiceMock;
         private readonly Mock<IMongoCollection<eMailJobDocument>> _collectionMock;
         private readonly Mock<IMongoIndexManager<eMailJobDocument>> _indexManagerMock;
         private readonly AtomDataSelectionPresignedUrlMail _sut;
@@ -26,7 +26,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             _loggerMock = new Mock<ILogger<HistoryexceedenceService>>();
             _mongoFactoryMock = new Mock<IMongoDbClientFactory>();
-            _awsPreSignedURLServiceMock = new Mock<IAWSPreSignedURLService>();
+            _AwsPreSignedUrLServiceMock = new Mock<IAwsPreSignedUrLService>();
             _collectionMock = new Mock<IMongoCollection<eMailJobDocument>>();
             _indexManagerMock = new Mock<IMongoIndexManager<eMailJobDocument>>();
 
@@ -43,7 +43,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             _sut = new AtomDataSelectionPresignedUrlMail(
                 _loggerMock.Object,
                 _mongoFactoryMock.Object,
-                _awsPreSignedURLServiceMock.Object);
+                _AwsPreSignedUrLServiceMock.Object);
         }
 
         // ─── Helpers ────────────────────────────────────────────────────────────
@@ -202,8 +202,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var doc = BuildEmailJobDocument();
             SetupFindReturns(doc);
-            _awsPreSignedURLServiceMock
-                .Setup(s => s.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<double>()))
+            _AwsPreSignedUrLServiceMock
+                .Setup(s => s.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
                 .ReturnsAsync((string?)null);
 
             var result = await _sut.GetPresignedUrlMail(doc.JobId);
@@ -218,8 +218,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var doc = BuildEmailJobDocument();
             SetupFindReturns(doc);
-            _awsPreSignedURLServiceMock
-                .Setup(s => s.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<double>()))
+            _AwsPreSignedUrLServiceMock
+                .Setup(s => s.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
                 .ThrowsAsync(new AmazonS3Exception("S3 error"));
 
             var result = await _sut.GetPresignedUrlMail(doc.JobId);
@@ -242,8 +242,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var doc = BuildEmailJobDocument();
             SetupFindReturns(doc);
-            _awsPreSignedURLServiceMock
-                .Setup(s => s.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<double>()))
+            _AwsPreSignedUrLServiceMock
+                .Setup(s => s.GeneratePreSignedURL(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
                 .ThrowsAsync(new Exception("Unexpected S3 failure"));
 
             var result = await _sut.GetPresignedUrlMail(doc.JobId);
@@ -267,7 +267,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             const string expectedUrl = "https://s3.amazonaws.com/test-bucket/AURN_NO2_London_2024.zip?sig=abc";
             var doc = BuildEmailJobDocument();
             SetupFindReturns(doc);
-            _awsPreSignedURLServiceMock
+            _AwsPreSignedUrLServiceMock
                 .Setup(s => s.GeneratePreSignedURL("test-bucket", "AURN_NO2_London_2024.zip", 604800))
                 .ReturnsAsync(expectedUrl);
 
@@ -293,14 +293,14 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             const string url = "https://example.com/file.zip";
             var doc = BuildEmailJobDocument(dataSource: dataSource, pollutantName: pollutant, region: region, year: year);
             SetupFindReturns(doc);
-            _awsPreSignedURLServiceMock
+            _AwsPreSignedUrLServiceMock
                 .Setup(s => s.GeneratePreSignedURL("test-bucket", expectedKey, 604800))
                 .ReturnsAsync(url);
 
             var result = await _sut.GetPresignedUrlMail(doc.JobId);
 
             Assert.Equal(url, result);
-            _awsPreSignedURLServiceMock.Verify(
+            _AwsPreSignedUrLServiceMock.Verify(
                 s => s.GeneratePreSignedURL("test-bucket", expectedKey, 604800), Times.Once);
         }
 
@@ -328,5 +328,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 It.IsAny<UpdateOptions>(),
                 It.IsAny<CancellationToken>()), Times.Once);
         }
+
     }
 }

@@ -29,16 +29,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                                     ReportDate = x.ReportDate,
                                                     DailyPollutantName = x.PollutantName,
                                                     DailyVerification = x.Verification,
-                                                    Total = (x.Values.Count() >= 0.75 * x.Count) ? x.Values.Average() : 0
+                                                    Total = (x.Values.Count >= 0.75 * x.Count) ? x.Values.Average() : 0
                                                 }).ToList();
                 return Daily_Average;
             }
             catch (Exception ex)
             {
-                logger.LogError("Error in Atom daily feed fetch {Error}", ex.Message);
-                logger.LogError("Error in Atom daily feed fetch {Error}", ex.StackTrace);
-                List<FinalData> Final_list = new List<FinalData>();
-                return Final_list;
+                logger.LogError(ex,"Error in Atom daily feed fetch");
+                return new List<FinalData>();
             }
         }
     }

@@ -29,7 +29,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError("Annual download CSV error: {Error}", ex.Message);
+                logger.LogError(ex, "Annual download CSV error");
                 return new byte[] { 0x20 };
             }
         }

@@ -19,7 +19,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
-using static AqieHistoricaldataBackend.Atomfeed.Services.AWSS3BucketService;
+using static AqieHistoricaldataBackend.Atomfeed.Services.Awss3BucketService;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
@@ -70,7 +70,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionStationService(ILogger<HistoryexceedenceService> Logger,
         IHttpClientFactory httpClientFactory,
     IAtomDataSelectionServices atomDataSelectionServices,
-    IAWSS3BucketService AWSS3BucketService, IAuthService AuthService,
+    IAwss3BucketService AWSS3BucketService, IAuthService AuthService,
     IMongoDbClientFactory MongoDbClientFactory) : IAtomDataSelectionStationService
     {
         // MongoDB collection for job documents
@@ -84,11 +84,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         // Primary constructor parameters are available as fields by the primary-constructor syntax used in this project.
         // (Logger, httpClientFactory, atomDataSelectionServices, AWSS3BucketService, AuthService)
 
-        public async Task<string> GetAtomDataSelectionStation(string pollutantName, string datasource,
-            string year, string region, string regiontype, string dataselectorfiltertype, string dataselectordownloadtype, string email)
+        public async Task<string> GetAtomDataSelectionStation(string? pollutantName, string? datasource, string? year, string? region, string? regiontype, string? dataselectorfiltertype, string? dataselectordownloadtype, string? email)
         {
             try
             {
+                if (string.IsNullOrEmpty(pollutantName) || string.IsNullOrEmpty(year))
+                {
+                    Logger.LogWarning("GetAtomDataSelectionStation called with null or empty pollutantName or year.");
+                    return "Failure";
+                }
+
                 var queryStringData = new AtomHistoryModel.QueryStringData
                 {
                     pollutantName = pollutantName,
@@ -103,8 +108,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 var token = await GetRicardoToken();
                 var sitemetadatainfo = await FetchSiteMetadata(token);
-                
-                var filteredSites = FilterSitesByPollutants(sitemetadatainfo, pollutantName);
+
+                var filteredSites = FilterSitesByPollutants(sitemetadatainfo, pollutantName, Logger);
                 var filterpollutantyear = FilterSitesByYearRanges(filteredSites, year);
 
                 var stationData = await atomDataSelectionServices.StationBoundry.GetAtomDataSelectionStationBoundryService(filterpollutantyear, region, regiontype);
@@ -124,7 +129,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error in GetAtomDataSelectionStation {Error}", ex.Message);
+                Logger.LogError(ex, "Error in GetAtomDataSelectionStation");
                 return "Failure";
             }
         }
@@ -142,9 +147,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return ParseSiteMeta(responsebody);
         }
 
-        private static List<SiteInfo> FilterSitesByPollutants(List<SiteInfo> sites, string pollutantName)
+        private static List<SiteInfo> FilterSitesByPollutants(List<SiteInfo> sites, string pollutantName, ILogger logger)
         {
-            var mappedPollutants = GetMappedPollutants(pollutantName, includeUnknowns: true);
+            var mappedPollutants = GetMappedPollutants(pollutantName,logger, includeUnknowns: true);
 
             return sites
                 .Select(site => new SiteInfo
@@ -268,9 +273,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var csvData = await atomDataSelectionServices.HourlyFetch.GetAtomDataSelectionHourlyFetchService(stationData, pollutantName, year);
             Logger.LogInformation("Mail job completed generating CSV data of count {Count}", csvData.Count);
             
-            Logger.LogInformation("Mail job presigned strated writecsvtoawss3bucket");
-            var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, queryStringData, dataselectordownloadtype);
-            Logger.LogInformation("Mail job presigned completed writecsvtoawss3bucket");
+            Logger.LogInformation("Mail job presigned strated WriteCsvToAwsS3BucketAsync");
+            var presignedUrl = await AWSS3BucketService.WriteCsvToAwsS3BucketAsync(csvData, queryStringData, dataselectordownloadtype);
+            Logger.LogInformation("Mail job presigned completed WriteCsvToAwsS3BucketAsync");
 
             return presignedUrl;
         }
@@ -357,10 +362,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
 
 
-        private static List<string> GetMappedPollutants(string pollutantNames, bool includeUnknowns = false)
+        private static List<string> GetMappedPollutants(string pollutantName, ILogger logger, bool includeUnknowns = false)
         {
             var result = new List<string>();
-            var names = pollutantNames.Split(',');
+            var names = pollutantName.Split(',');
 
             var pollutantMap = new Dictionary<string, List<string>>
             {
@@ -393,15 +398,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var trimmedName = name.Trim();
                 if (pollutantMap.TryGetValue(trimmedName, out var mappedNames))
                 {
-                    result.AddRange(mappedNames); // Add all mapped values for this key
+                    result.AddRange(mappedNames);
                 }
                 else if (includeUnknowns)
                 {
-                    result.Add(trimmedName); // Add raw name if not found
+                    result.Add(trimmedName);
                 }
                 else
                 {
-                    Console.WriteLine($"Warning: Unknown pollutant '{trimmedName}' not found in map.");
+                    logger.LogWarning("Unknown pollutant '{PollutantName}' not found in map.", trimmedName);
                 }
             }
 
@@ -447,7 +452,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     Logger.LogInformation("ProcessQueueAsync Background job {JobId} generated CSV data of count {Count}", job.JobId, csvData.Count);
 
                     // 2) write CSV to S3 and get presigned url
-                    var presignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(csvData, job.Data!, job.DownloadType!);
+                    var presignedUrl = await AWSS3BucketService.WriteCsvToAwsS3BucketAsync(csvData, job.Data!, job.DownloadType!);
 
                     // 3) update job as completed with ResultUrl
                     var updateCompleted = Builders<JobDocument>.Update

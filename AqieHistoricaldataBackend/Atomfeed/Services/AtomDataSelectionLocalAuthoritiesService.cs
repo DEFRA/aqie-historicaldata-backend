@@ -21,28 +21,25 @@ IHttpClientFactory httpClientFactory) : IAtomDataSelectionLocalAuthoritiesServic
 
                 List<LocalAuthorityData> localAuthoritiesfinallist = new List<LocalAuthorityData>();
 
-                // Fetch Local Authorities data once to get region mapping
                 var laClient = httpClientFactory.CreateClient("laqmAPI");
 
-                //for cdp
                 laClient.DefaultRequestHeaders.Add("X-API-Key", Environment.GetEnvironmentVariable("LAQM_API_KEY"));
                 laClient.DefaultRequestHeaders.Add("X-API-PartnerId", Environment.GetEnvironmentVariable("LAQM_USERID"));
 
                 var localauthorities = $"/xapi/getLocalAuthorities/json";
                 var localauthoritiesresponse = await laClient.GetStringAsync(localauthorities);
 
-                // Deserialize the local authorities response
                 var allLocalAuthorities = JsonConvert.DeserializeObject<LocalAuthoritiesRoot>(localauthoritiesresponse);
 
-                // Create a dictionary for quick region lookup by LA_ID, handling duplicate keys safely
+                // Dictionary<int, string?> to match the nullable LA_REGION value
                 var regionLookup = allLocalAuthorities?.data?
                     .GroupBy(la => la.LA_ID)
                     .ToDictionary(g => g.Key, g => g.Last().LA_REGION)
-                    ?? new Dictionary<int, string>();
+                    ?? new Dictionary<int, string?>();
 
                 foreach (var laId in selectedlocalAuthorityId)
                 {
-                    Logger.LogInformation($"Selected From frontend API LA ID: {laId}");
+                    Logger.LogInformation("Selected From frontend API LA ID: {LaId}", laId);
 
                     string year = (DateTime.Now.Year - 1).ToString();
                     string localAuthorityId = laId;
@@ -55,10 +52,9 @@ IHttpClientFactory httpClientFactory) : IAtomDataSelectionLocalAuthoritiesServic
                     var localAuthorities = JsonConvert.DeserializeObject<LocalAuthoritiesRoot>(laResponse);
                     if (localAuthorities?.data != null)
                     {
-                        // Log the local authorities data
                         foreach (var la in localAuthorities.data)
                         {
-                            Logger.LogInformation($"From LAQM API LA ID: {la.LA_ID}");
+                            Logger.LogInformation("From LAQM API LA ID: {LaId}", la.LA_ID);
 
                             double easting = la.X_OS_Grid_Reference;
                             double northing = la.Y_OS_Grid_Reference;
@@ -84,7 +80,6 @@ IHttpClientFactory httpClientFactory) : IAtomDataSelectionLocalAuthoritiesServic
                             la.Latitude = point[1];
                             la.Longitude = point[0];
 
-                            // Set the region from the lookup dictionary
                             if (regionLookup.TryGetValue(la.LA_ID, out var laRegion))
                             {
                                 la.LA_REGION = laRegion;
@@ -98,10 +93,9 @@ IHttpClientFactory httpClientFactory) : IAtomDataSelectionLocalAuthoritiesServic
             }
             catch (Exception ex)
             {
-                Logger.LogError($"Error in GetAtomDataSelectionStationBoundryService: {ex.Message}");
+                Logger.LogError(ex, "Error in GetAtomDataSelectionStationBoundryService");
                 throw;
             }
         }
     }
-
 }

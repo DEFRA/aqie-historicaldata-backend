@@ -8,7 +8,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class HistoryexceedenceService(ILogger<HistoryexceedenceService> Logger,
         IAtomHourlyFetchService AtomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService) : IHistoryexceedenceService
     {
-        public async Task<dynamic> GetHistoryexceedencedata(QueryStringData data)
+        public async Task<dynamic?> GetHistoryexceedencedata(QueryStringData data)
         {
             try
             {
@@ -40,8 +40,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.Message);
-                Logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.StackTrace);
+                Logger.LogError(ex,"Error in Atom Historyexceedencedata");
                 return "Failure";
             }
         }

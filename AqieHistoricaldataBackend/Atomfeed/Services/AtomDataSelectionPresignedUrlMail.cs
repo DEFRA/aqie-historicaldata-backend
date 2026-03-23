@@ -14,24 +14,20 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionPresignedUrlMail(
                                         ILogger<HistoryexceedenceService> Logger,
                                         IMongoDbClientFactory MongoDbClientFactory,
-                                        IAWSPreSignedURLService awsPreSignedURLService
+                                        IAwsPreSignedUrLService AwsPreSignedUrLService
                                         ) : IAtomDataSelectionPresignedUrlMail
     {
-
-        // MongoDB collection for job documents
         private IMongoCollection<eMailJobDocument>? _jobCollection;
-        public async Task<string> GetPresignedUrlMail(string jobId)
+
+        public async Task<string?> GetPresignedUrlMail(string jobId)
         {
             try
             {
                 Logger.LogInformation("GetPresignedUrlMail method started for JobId: {JobId}", jobId);
                 if (string.IsNullOrWhiteSpace(jobId)) return null;
-                // Lazy-initialize the collection using the injected factory so _jobCollection won't be null
                 if (_jobCollection == null)
                 {
                     _jobCollection = MongoDbClientFactory.GetCollection<eMailJobDocument>("aqie_csvemailexport_jobs");
-
-                    // Ensure an index exists for quick lookups by JobId (no-op if it already exists)
                     try
                     {
                         var indexKeys = Builders<eMailJobDocument>.IndexKeys.Ascending(j => j.JobId);
@@ -39,19 +35,26 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
                     catch (Exception ix)
                     {
-                        // Log index creation failure but continue — reads can still function
                         Logger.LogWarning(ix, "Failed to create index on aqie_csvexport_jobs collection");
                     }
                 }
 
                 var filter = Builders<eMailJobDocument>.Filter.Eq(d => d.JobId, jobId);
-                var doc = await _jobCollection.Find(filter).FirstOrDefaultAsync();
+
+                // Use FindAsync directly so the injected IMongoCollection mock is invoked
+                // unambiguously, avoiding extension-method indirection that bypasses the mock.
+                eMailJobDocument? doc;
+                using (var cursor = await _jobCollection.FindAsync(filter))
+                {
+                    doc = await cursor.FirstOrDefaultAsync();
+                }
+
                 if (doc == null) return null;
 
                 Logger.LogInformation("Document CreatedAt value: {CreatedAt}", doc.CreatedAt);
 
                 string s3Key = $"{doc.DataSource}_{doc.PollutantName}_{doc.Region}_{doc.Year}.zip";
-                string resultUrl = await GetS3data(s3Key);
+                string? resultUrl = await GetS3data(s3Key);
                 if (resultUrl == null) return null;
 
                 var update = Builders<eMailJobDocument>.Update
@@ -65,7 +68,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Error in GetPresignedUrlMail for JobId: {JobId}", jobId);
-                
+
                 if (_jobCollection != null)
                 {
                     var update = Builders<eMailJobDocument>.Update
@@ -82,17 +85,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        private async Task<string> GetS3data(string s3Key)
+        private async Task<string?> GetS3data(string s3Key)
         {
-            // Pull the object from S3 using the key stored in doc.ResultUrl
-            string bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME");
+            string? bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME");
             Logger.LogInformation("Fetching S3 object. Bucket: {BucketName}, Key: {S3Key}", bucketName, s3Key);
 
             try
             {
-
                 Logger.LogInformation("S3 bucket GetPresignedUrlMail start {Datetime}", DateTime.Now);
-                var url = await awsPreSignedURLService.GeneratePreSignedURL(bucketName, s3Key, 604800);
+                var url = await AwsPreSignedUrLService.GeneratePreSignedURL(bucketName, s3Key, 604800);
                 Logger.LogInformation("S3 bucket GetPresignedUrlMail final URL {PresignedUrl}", url);
                 return url;
             }
@@ -109,6 +110,5 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return null;
             }
         }
-
     }
 }

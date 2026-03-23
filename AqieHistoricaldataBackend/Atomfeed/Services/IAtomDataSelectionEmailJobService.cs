@@ -9,7 +9,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         [ExcludeFromCodeCoverage]
         Task<string> GetAtomemailjobDataSelection(QueryStringData data);
         Task ProcessPendingEmailJobsAsync(CancellationToken stoppingToken);
-       
-        //Task ProcessPendingEmailJobsAsync();
+             
     }
 }

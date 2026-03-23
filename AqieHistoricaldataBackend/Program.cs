@@ -141,12 +141,12 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAtomHourlyFetchService, AtomHourlyFetchService>();
     builder.Services.AddSingleton<IAtomDailyFetchService, AtomDailyFetchService>();
     builder.Services.AddSingleton<IAtomAnnualFetchService, AtomAnnualFetchService>();
-    builder.Services.AddSingleton<IAWSS3BucketService, AWSS3BucketService>();
+    builder.Services.AddSingleton<IAwss3BucketService, Awss3BucketService>();
     builder.Services.AddSingleton<IS3TransferUtility, S3TransferUtility>();    
     builder.Services.AddSingleton<IHourlyAtomFeedExportCsv, HourlyAtomFeedExportCsv>();
     builder.Services.AddSingleton<IDailyAtomFeedExportCsv, DailyAtomFeedExportCsv>();
     builder.Services.AddSingleton<IAnnualAtomFeedExportCsv, AnnualAtomFeedExportCsv>();
-    builder.Services.AddSingleton<IAWSPreSignedURLService, AWSPreSignedURLService>();
+    builder.Services.AddSingleton<IAwsPreSignedUrLService, AwsPreSignedUrLService>();
     builder.Services.AddSingleton<IHistoryexceedenceService, HistoryexceedenceService>();
     builder.Services.AddSingleton<IAtomDataSelectionService, AtomDataSelectionService>();
     builder.Services.AddSingleton<IAtomDataSelectionStationBoundryService, AtomDataSelectionStationBoundryService>();

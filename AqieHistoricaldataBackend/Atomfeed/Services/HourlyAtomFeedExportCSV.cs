@@ -24,8 +24,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError("Hourly download csv error Info message {Error}", ex.Message);
-                logger.LogError("Hourly download csv Info stacktrace {Error}", ex.StackTrace);
+                logger.LogError(ex,"Hourly download csv error Info message");
                 return new byte[] { 0x20 };
             }
         }

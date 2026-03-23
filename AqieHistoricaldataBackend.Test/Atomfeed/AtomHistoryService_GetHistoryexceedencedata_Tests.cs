@@ -26,7 +26,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         private readonly Mock<IAtomHourlyFetchService> _hourlyServiceMock = new();
         private readonly Mock<IAtomDailyFetchService> _dailyServiceMock = new();
         private readonly Mock<IAtomAnnualFetchService> _annualServiceMock = new();
-        private readonly Mock<IAWSS3BucketService> _s3ServiceMock = new();
+        private readonly Mock<IAwss3BucketService> _s3ServiceMock = new();
         private readonly Mock<IAtomDataSelectionService> _dataSelectionServiceMock = new();
         private readonly Mock<IAtomDataSelectionJobStatus> _dataSelectionJobStatusMock = new();
         private readonly Mock<IAtomDataSelectionEmailJobService> _dataSelectionEmailJobServiceMock = new();
@@ -228,15 +228,15 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateService();
             await service.GetHistoryexceedencedata(data);
 
-            // The service logs two separate LogError calls (Message + StackTrace)
+            // Verify an Error log occurred and the exception message contains the expected text.
             _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Error,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains("log-test-error")),
-                    It.IsAny<Exception>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.Is<Exception>(e => e.Message.Contains("log-test-error")),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                Times.AtLeastOnce);
+                Times.Once);
         }
 
         [Fact]
@@ -251,15 +251,16 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateService();
             await service.GetHistoryexceedencedata(data);
 
-            // One log for ex.Message, one for ex.StackTrace
+            // Service currently logs a single Error with exception details;
+            // assert that an Error-level log was written exactly once.
             _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Error,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, _) => true),
+                    It.IsAny<It.IsAnyType>(),
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                Times.Exactly(2));
+                Times.Once);
         }
 
         [Fact]

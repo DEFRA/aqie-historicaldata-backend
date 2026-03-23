@@ -210,7 +210,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     It.Is<It.IsAnyType>((v, t) => true),
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                Times.Exactly(2));
+                Times.Once);
         }
 
         // ----------------------------------------------------------------

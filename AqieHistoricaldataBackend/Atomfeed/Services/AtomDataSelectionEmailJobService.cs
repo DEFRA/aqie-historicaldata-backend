@@ -62,8 +62,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error in Atom GetAtomemailjobDataSelection {Error}", ex.Message);
-                Logger.LogError("Error in Atom GetAtomemailjobDataSelection {Error}", ex.StackTrace);
+                Logger.LogError(ex, "Error in Atom GetAtomemailjobDataSelection"); // called exactly once
                 return "Failure";
             }
         }
@@ -184,7 +183,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
                     catch (Exception exJob)
                     {
-                        Logger.LogError("ProcessPendingEmailJobsAsync Error processing email job {JobId}: {Error}", job.JobId, exJob.Message);
+                        Logger.LogError(exJob, "ProcessPendingEmailJobsAsync Error processing email job {JobId}", job.JobId);
                         var update = Builders<eMailJobDocument>.Update
                             .Set(j => j.ErrorReason, exJob.Message)
                             .Set(j => j.Status, JobStatusEnum.Failed)
@@ -199,7 +198,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error in ProcessPendingEmailJobsAsync: {Error}", ex.Message);
+                Logger.LogError(ex,"Error in ProcessPendingEmailJobsAsync");
             }
         }
 
@@ -257,7 +256,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error in mailservice: {Error}", ex.Message);
+                Logger.LogError(ex,"Error in mailservice");
                 return ex.Message;
             }
         }
@@ -274,7 +273,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error in Getmilisecond: {Error}", ex.Message);
+                Logger.LogError(ex,"Error in Getmilisecond");
                 return null;
             }
         }
