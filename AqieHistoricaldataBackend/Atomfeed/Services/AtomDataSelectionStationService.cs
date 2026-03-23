@@ -112,17 +112,20 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var filteredSites = FilterSitesByPollutants(sitemetadatainfo, pollutantName, Logger);
                 var filterpollutantyear = FilterSitesByYearRanges(filteredSites, year);
 
-                var stationData = await atomDataSelectionServices.StationBoundry.GetAtomDataSelectionStationBoundryService(filterpollutantyear, region, regiontype);
+                var stationData = await atomDataSelectionServices.StationBoundry.GetAtomDataSelectionStationBoundryService(
+                    filterpollutantyear,
+                    region ?? string.Empty,
+                    regiontype ?? string.Empty);
                 var stationcountresult = stationData.Count;
 
                 if (dataselectorfiltertype == "dataSelectorCount")
                 {
                     return stationcountresult.ToString();
                 }
-                
+
                 if (dataselectorfiltertype == "dataSelectorHourly")
                 {
-                    return await HandleHourlyDataSelection(stationData, pollutantName, year, queryStringData, dataselectordownloadtype);
+                    return await HandleHourlyDataSelection(stationData, pollutantName, year, queryStringData, dataselectordownloadtype ?? string.Empty);
                 }
 
                 return "Failure";

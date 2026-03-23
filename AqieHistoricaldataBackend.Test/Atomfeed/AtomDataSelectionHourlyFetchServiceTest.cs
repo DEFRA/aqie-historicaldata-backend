@@ -760,7 +760,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var method = typeof(AtomDataSelectionHourlyFetchService)
                 .GetMethod("GetPollutantsToDisplay", BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance)
                 ?? throw new InvalidOperationException("Could not find GetPollutantsToDisplay via reflection.");
-            // It's a static method, invoke with null target
             return (List<PollutantDetails>)method.Invoke(null, new object[] { filter })!;
         }
 

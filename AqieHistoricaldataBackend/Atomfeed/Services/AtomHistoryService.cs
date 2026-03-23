@@ -75,11 +75,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         public async Task<string> GetAtomHourlydata(QueryStringData data)
         {
-            string siteId = data.SiteId;
-            string year = data.Year;
+            string siteId = data.SiteId ?? string.Empty;
+            string year = data.Year ?? string.Empty;
             string PresignedUrl = string.Empty;
-            string downloadfilter = data.DownloadPollutant;
-            string downloadtype = data.DownloadPollutantType;
+            string downloadfilter = data.DownloadPollutant ?? string.Empty;
+            string downloadtype = data.DownloadPollutantType ?? string.Empty;
             try
             {
                 var finalhourlypollutantresult = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
@@ -136,7 +136,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        public async Task<dynamic> GetHistoryexceedencedata(QueryStringData data)
+        public async Task<dynamic?> GetHistoryexceedencedata(QueryStringData data)
         {
             try
             {
@@ -197,7 +197,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 var presignedUrlresult = await AtomDataSelectionPresignedUrlMail.GetPresignedUrlMail(data.jobId);
-                return presignedUrlresult;
+                return presignedUrlresult ?? string.Empty;
             }
             catch (Exception ex)
             {

@@ -122,7 +122,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 new PollutantDetails { PollutantName = "Nitric oxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/38" }
             };
             // Split and normalize the filter string
-            var filterList = filter.Split(',')
+            var filterList = (filter ?? string.Empty)
+                                   .Split(',')
                                    .Select(f => f.Trim())
                                    .ToList();
             // Filter using case-insensitive comparison
