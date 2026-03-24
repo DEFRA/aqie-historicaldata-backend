@@ -21,7 +21,7 @@ public class AtomHistoryServiceTests
     private readonly Mock<IAtomHourlyFetchService> _hourlyServiceMock = new();
     private readonly Mock<IAtomDailyFetchService> _dailyServiceMock = new();
     private readonly Mock<IAtomAnnualFetchService> _annualServiceMock = new();
-    private readonly Mock<IAWSS3BucketService> _s3ServiceMock = new();
+    private readonly Mock<IAwss3BucketService> _s3ServiceMock = new();
     private readonly Mock<IHistoryexceedenceService> _exceedenceServiceMock = new();
     private readonly Mock<IAtomDataSelectionService> _dataSelectionServiceMock = new();
     private readonly Mock<IAtomDataSelectionJobStatus> _dataSelectionJobStatusMock = new();
@@ -116,7 +116,7 @@ public class AtomHistoryServiceTests
         var hourlyData = new List<AtomHistoryModel.FinalData> { new() };
 
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(hourlyData);
-        _s3ServiceMock.Setup(s => s.writecsvtoawss3bucket(hourlyData, data, "Hourly")).ReturnsAsync("hourly-url");
+        _s3ServiceMock.Setup(s => s.WriteCsvToAwsS3BucketAsync(hourlyData, data, "Hourly")).ReturnsAsync("hourly-url");
 
         var service = CreateService();
         var result = await service.GetAtomHourlydata(data);
@@ -133,7 +133,7 @@ public class AtomHistoryServiceTests
 
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(hourlyData);
         _dailyServiceMock.Setup(s => s.GetAtomDailydatafetch(hourlyData, data)).ReturnsAsync(dailyData);
-        _s3ServiceMock.Setup(s => s.writecsvtoawss3bucket(dailyData, data, "Daily")).ReturnsAsync("daily-url");
+        _s3ServiceMock.Setup(s => s.WriteCsvToAwsS3BucketAsync(dailyData, data, "Daily")).ReturnsAsync("daily-url");
 
         var service = CreateService();
         var result = await service.GetAtomHourlydata(data);
@@ -150,7 +150,7 @@ public class AtomHistoryServiceTests
 
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(hourlyData);
         _annualServiceMock.Setup(s => s.GetAtomAnnualdatafetch(hourlyData, data)).ReturnsAsync(annualData);
-        _s3ServiceMock.Setup(s => s.writecsvtoawss3bucket(annualData, data, "Annual")).ReturnsAsync("annual-url");
+        _s3ServiceMock.Setup(s => s.WriteCsvToAwsS3BucketAsync(annualData, data, "Annual")).ReturnsAsync("annual-url");
 
         var service = CreateService();
         var result = await service.GetAtomHourlydata(data);
@@ -204,7 +204,7 @@ public class AtomHistoryServiceTests
 
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(hourlyData);
         _dailyServiceMock.Setup(s => s.GetAtomDailydatafetch(hourlyData, data)).ReturnsAsync(dailyData);
-        _s3ServiceMock.Setup(s => s.writecsvtoawss3bucket(dailyData, data, "Daily")).ThrowsAsync(new Exception("s3 fail"));
+        _s3ServiceMock.Setup(s => s.WriteCsvToAwsS3BucketAsync(dailyData, data, "Daily")).ThrowsAsync(new Exception("s3 fail"));
 
         var service = CreateService();
         var result = await service.GetAtomHourlydata(data);
@@ -221,7 +221,7 @@ public class AtomHistoryServiceTests
 
         _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site", "2023", "NO2")).ReturnsAsync(hourlyData);
         _annualServiceMock.Setup(s => s.GetAtomAnnualdatafetch(hourlyData, data)).ReturnsAsync(annualData);
-        _s3ServiceMock.Setup(s => s.writecsvtoawss3bucket(annualData, data, "Annual")).ThrowsAsync(new Exception("s3 fail"));
+        _s3ServiceMock.Setup(s => s.WriteCsvToAwsS3BucketAsync(annualData, data, "Annual")).ThrowsAsync(new Exception("s3 fail"));
 
         var service = CreateService();
         var result = await service.GetAtomHourlydata(data);

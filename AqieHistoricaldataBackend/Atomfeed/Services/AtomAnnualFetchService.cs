@@ -1,3 +1,4 @@
+using System.Globalization;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
@@ -10,33 +11,31 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 var dailyAverage = await AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
-                //To get the daily average
                 var annualAverage = dailyAverage
-                    .Where(x => x.ReportDate != null && DateTime.TryParse(x.ReportDate, out _))
+                    .Where(x => x.ReportDate != null && DateTime.TryParse(x.ReportDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
                     .GroupBy(x => new
                     {
                         ReportDate = Convert.ToDateTime(x.ReportDate).Year.ToString(),
                         x.DailyPollutantName,
                         x.DailyVerification
                     })
-                                            .Select(x =>
-                                    {
-                                        var validTotals = x.Where(y => Convert.ToDecimal(y.Total) != 0).ToList();                                        
-                                        return new FinalData
-                                        {
-                                            ReportDate = x.Key.ReportDate,
-                                            AnnualPollutantName = x.Key.DailyPollutantName,
-                                            AnnualVerification = x.Key.DailyVerification,
-                                            Total = validTotals.Any() ? validTotals.Average(y => Convert.ToDecimal(y.Total)) : 0
-                                        };
-                                    }).ToList();
+                    .Select(x =>
+                    {
+                        var validTotals = x.Where(y => Convert.ToDecimal(y.Total) != 0).ToList();
+                        return new FinalData
+                        {
+                            ReportDate = x.Key.ReportDate,
+                            AnnualPollutantName = x.Key.DailyPollutantName,
+                            AnnualVerification = x.Key.DailyVerification,
+                            Total = validTotals.Count > 0 ? validTotals.Average(y => Convert.ToDecimal(y.Total)) : 0
+                        };
+                    }).ToList();
                 return annualAverage;
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error in Atom Annual feed fetch {Error}", ex.Message);
-                List<FinalData> Final_list = new List<FinalData>();
-                return Final_list;
+                return new List<FinalData>();
             }
         }
     }

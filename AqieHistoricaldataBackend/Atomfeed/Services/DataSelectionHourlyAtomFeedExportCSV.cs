@@ -60,8 +60,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError("DataSelection Hourly download csv dataSelectionHourlyAtomFeedExportCSV error Info message {Error}", ex.Message);
-                logger.LogError("DataSelection Hourly download csv dataSelectionHourlyAtomFeedExportCSV Info stacktrace {Error}", ex.StackTrace);
+                logger.LogError(ex,"DataSelection Hourly download csv dataSelectionHourlyAtomFeedExportCSV error Info message");
                 return new byte[] { 0x20 };
             }
         }

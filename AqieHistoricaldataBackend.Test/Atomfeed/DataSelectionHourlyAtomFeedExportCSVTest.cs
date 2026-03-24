@@ -473,7 +473,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     LogLevel.Error,
                     It.IsAny<EventId>(),
                     It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains(
-                        "DataSelection Hourly download csv dataSelectionHourlyAtomFeedExportCSV Info stacktrace")),
+                        "DataSelection Hourly download csv dataSelectionHourlyAtomFeedExportCSV error Info message")), 
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);

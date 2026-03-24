@@ -8,19 +8,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionJobStatus(ILogger<HistoryexceedenceService> Logger,
     IMongoDbClientFactory MongoDbClientFactory) : IAtomDataSelectionJobStatus
     {
-        // MongoDB collection for job documents
         private IMongoCollection<JobDocument>? _jobCollection;
-        public async Task<JobInfoDto?> GetAtomDataSelectionJobStatusdata(string jobID)
+
+        public async Task<JobInfoDto?> GetAtomDataSelectionJobStatusdata(string? jobID)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(jobID)) return null;
-                // Lazy-initialize the collection using the injected factory so _jobCollection won't be null
                 if (_jobCollection == null)
                 {
                     _jobCollection = MongoDbClientFactory.GetCollection<JobDocument>("aqie_csvexport_jobs");
-
-                    // Ensure an index exists for quick lookups by JobId (no-op if it already exists)
                     try
                     {
                         var indexKeys = Builders<JobDocument>.IndexKeys.Ascending(j => j.JobId);
@@ -28,7 +25,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }
                     catch (Exception ix)
                     {
-                        // Log index creation failure but continue — reads can still function
                         Logger.LogWarning(ix, "Failed to create index on aqie_csvexport_jobs collection");
                     }
                 }
@@ -51,8 +47,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error in Atom GetAtomDataSelectionJobStatus {Error}", ex.Message);
-                Logger.LogError("Error in Atom GetAtomDataSelectionJobStatus {Error}", ex.StackTrace);
+                Logger.LogError(ex, "Error in Atom GetAtomDataSelectionJobStatus");
                 return null;
             }
         }

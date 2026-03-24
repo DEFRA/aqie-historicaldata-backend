@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Xml;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
+
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AtomDataSelectionHourlyFetchService(ILogger<HistoryexceedenceService> Logger,
@@ -19,7 +20,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 Logger.LogInformation("Fetch and processing started in {ElapsedSeconds} seconds.", stopwatch.Elapsed.TotalSeconds);
                 var pollutantsToDisplay = GetPollutantsToDisplay(pollutantName);
                 var resultsBag = new ConcurrentBag<FinalData>();
-               
+
                 var siteYearPairs = filteredstationpollutant
                                     .SelectMany(siteinfo => years.Select(year => new { siteinfo, year }));
                 await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 5 }, async (pair, ct) =>
@@ -35,7 +36,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     {
                         var errorMessage = $"Error processing site {pair.siteinfo.LocalSiteId} for year {pair.year}: {ex.Message}";
                         Console.WriteLine(errorMessage);
-                        Logger.LogError("Error processing site {SiteID} for year {Year}: {Error}", pair.siteinfo.LocalSiteId, pair.year, ex.Message);
+                        Logger.LogError(ex,"Error processing site {SiteID} for year {Year}: {Error}", pair.siteinfo.LocalSiteId, pair.year, ex.Message);
                         await File.AppendAllTextAsync("error_log.txt", $"{DateTime.Now}: {errorMessage}{Environment.NewLine}", ct);
                     }
                 });
@@ -50,12 +51,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error in GetAtomDataSelectionHourlyFetchService {Error}", ex.Message);
-                Logger.LogError("Error in GetAtomDataSelectionHourlyFetchService {Error}", ex.StackTrace);
+                Logger.LogError(ex, "Error in GetAtomDataSelectionHourlyFetchService");
                 return new List<FinalData>();
             }
         }
-        private async Task<JArray> FetchAtomFeedAsync(string siteID, string year)
+
+        private async Task<JArray> FetchAtomFeedAsync(string? siteID, string year)
         {
             if (string.IsNullOrWhiteSpace(siteID) || string.IsNullOrWhiteSpace(year))
             {
@@ -67,7 +68,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 var response = await client.GetAsync(url);
-                // Check for 404 before any other status handling
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
                     Logger.LogWarning("Atom feed not found (404) for URL: {Url} (siteID: {SiteID}, year: {Year})", url, siteID, year);
@@ -88,25 +88,27 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var xml = new XmlDocument();
                 xml.Load(stream);
                 var json = Newtonsoft.Json.JsonConvert.SerializeXmlNode(xml);
-                return JObject.Parse(json)["gml:FeatureCollection"]["gml:featureMember"] as JArray;
+                var featureCollection = JObject.Parse(json)["gml:FeatureCollection"];
+                return featureCollection?["gml:featureMember"] as JArray ?? new JArray();
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                Logger.LogWarning("Atom feed not found (404) for URL: {Url} (siteID: {SiteID}, year: {Year})", url, siteID, year);
+                Logger.LogWarning(ex,"Atom feed not found (404) for URL: {Url} (siteID: {SiteID}, year: {Year})", url, siteID, year);
                 return new JArray();
             }
             catch (HttpRequestException ex)
             {
-                Logger.LogError("HTTP error FetchAtomFeedAsync fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex.Message);
+                Logger.LogError(ex,"HTTP error FetchAtomFeedAsync fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex.Message);
                 return new JArray();
             }
             catch (Exception ex)
             {
-                Logger.LogError("Error FetchAtomFeedAsync fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex.Message);
+                Logger.LogError(ex,"Error FetchAtomFeedAsync fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex.Message);
                 return new JArray();
             }
         }
-        private List<PollutantDetails> GetPollutantsToDisplay(string filter)
+
+        private static List<PollutantDetails> GetPollutantsToDisplay(string? filter)
         {
             var allPollutants = new List<PollutantDetails>
             {
@@ -120,7 +122,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 new PollutantDetails { PollutantName = "Nitric oxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/38" }
             };
             // Split and normalize the filter string
-            var filterList = filter.Split(',')
+            var filterList = (filter ?? string.Empty)
+                                   .Split(',')
                                    .Select(f => f.Trim())
                                    .ToList();
             // Filter using case-insensitive comparison
@@ -155,7 +158,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError("Error processing ProcessAtomData feature member: {Error}", ex.Message);
+                    Logger.LogError(ex,"Error processing ProcessAtomData feature member");
                 }
             }
             return finalList;

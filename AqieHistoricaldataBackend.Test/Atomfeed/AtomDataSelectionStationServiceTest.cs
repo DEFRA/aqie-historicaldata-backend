@@ -113,7 +113,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         private readonly Mock<IAtomDataSelectionLocalAuthoritiesService> _localAuthMock = new();
         private readonly Mock<IAtomDataSelectionHourlyFetchService> _hourlyFetchMock = new();
         private readonly Mock<IAtomDataSelectionServices> _atomDataSelectionServicesMock = new();
-        private readonly Mock<IAWSS3BucketService> _s3Mock = new();
+        private readonly Mock<IAwss3BucketService> _s3Mock = new();
         private readonly Mock<IAuthService> _authServiceMock = new();
         private readonly Mock<IMongoDbClientFactory> _mongoFactoryMock = new();
         private readonly Mock<HttpMessageHandler> _ricardoHandlerMock = new();
@@ -287,7 +287,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<FinalData>());
 
             _s3Mock
-                .Setup(s => s.writecsvtoawss3bucket(It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
                 .ReturnsAsync("https://s3.example.com/file.zip");
 
             var result = await CreateService().GetAtomDataSelectionStation(
@@ -786,7 +786,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<FinalData>());
 
             _s3Mock
-                .Setup(s => s.writecsvtoawss3bucket(It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
                 .ThrowsAsync(new Exception("S3 error"));
 
             var result = await CreateService().GetAtomDataSelectionStation(

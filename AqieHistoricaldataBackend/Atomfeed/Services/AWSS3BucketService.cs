@@ -24,62 +24,40 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
     }
 
-    public class AWSS3BucketService(ILogger<AWSS3BucketService> logger, IHourlyAtomFeedExportCsv hourlyAtomFeedExportCsv,
+    public class Awss3BucketService(ILogger<Awss3BucketService> logger, IHourlyAtomFeedExportCsv hourlyAtomFeedExportCsv,
         IDailyAtomFeedExportCsv dailyAtomFeedExportCsv, IAnnualAtomFeedExportCsv annualAtomFeedExportCsv,
-        IAWSPreSignedURLService awsPreSignedURLService, IS3TransferUtility s3TransferUtility,
-        IDataSelectionHourlyAtomFeedExportCsv DataSelectionHourlyAtomFeedExportCsv) : IAWSS3BucketService
+        IAwsPreSignedUrLService AwsPreSignedUrLService, IS3TransferUtility s3TransferUtility,
+        IDataSelectionHourlyAtomFeedExportCsv DataSelectionHourlyAtomFeedExportCsv) : IAwss3BucketService
     {
         private readonly IS3TransferUtility s3TransferUtility = s3TransferUtility;
 
-        public async Task<string> writecsvtoawss3bucket(List<FinalData> Final_list, QueryStringData data, string downloadtype)
+        public async Task<string> WriteCsvToAwsS3BucketAsync(List<FinalData> finalList, QueryStringData data, string downloadType)
         {
             try
             {
+                string bucketName = GetBucketName();
                 byte[] csvBytes;
                 string key;
-                string bucketName = GetBucketName();
-                string region = GetAwsRegion();
 
                 if (data.dataselectorfiltertype == "dataSelectorHourly")
                 {
                     logger.LogInformation("dataSelectorHourly entered {Starttime}", DateTime.Now);
-                    if (data.dataselectordownloadtype == "dataSelectorSingle")
-                    {
-                        logger.LogInformation("dataSelectorSingle started {Starttime}", DateTime.Now);
-                        csvBytes = await GetDataselectorCsvBytesAsync(Final_list, data, downloadtype);
-                        logger.LogInformation("csvBytes generated ended {Starttime}", DateTime.Now);
-                    }
-                    else
-                    {
-                        logger.LogInformation("else part {Starttime}", DateTime.Now);
-                        csvBytes = await GetDataselectorCsvBytesAsync(Final_list, data, downloadtype);
-                    }
-                    key = dataselectorGenerateS3Key(data);
-                    logger.LogInformation("dataselectorGenerateS3Key entered {Starttime}", DateTime.Now);
-                    region = GetAwsRegion();
-                    logger.LogInformation("GetAwsRegion entered {Starttime}", DateTime.Now);
-                    bucketName = GetBucketName();
-                    logger.LogInformation("GetBucketName entered {Starttime}", DateTime.Now);
-                    await UploadToS3Async(csvBytes, bucketName, key);
-                    logger.LogInformation("UploadToS3Async entered {Starttime}", DateTime.Now);
-                    return await GeneratePresignedUrlAsync(bucketName, key);
+                    csvBytes = await GetDataselectorCsvBytesAsync(finalList, data, downloadType);
+                    key = DataSelectorGenerateS3Key(data);
                 }
                 else
                 {
                     logger.LogInformation("else dataSelectorHourly entered {Starttime}", DateTime.Now);
-                    csvBytes = await GetCsvBytesAsync(Final_list, data, downloadtype);
-                    key = GenerateS3Key(data); region = GetAwsRegion();
-                    bucketName = GetBucketName();
-                    await UploadToS3Async(csvBytes, bucketName, key);
-                    return await GeneratePresignedUrlAsync(bucketName, key);
+                    csvBytes = await GetCsvBytesAsync(finalList, data, downloadType);
+                    key = GenerateS3Key(data);
                 }
 
-
+                await UploadToS3Async(csvBytes, bucketName, key);
+                return await GeneratePresignedUrlAsync(bucketName, key);
             }
             catch (Exception ex)
             {
-                logger.LogError("Error writecsvtoawss3bucket AWS S3 bucket Info message {Error}", ex.Message);
-                logger.LogError("Error writecsvtoawss3bucket AWS S3 bucket Info stacktrace {Error}", ex.StackTrace);
+                logger.LogError(ex, "Error WriteCsvToAwsS3BucketAsync AWS S3 bucket Info message");
                 return string.Empty;
             }
         }
@@ -104,30 +82,24 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             };
         }
 
-        private string GetAwsRegion()
+        private static string GetBucketName()
         {
-            var region = Environment.GetEnvironmentVariable("AWS_REGION");
-            if (string.IsNullOrEmpty(region))
-                throw new ArgumentNullException("AWS_REGION");
-            return region;
-        }
-
-        private string GetBucketName()
-        {
-            var bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME");
+            var bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME", EnvironmentVariableTarget.Process);
             if (string.IsNullOrEmpty(bucketName))
-                throw new ArgumentNullException("S3_BUCKET_NAME");
+                throw new InvalidOperationException("Environment variable 'S3_BUCKET_NAME' is not configured.");
             return bucketName;
         }
 
-        private string GenerateS3Key(QueryStringData data)
+        private static string GenerateS3Key(QueryStringData data)
         {
             return $"{data.SiteName}_{data.DownloadPollutant}_{data.DownloadPollutantType}_{data.Year}.csv";
         }
-        private string dataselectorGenerateS3Key(QueryStringData data)
+
+        private static string DataSelectorGenerateS3Key(QueryStringData data)
         {
             return $"{data.dataSource}_{data.pollutantName}_{data.Region}_{data.Year}.zip";
         }
+
         private async Task UploadToS3Async(byte[] csvBytes, string bucketName, string key)
         {
             logger.LogInformation("S3 bucket upload start {Starttime}", DateTime.Now);
@@ -139,10 +111,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         private async Task<string> GeneratePresignedUrlAsync(string bucketName, string key)
         {
             logger.LogInformation("S3 bucket PresignedUrl start {Datetime}", DateTime.Now);
-            // Expire in 2 days (172800 seconds) for 7days (604800 seconds)
-            var url = await awsPreSignedURLService.GeneratePreSignedURL(bucketName, key, 604800);
+            var url = await AwsPreSignedUrLService.GeneratePreSignedURL(bucketName, key, 604800);
             logger.LogInformation("S3 bucket PresignedUrl final URL {PresignedUrl}", url);
-            return url;
+            return url ?? string.Empty;
         }
+
     }
 }

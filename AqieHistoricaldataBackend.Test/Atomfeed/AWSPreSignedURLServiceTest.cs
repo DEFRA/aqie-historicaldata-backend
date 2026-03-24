@@ -9,17 +9,17 @@ using System.Threading.Tasks;
 
 namespace AqieHistoricaldataBackend.Test.Atomfeed
 {
-    public class AWSPreSignedURLServiceTest
+    public class AwsPreSignedUrLServiceTest
     {
         private readonly Mock<ILogger<HourlyAtomFeedExportCsv>> _mockLogger;
         private readonly Mock<IAmazonS3> _mockS3Client;
-        private readonly AWSPreSignedURLService _service;
+        private readonly AwsPreSignedUrLService _service;
 
-        public AWSPreSignedURLServiceTest()
+        public AwsPreSignedUrLServiceTest()
         {
             _mockLogger = new Mock<ILogger<HourlyAtomFeedExportCsv>>();
             _mockS3Client = new Mock<IAmazonS3>();
-            _service = new AWSPreSignedURLService(_mockLogger.Object, _mockS3Client.Object);
+            _service = new AwsPreSignedUrLService(_mockLogger.Object, _mockS3Client.Object);
         }
 
         [Fact]
@@ -56,7 +56,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     LogLevel.Error,
                     It.IsAny<EventId>(),
                     It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("AmazonS3Exception Error:S3 error")),
-                    null,
+                    It.IsAny<Exception>(),   
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);
         }
@@ -79,7 +79,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     LogLevel.Error,
                     It.IsAny<EventId>(),
                     It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Error in GeneratePreSignedURL Info message Generic error")),
-                    null,
+                    It.IsAny<Exception>(),  
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);
             _mockLogger.Verify(
@@ -87,9 +87,9 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     LogLevel.Error,
                     It.IsAny<EventId>(),
                     It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Error in GeneratePreSignedURL")),
-                    null,
+                    It.IsAny<Exception>(),   
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                Times.Exactly(2));
+                Times.Once); 
         }
 
         [Fact]

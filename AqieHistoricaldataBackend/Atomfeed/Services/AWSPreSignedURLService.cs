@@ -3,17 +3,17 @@ using Amazon.S3;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AWSPreSignedURLService(ILogger<HourlyAtomFeedExportCsv> logger, IAmazonS3 s3Client) : IAWSPreSignedURLService
+    public class AwsPreSignedUrLService(ILogger<HourlyAtomFeedExportCsv> logger, IAmazonS3 s3Client) : IAwsPreSignedUrLService
     {
-        public async Task<string> GeneratePreSignedURL(string bucketName, string keyName, double duration)
+        public async Task<string?> GeneratePreSignedURL(string? bucketName, string s3Key, int expiryInSeconds)
         {
             try
             {
                 var request = new GetPreSignedUrlRequest
                 {
                     BucketName = bucketName,
-                    Key = keyName,
-                    Expires = DateTime.UtcNow.AddSeconds(duration)
+                    Key = s3Key,
+                    Expires = DateTime.UtcNow.AddSeconds(expiryInSeconds)
                 };
 
                 string url = await s3Client.GetPreSignedURLAsync(request);
@@ -21,13 +21,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (AmazonS3Exception ex)
             {
-                logger.LogError("AmazonS3Exception Error:{Error}", ex.Message);
+                logger.LogError(ex, "AmazonS3Exception Error:{Message}", ex.Message);
                 return "error";
             }
             catch (Exception ex)
             {
-                logger.LogError("Error in GeneratePreSignedURL Info message {Error}", ex.Message);
-                logger.LogError("Error in GeneratePreSignedURL {Error}", ex.StackTrace);
+                logger.LogError(ex, "Error in GeneratePreSignedURL Info message {Message}", ex.Message);
                 return "error";
             }
         }

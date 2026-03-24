@@ -31,7 +31,6 @@ using System.Net.Sockets;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
-using static Amazon.Internal.RegionEndpointProviderV2;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 using static AqieHistoricaldataBackend.Atomfeed.Services.AtomHistoryService;
 using static System.Net.Mime.MediaTypeNames;
@@ -42,7 +41,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AtomHistoryService(ILogger<AtomHistoryService> logger, IHttpClientFactory httpClientFactory,
         IAtomHourlyFetchService atomHourlyFetchService, IAtomDailyFetchService AtomDailyFetchService, IAtomAnnualFetchService AtomAnnualFetchService,
-        IAWSS3BucketService AWSS3BucketService, IAtomDataSelectionService AtomDataSelectionService,
+        IAwss3BucketService Awss3BucketService, IAtomDataSelectionService AtomDataSelectionService,
         IAtomDataSelectionJobStatus AtomDataSelectionJobStatus,
         IAtomDataSelectionEmailJobService AtomDataSelectionEmailJobService,
         IHistoryexceedenceService HistoryexceedenceService,
@@ -68,8 +67,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError("Error AtomHealthcheck Info message {Error}", ex.Message);
-                logger.LogError("Error AtomHealthcheck Info stacktrace {Error}", ex.StackTrace);
+                logger.LogError(ex, "Error AtomHealthcheck Info message");
                 return "Error";
             }
         }
@@ -77,11 +75,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         public async Task<string> GetAtomHourlydata(QueryStringData data)
         {
-            string siteId = data.SiteId;
-            string year = data.Year;
+            string siteId = data.SiteId ?? string.Empty;
+            string year = data.Year ?? string.Empty;
             string PresignedUrl = string.Empty;
-            string downloadfilter = data.DownloadPollutant;
-            string downloadtype = data.DownloadPollutantType;
+            string downloadfilter = data.DownloadPollutant ?? string.Empty;
+            string downloadtype = data.DownloadPollutantType ?? string.Empty;
             try
             {
                 var finalhourlypollutantresult = await atomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
@@ -91,24 +89,23 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     //To get the daily average 
                     var dailyAverage = await AtomDailyFetchService.GetAtomDailydatafetch(finalhourlypollutantresult, data);
 
-                    PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(dailyAverage, data, downloadtype);
+                    PresignedUrl = await Awss3BucketService.WriteCsvToAwsS3BucketAsync(dailyAverage, data, downloadtype);
                 }
                 else if (downloadtype == "Annual")
                 {
                     var annualAverage = await AtomAnnualFetchService.GetAtomAnnualdatafetch(finalhourlypollutantresult, data);
 
-                    PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(annualAverage, data, downloadtype);
+                    PresignedUrl = await Awss3BucketService.WriteCsvToAwsS3BucketAsync(annualAverage, data, downloadtype);
                 }
                 else
                 {
                     //To get the Hourly data
-                    PresignedUrl = await AWSS3BucketService.writecsvtoawss3bucket(finalhourlypollutantresult, data, downloadtype);
+                    PresignedUrl = await Awss3BucketService.WriteCsvToAwsS3BucketAsync(finalhourlypollutantresult, data, downloadtype);
                 }
             }
             catch (Exception ex)
-            {
-                logger.LogError("Error in Atom feed fetch {Error}", ex.Message);
-                logger.LogError("Error in Atom feed fetch {Error}", ex.StackTrace);
+            {                
+                logger.LogError(ex, "Error in Atom feed fetch");
             }
             return PresignedUrl;
         }
@@ -139,7 +136,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        public async Task<dynamic> GetHistoryexceedencedata(QueryStringData data)
+        public async Task<dynamic?> GetHistoryexceedencedata(QueryStringData data)
         {
             try
             {
@@ -148,8 +145,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.Message);
-                logger.LogError("Error in Atom Historyexceedencedata {Error}", ex.StackTrace);
+                logger.LogError(ex, "Error in Atom Historyexceedencedata");
                 return "Failure";
             }
         }
@@ -163,8 +159,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError("Error in Atom GetatomDataSelectiondata {Error}", ex.Message);
-                logger.LogError("Error in Atom GetatomDataSelectiondata {Error}", ex.StackTrace);
+                logger.LogError(ex, "Error in Atom GetatomDataSelectiondata");
                 return "Failure";
             }
         }
@@ -178,8 +173,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError("Error in GetAtomDataSelectionJobStatus {Error}", ex.Message);
-                logger.LogError("Error in GetAtomDataSelectionJobStatus {Error}", ex.StackTrace);
+                logger.LogError(ex, "Error in GetAtomDataSelectionJobStatus");
                 return default(JobInfoDto); // Return default value for JobInfoDto instead of "Failure"
             }
         }
@@ -193,8 +187,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError("Error in Atom GetatomDataSelectiondata {Error}", ex.Message);
-                logger.LogError("Error in Atom GetatomDataSelectiondata {Error}", ex.StackTrace);
+                logger.LogError(ex, "Error in Atom GetatomDataSelectiondata");
                 return "Failure";
             }
         }
@@ -204,12 +197,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 var presignedUrlresult = await AtomDataSelectionPresignedUrlMail.GetPresignedUrlMail(data.jobId);
-                return presignedUrlresult;
+                return presignedUrlresult ?? string.Empty;
             }
             catch (Exception ex)
             {
-                logger.LogError("Error in Atom GetPresignedUrlMail {Error}", ex.Message);
-                logger.LogError("Error in Atom GetPresignedUrlMail {Error}", ex.StackTrace);
+                logger.LogError(ex, "Error in Atom GetPresignedUrlMail");
                 return "Failure";
             }
         }
