@@ -11,12 +11,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                // L15/L16: null-coalesce nullable string? properties to non-nullable string
                 string siteId = data.SiteId ?? string.Empty;
                 string year = data.Year ?? string.Empty;
                 string downloadfilter = "All";
 
-                // L19: siteId and year are now guaranteed non-null
                 var hourlyData = await AtomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
                 var distinctPollutants = GetOrderedDistinctPollutants(hourlyData);
                 var filteredHourly = GetFilteredHourlyPollutants(hourlyData);
@@ -45,14 +43,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        // L48: marked static; L51: OfType<string>() removes nulls, fixing List<string?> mismatch and null IndexOf arg
         private static List<string> GetOrderedDistinctPollutants(List<FinalData> data)
         {
             var customOrder = new List<string> { "PM2.5", "PM10", "Nitrogen dioxide", "Ozone", "Sulphur dioxide" };
             return data.Select(s => s.PollutantName).OfType<string>().Distinct().OrderBy(m => customOrder.IndexOf(m)).ToList();
         }
 
-        // L54: marked static
         private static List<dynamic> GetFilteredHourlyPollutants(List<FinalData> data)
         {
             return data.Where(p =>
@@ -63,7 +59,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 .ToList<dynamic>();
         }
 
-        // L64: marked static
         private static List<dynamic> GetHourlyExceedances(List<string> pollutants, List<dynamic> filtered)
         {
             return pollutants.Select(name => new
@@ -74,7 +69,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }).ToList<dynamic>();
         }
 
-        // L74: marked static
         private static List<dynamic> GetFilteredDailyPollutants(List<FinalData> data)
         {
             return data.Where(p =>
@@ -85,7 +79,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 .ToList<dynamic>();
         }
 
-        // L84: marked static
         private static List<dynamic> GetDailyExceedances(List<string> pollutants, List<dynamic> filtered)
         {
             return pollutants.Select(name => new
@@ -129,8 +122,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 .FirstOrDefault() ?? "Data has been verified";
         }
 
-        // L123: marked static; L129/L132: DateTimeKind.Local added; L137: nested ternary extracted;
-        // L143/L151: CultureInfo.InvariantCulture added; L151: null-forgiving operator for already-validated StartTime
         private static List<dynamic> GetDataCapturePercentages(List<FinalData> data, string year)
         {
             DateTime today = DateTime.Today;
@@ -139,7 +130,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
             DateTime startInclusive = new DateTime(yearToCheck, 1, 1, 0, 0, 0, DateTimeKind.Local);
 
-            // L137: extracted nested ternary into independent statements
             DateTime endExclusive;
             int daysInWindow;
             if (yearToCheck == currentYear)
@@ -173,7 +163,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return result;
         }
 
-        // L158: marked static
         private static List<dynamic> MergeExceedanceData(
             List<dynamic> hourly,
             List<dynamic> daily,
