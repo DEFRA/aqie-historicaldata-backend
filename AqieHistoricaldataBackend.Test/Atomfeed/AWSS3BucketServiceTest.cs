@@ -42,7 +42,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetEnvVars(AwsRegion, BucketName);
         }
 
-        private static void SetEnvVars(string region, string bucket)
+        private static void SetEnvVars(string region, string? bucket)
         {
             Environment.SetEnvironmentVariable("AWS_REGION", region);
             Environment.SetEnvironmentVariable("S3_BUCKET_NAME", bucket);
