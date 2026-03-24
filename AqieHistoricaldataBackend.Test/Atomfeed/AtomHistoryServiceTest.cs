@@ -517,5 +517,70 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.AtLeastOnce);
         }
+
+        // ─── GetAtomDataSelectionPresignedUrlMail ─────────────────────────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionPresignedUrlMail_ReturnsUrl_WhenSuccessful()
+        {
+            var data = new AtomModel.QueryStringData { jobId = "job-abc" };
+            _presignedUrlMailMock
+                .Setup(s => s.GetPresignedUrlMail("job-abc"))
+                .ReturnsAsync("https://s3.example.com/signed-url");
+
+            var service = CreateService();
+            var result = await service.GetAtomDataSelectionPresignedUrlMail(data);
+
+            Assert.Equal("https://s3.example.com/signed-url", result);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionPresignedUrlMail_ReturnsEmpty_WhenServiceReturnsNull()
+        {
+            var data = new AtomModel.QueryStringData { jobId = "job-abc" };
+            _presignedUrlMailMock
+                .Setup(s => s.GetPresignedUrlMail("job-abc"))
+                .ReturnsAsync((string?)null);
+
+            var service = CreateService();
+            var result = await service.GetAtomDataSelectionPresignedUrlMail(data);
+
+            Assert.Equal(string.Empty, result);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionPresignedUrlMail_ReturnsFailure_WhenExceptionThrown()
+        {
+            var data = new AtomModel.QueryStringData { jobId = "job-abc" };
+            _presignedUrlMailMock
+                .Setup(s => s.GetPresignedUrlMail(It.IsAny<string>()))
+                .ThrowsAsync(new Exception("fail"));
+
+            var service = CreateService();
+            var result = await service.GetAtomDataSelectionPresignedUrlMail(data);
+
+            Assert.Equal("Failure", result);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionPresignedUrlMail_LogsError_WhenExceptionThrown()
+        {
+            var data = new AtomModel.QueryStringData { jobId = "job-abc" };
+            _presignedUrlMailMock
+                .Setup(s => s.GetPresignedUrlMail(It.IsAny<string>()))
+                .ThrowsAsync(new Exception("fail"));
+
+            var service = CreateService();
+            await service.GetAtomDataSelectionPresignedUrlMail(data);
+
+            _loggerMock.Verify(
+                x => x.Log(
+                    LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((v, t) => true),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.AtLeastOnce);
+        }
     }
 }

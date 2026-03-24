@@ -31,6 +31,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             Environment.SetEnvironmentVariable("TIME_INTERVAL", null);
             _service.Dispose();
+            GC.SuppressFinalize(this);
         }
 
         // ----------------------------------------------------------------

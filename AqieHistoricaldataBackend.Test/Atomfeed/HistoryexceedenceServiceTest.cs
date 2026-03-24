@@ -109,14 +109,62 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         [Fact]
-        public void GetDataVerifiedTag_ReturnsCorrectTag()
+        public void GetDataCapturePercentages_HandlesCurrentYear()
         {
-            var data = new List<AtomModel.FinalData> {
-                new AtomModel.FinalData { StartTime = DateTime.Now.AddDays(-1).ToString(), Verification = "1" },
+            int currentYear = DateTime.Now.Year;
+            var hourlyData = new List<AtomModel.FinalData>
+            {
+                new AtomModel.FinalData
+                {
+                    PollutantName = "PM10",
+                    StartTime = new DateTime(currentYear, 1, 1).ToString("o"),
+                    Validity = "1"
+                }
+            };
+
+            var method = typeof(HistoryexceedenceService).GetMethod(
+                "GetDataCapturePercentages",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+            Assert.NotNull(method);
+            var result = method.Invoke(null, new object[] { hourlyData, currentYear.ToString() }) as List<dynamic>;
+
+            Assert.NotNull(result);
+        }
+
+        [Fact]
+        public void GetAnnualExceedances_ReturnsNullTotal_WhenAllTotalsAreZero()
+        {
+            var data = new List<AtomModel.FinalData>
+            {
+                new AtomModel.FinalData
+                {
+                    DailyPollutantName = "PM10",
+                    ReportDate = "2024-01-01",
+                    Total = 0
+                }
+            };
+
+            var method = typeof(HistoryexceedenceService).GetMethod(
+                "GetAnnualExceedances",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+            Assert.NotNull(method);
+            var result = method.Invoke(null, new object[] { data }) as List<AtomModel.FinalData>;
+
+            Assert.NotNull(result);
+            Assert.Null(result[0].Total);
+        }
+
+        [Fact]
+        public void GetDataVerifiedTag_ReturnsNotVerified_WhenFirstItemIsVerified()
+        {
+            // Verification == "2" at index 0 → "Data has not been verified"
+            var data = new List<AtomModel.FinalData>
+            {
                 new AtomModel.FinalData { StartTime = DateTime.Now.ToString(), Verification = "2" }
             };
 
-            // Methods are static — use BindingFlags.Static and pass null as the invocation target
             var method = typeof(HistoryexceedenceService).GetMethod(
                 "GetDataVerifiedTag",
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
@@ -124,7 +172,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Assert.NotNull(method);
             var result = method.Invoke(null, new object[] { data }) as string;
 
-            Assert.Contains("Data has been verified until", result);
+            Assert.Equal("Data has not been verified", result);
         }
     }
 }
