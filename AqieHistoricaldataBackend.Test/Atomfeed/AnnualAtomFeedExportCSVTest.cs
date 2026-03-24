@@ -8,43 +8,6 @@ using Moq;
 using Xunit;
 using AqieHistoricaldataBackend.Atomfeed.Services;
 
-// Mocked model classes
-namespace AqieHistoricaldataBackend.Atomfeed.Models
-{
-    public class FinalData
-    {
-        public string ReportDate { get; set; }
-        public string AnnualPollutantname { get; set; }
-        public double Total { get; set; }
-        public string AnnualVerification { get; set; }
-        public string DailyPollutantname { get; set; }
-        public string DailyVerification { get; set; }
-    }
-
-    public class pivotpollutant
-    {
-        public string date { get; set; }
-        public List<SubpollutantItem> Subpollutant { get; set; }
-    }
-
-    public class SubpollutantItem
-    {
-        public string pollutantname { get; set; }
-        public string pollutantvalue { get; set; }
-        public string verification { get; set; }
-    }
-
-    public class querystringdata
-    {
-        public string stationreaddate { get; set; }
-        public string sitename { get; set; }
-        public string siteType { get; set; }
-        public string region { get; set; }
-        public string latitude { get; set; }
-        public string longitude { get; set; }
-    }
-}
-
 namespace AqieHistoricaldataBackend.Tests
 {
     using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
@@ -60,7 +23,7 @@ namespace AqieHistoricaldataBackend.Tests
             _service = new AnnualAtomFeedExportCsv(_mockLogger.Object);
         }
 
-        private QueryStringData GetSampleQueryData() => new()
+        private static QueryStringData GetSampleQueryData() => new()
         {
             StationReadDate = "2024-01-01",
             SiteName = "Test Site",
@@ -161,29 +124,28 @@ namespace AqieHistoricaldataBackend.Tests
 
             Assert.Equal(new byte[] { 0x20 }, result);
             _mockLogger.Verify(
-                                 x => x.Log(
-                                 LogLevel.Error,
-                                 It.IsAny<EventId>(),
-                                 It.Is<It.IsAnyType>((v, t) => true),
-                                 It.IsAny<Exception>(),
-                                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                                 Times.AtLeastOnce);
+                x => x.Log(
+                    LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((v, t) => true),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.AtLeastOnce);
         }
 
         [Fact]
         public async Task ExportCsv_WithNullFieldsInFinalData_HandlesGracefully()
         {
             var finalList = new List<FinalData>
-        {
-            new FinalData { ReportDate = "2023", AnnualPollutantName = "PM10", Total = 0, AnnualVerification = null }
-        };
+            {
+                new FinalData { ReportDate = "2023", AnnualPollutantName = "PM10", Total = 0, AnnualVerification = null }
+            };
 
             var result = await _service.annualatomfeedexport_csv(finalList, GetSampleQueryData());
             var csv = Encoding.UTF8.GetString(result);
             Assert.Contains("no data", csv);
             Assert.Contains("others", csv);
         }
-
 
         [Fact]
         public async Task ExportCsv_WithNullQueryFields_StillGeneratesCsv()
@@ -269,6 +231,5 @@ namespace AqieHistoricaldataBackend.Tests
                 Assert.Contains($"Pollutant{i}", csv);
             }
         }
-
     }
 }

@@ -9,8 +9,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 var groupedData = GroupDataByDate(Final_list);
+                // L21/L22: use OfType<string>() to filter nulls and produce List<string> (non-nullable)
                 var distinctPollutants = Final_list
                     .Select(s => s.DailyPollutantName)
+                    .OfType<string>()
                     .Distinct()
                     .OrderBy(m => m)
                     .ToList();
@@ -25,12 +27,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError(ex,"Daily download csv Info message");
+                logger.LogError(ex, "Daily download csv Info message");
                 return new byte[] { 0x20 };
             }
         }
 
-        private List<PivotPollutant> GroupDataByDate(List<FinalData> finalList)
+        // L33: mark as static — no instance data accessed
+        private static List<PivotPollutant> GroupDataByDate(List<FinalData> finalList)
         {
             return finalList
                 .GroupBy(x => Convert.ToDateTime(x.ReportDate).Date)
@@ -52,7 +55,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }).ToList();
         }
 
-        private void WriteMetadata(StreamWriter writer, QueryStringData data)
+        // L55: mark as static — no instance data accessed
+        private static void WriteMetadata(StreamWriter writer, QueryStringData data)
         {
             string stationDate = Convert.ToDateTime(data.StationReadDate).ToString();
             writer.WriteLine($"Daily data from Defra on {stationDate}");
@@ -64,7 +68,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             writer.WriteLine("Notes:,[1] All Data GMT hour ending;  [2] Some shorthand is used V = Verified P = Provisionally Verified N = Not Verified S = Suspect [3] Unit of measurement (for pollutants) = ugm-3");
         }
 
-        private void WriteHeaders(StreamWriter writer, List<string> distinctPollutants)
+        // L67: mark as static — no instance data accessed
+        private static void WriteHeaders(StreamWriter writer, List<string> distinctPollutants)
         {
             writer.Write("Date");
             foreach (var pollutant in distinctPollutants)
@@ -80,14 +85,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             writer.WriteLine();
         }
 
-        private void WriteData(StreamWriter writer, List<PivotPollutant> groupedData, List<string> distinctPollutants)
+        // L83: mark as static — no instance data accessed
+        private static void WriteData(StreamWriter writer, List<PivotPollutant> groupedData, List<string> distinctPollutants)
         {
             foreach (var item in groupedData)
             {
                 writer.Write(item.Date);
                 foreach (var pollutant in distinctPollutants)
                 {
-                    var sub = item.SubPollutant.FirstOrDefault(s => s.PollutantName == pollutant);
+                    // L90: item.SubPollutant may be null — use ?. to avoid possible null dereference
+                    var sub = item.SubPollutant?.FirstOrDefault(s => s.PollutantName == pollutant);
                     writer.Write($",{sub?.PollutantValue ?? ""},{sub?.Verification ?? ""}");
                 }
                 writer.WriteLine();

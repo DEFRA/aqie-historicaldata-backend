@@ -17,7 +17,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
 
 
-        private List<PollutantDetails> GetPollutantsToDisplay(string filter)
+        private static List<PollutantDetails> GetPollutantsToDisplay(string filter)
         {
             var allPollutants = new List<PollutantDetails>
             {
@@ -67,7 +67,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var xml = new XmlDocument();
                 xml.Load(stream);
                 var json = Newtonsoft.Json.JsonConvert.SerializeXmlNode(xml);
-                return JObject.Parse(json)["gml:FeatureCollection"]["gml:featureMember"] as JArray ?? new JArray();
+                return JObject.Parse(json)["gml:FeatureCollection"]?["gml:featureMember"] as JArray ?? new JArray();
             }
             catch (HttpRequestException ex)
             {
@@ -91,7 +91,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     var feature = features[i];
                     var href = feature["om:OM_Observation"]?["om:observedProperty"]?["@xlink:href"]?.ToString();
-                    string cleanedUrl = href?.Replace("http://", "");
+                    string? cleanedUrl = href?.Replace("http://", "");
                     if (string.IsNullOrEmpty(href)) continue;
 
                     var match = pollutants.FirstOrDefault(p => p.PollutantMasterUrl == cleanedUrl);
@@ -113,7 +113,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return finalList;
         }
 
-        private List<FinalData> ExtractFinalData(string values, string pollutantName)
+        private static List<FinalData> ExtractFinalData(string values, string pollutantName)
         {
             return values.Replace("\r\n", "").Trim().Split("@@")
                 .Select(item => item.Split(','))

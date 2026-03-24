@@ -169,7 +169,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             .Any(tp => p.Name.Contains(tp, StringComparison.OrdinalIgnoreCase)))
                         .ToList()
                 })
-                .Where(site => site.Pollutants?.Any() == true)
+                .Where(site => site.Pollutants?.Count > 0)
                 .GroupBy(site => site.LocalSiteId)
                 .Select(g => g.First())
                 .ToList();

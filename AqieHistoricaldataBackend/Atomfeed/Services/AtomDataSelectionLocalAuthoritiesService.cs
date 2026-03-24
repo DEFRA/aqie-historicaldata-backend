@@ -93,8 +93,10 @@ IHttpClientFactory httpClientFactory) : IAtomDataSelectionLocalAuthoritiesServic
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error in GetAtomDataSelectionStationBoundryService");
-                throw;
+                // Log the error and return an empty list rather than both logging and rethrowing,
+                // which would cause the exception to be logged twice up the call stack.
+                Logger.LogError(ex, "Error in GetAtomDataSelectionLocalAuthoritiesService");
+                return new List<LocalAuthorityData>();
             }
         }
     }

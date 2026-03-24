@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -32,12 +31,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var query = new QueryStringData { SiteId = "site1", Year = "2024" };
             var hourlyData = new List<AtomModel.FinalData> {
-            new AtomModel.FinalData { PollutantName = "Nitrogen dioxide", Value = "201", StartTime = DateTime.Now.ToString(), Verification = "2", Validity = "1" },
-            new AtomModel.FinalData { PollutantName = "Sulphur dioxide", Value = "351", StartTime = DateTime.Now.ToString(), Verification = "1", Validity = "1" }
-        };
+                new AtomModel.FinalData { PollutantName = "Nitrogen dioxide", Value = "201", StartTime = DateTime.Now.ToString(), Verification = "2", Validity = "1" },
+                new AtomModel.FinalData { PollutantName = "Sulphur dioxide", Value = "351", StartTime = DateTime.Now.ToString(), Verification = "1", Validity = "1" }
+            };
             var dailyData = new List<AtomModel.FinalData> {
-            new AtomModel.FinalData { DailyPollutantName = "PM10", Total = 51, ReportDate = DateTime.Now.ToString() }
-        };
+                new AtomModel.FinalData { DailyPollutantName = "PM10", Total = 51, ReportDate = DateTime.Now.ToString() }
+            };
 
             _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch("site1", "2024", "All")).ReturnsAsync(hourlyData);
             _dailyServiceMock.Setup(s => s.GetAtomDailydatafetch(hourlyData, query)).ReturnsAsync(dailyData);
@@ -66,8 +65,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var query = new QueryStringData { SiteId = "site1", Year = "2024" };
             var hourlyData = new List<AtomModel.FinalData> {
-            new AtomModel.FinalData { PollutantName = "Nitrogen dioxide", Value = "invalid", StartTime = DateTime.Now.ToString(), Verification = "2", Validity = "1" }
-        };
+                new AtomModel.FinalData { PollutantName = "Nitrogen dioxide", Value = "invalid", StartTime = DateTime.Now.ToString(), Verification = "2", Validity = "1" }
+            };
 
             _hourlyServiceMock.Setup(s => s.GetAtomHourlydatafetch(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
                 .ReturnsAsync(hourlyData);
@@ -95,11 +94,16 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public void GetDataCapturePercentages_HandlesLeapYear()
         {
             var hourlyData = new List<AtomModel.FinalData> {
-            new AtomModel.FinalData { PollutantName = "PM10", StartTime = new DateTime(2020, 1, 1).ToString(), Validity = "1" }
-        };
+                new AtomModel.FinalData { PollutantName = "PM10", StartTime = new DateTime(2020, 1, 1).ToString(), Validity = "1" }
+            };
 
-            var method = typeof(HistoryexceedenceService).GetMethod("GetDataCapturePercentages", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var result = method.Invoke(_service, new object[] { hourlyData, "2020" }) as List<dynamic>;
+            // Methods are static — use BindingFlags.Static and pass null as the invocation target
+            var method = typeof(HistoryexceedenceService).GetMethod(
+                "GetDataCapturePercentages",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+            Assert.NotNull(method); // guard: method must exist before invoking
+            var result = method.Invoke(null, new object[] { hourlyData, "2020" }) as List<dynamic>;
 
             Assert.NotNull(result);
         }
@@ -108,12 +112,17 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public void GetDataVerifiedTag_ReturnsCorrectTag()
         {
             var data = new List<AtomModel.FinalData> {
-            new AtomModel.FinalData { StartTime = DateTime.Now.AddDays(-1).ToString(), Verification = "1" },
-            new AtomModel.FinalData { StartTime = DateTime.Now.ToString(), Verification = "2" }
-        };
+                new AtomModel.FinalData { StartTime = DateTime.Now.AddDays(-1).ToString(), Verification = "1" },
+                new AtomModel.FinalData { StartTime = DateTime.Now.ToString(), Verification = "2" }
+            };
 
-            var method = typeof(HistoryexceedenceService).GetMethod("GetDataVerifiedTag", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var result = method.Invoke(_service, new object[] { data }) as string;
+            // Methods are static — use BindingFlags.Static and pass null as the invocation target
+            var method = typeof(HistoryexceedenceService).GetMethod(
+                "GetDataVerifiedTag",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+            Assert.NotNull(method);
+            var result = method.Invoke(null, new object[] { data }) as string;
 
             Assert.Contains("Data has been verified until", result);
         }

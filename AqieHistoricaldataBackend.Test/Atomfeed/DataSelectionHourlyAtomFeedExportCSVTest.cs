@@ -224,7 +224,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [InlineData("9", "others")]
         [InlineData("", "others")]
         [InlineData(null, "others")]
-        public async Task ExportCsv_MapsVerificationToCorrectStatus(string verification, string expectedStatus)
+        public async Task ExportCsv_MapsVerificationToCorrectStatus(string? verification, string expectedStatus)
         {
             var finalList = BuildFinalList(
                 new FinalData

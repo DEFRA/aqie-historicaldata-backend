@@ -362,28 +362,29 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         // ──────────────────────────────────────────────────────────────────────
 
         [Fact]
-        public async Task GetAtomDataSelectionLocalAuthoritiesService_HttpClientFactoryThrows_LogsErrorAndRethrows()
+        public async Task GetAtomDataSelectionLocalAuthoritiesService_HttpClientFactoryThrows_LogsErrorAndReturnsEmpty()
         {
             _httpClientFactoryMock
                 .Setup(f => f.CreateClient("laqmAPI"))
                 .Throws(new HttpRequestException("Connection refused"));
 
-            await Assert.ThrowsAsync<HttpRequestException>(() =>
-                CreateService().GetAtomDataSelectionLocalAuthoritiesService("1"));
+            var result = await CreateService().GetAtomDataSelectionLocalAuthoritiesService("1");
+
+            Assert.Empty(result);
 
             _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Error,
                     It.IsAny<EventId>(),
                     It.Is<It.IsAnyType>((v, _) =>
-                        v.ToString()!.Contains("Error in GetAtomDataSelectionStationBoundryService")),
+                        v.ToString()!.Contains("Error in GetAtomDataSelectionLocalAuthoritiesService")),
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);
         }
 
         [Fact]
-        public async Task GetAtomDataSelectionLocalAuthoritiesService_GetLocalAuthoritiesHttpCallThrows_LogsAndRethrows()
+        public async Task GetAtomDataSelectionLocalAuthoritiesService_GetLocalAuthoritiesHttpCallThrows_LogsAndReturnsEmpty()
         {
             var handlerMock = new Mock<HttpMessageHandler>();
             handlerMock.Protected()
@@ -396,22 +397,23 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var client = new HttpClient(handlerMock.Object) { BaseAddress = new Uri("https://www.laqmportal.co.uk/") };
             _httpClientFactoryMock.Setup(f => f.CreateClient("laqmAPI")).Returns(client);
 
-            await Assert.ThrowsAsync<HttpRequestException>(() =>
-                CreateService().GetAtomDataSelectionLocalAuthoritiesService("1"));
+            var result = await CreateService().GetAtomDataSelectionLocalAuthoritiesService("1");
+
+            Assert.Empty(result);
 
             _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Error,
                     It.IsAny<EventId>(),
                     It.Is<It.IsAnyType>((v, _) =>
-                        v.ToString()!.Contains("Error in GetAtomDataSelectionStationBoundryService")),
+                        v.ToString()!.Contains("Error in GetAtomDataSelectionLocalAuthoritiesService")),
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);
         }
 
         [Fact]
-        public async Task GetAtomDataSelectionLocalAuthoritiesService_GetSingleDtHttpCallThrows_LogsAndRethrows()
+        public async Task GetAtomDataSelectionLocalAuthoritiesService_GetSingleDtHttpCallThrows_LogsAndReturnsEmpty()
         {
             // getLocalAuthorities succeeds; getSingleDTDataByYear throws
             var handlerMock = new Mock<HttpMessageHandler>();
@@ -438,15 +440,16 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var client = new HttpClient(handlerMock.Object) { BaseAddress = new Uri("https://www.laqmportal.co.uk/") };
             _httpClientFactoryMock.Setup(f => f.CreateClient("laqmAPI")).Returns(client);
 
-            await Assert.ThrowsAsync<HttpRequestException>(() =>
-                CreateService().GetAtomDataSelectionLocalAuthoritiesService("1"));
+            var result = await CreateService().GetAtomDataSelectionLocalAuthoritiesService("1");
+
+            Assert.Empty(result);
 
             _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Error,
                     It.IsAny<EventId>(),
                     It.Is<It.IsAnyType>((v, _) =>
-                        v.ToString()!.Contains("Error in GetAtomDataSelectionStationBoundryService")),
+                        v.ToString()!.Contains("Error in GetAtomDataSelectionLocalAuthoritiesService")),
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);

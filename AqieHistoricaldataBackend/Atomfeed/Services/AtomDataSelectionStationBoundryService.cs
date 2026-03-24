@@ -51,7 +51,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         private static readonly ConcurrentDictionary<string, Lazy<Boundary>> CountryBoundariesLazy =
             new(StringComparer.OrdinalIgnoreCase);
 
-        private static readonly IReadOnlyDictionary<string, string> GeoJsonPaths =
+        // L54: use Dictionary<string, string> directly — IReadOnlyDictionary adds a vtable indirection on every lookup
+        private static readonly Dictionary<string, string> GeoJsonPaths =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["England"] = "GeoBoundaries/england.geojson",
