@@ -89,7 +89,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }).ToList<dynamic>();
         }
 
-        // L94: marked static; L108: Count > 0 instead of Any()
         private static List<FinalData> GetAnnualExceedances(List<FinalData> data)
         {
             return data.GroupBy(x => new
@@ -111,7 +110,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }).ToList();
         }
 
-        // L113: marked static
         private static string GetDataVerifiedTag(List<FinalData> data)
         {
             return data.Select((pollutant, index) => new { Pollutant = pollutant, Index = index })

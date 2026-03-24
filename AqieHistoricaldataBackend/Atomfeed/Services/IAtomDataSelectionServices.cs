@@ -1,7 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public interface IAtomDataSelectionServices
     {
+        [ExcludeFromCodeCoverage]
         IAtomDataSelectionStationBoundryService StationBoundry { get; }
         IAtomDataSelectionLocalAuthoritiesService LocalAuthorities { get; }
         IAtomDataSelectionHourlyFetchService HourlyFetch { get; }
@@ -9,6 +12,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
     public class AtomDataSelectionServices : IAtomDataSelectionServices
     {
+        [ExcludeFromCodeCoverage]
         public IAtomDataSelectionStationBoundryService StationBoundry { get; }
         public IAtomDataSelectionLocalAuthoritiesService LocalAuthorities { get; }
         public IAtomDataSelectionHourlyFetchService HourlyFetch { get; }
