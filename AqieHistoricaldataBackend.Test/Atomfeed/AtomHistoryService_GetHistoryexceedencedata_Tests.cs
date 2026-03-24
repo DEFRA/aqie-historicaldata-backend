@@ -77,12 +77,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             _exceedenceServiceMock
                 .Setup(s => s.GetHistoryexceedencedata(data))
-                .ReturnsAsync((object)expected); // For anonymous types or objects
+                .ReturnsAsync((object)expected);
 
             var service = CreateService();
-            dynamic result = await service.GetHistoryexceedencedata(data);
+            dynamic? result = await service.GetHistoryexceedencedata(data);  
 
-            Assert.Equal(expected, (object)result);
+            Assert.Equal(expected, (object?)result);  
         }
 
         [Fact]
@@ -92,12 +92,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             _exceedenceServiceMock
                 .Setup(s => s.GetHistoryexceedencedata(data))
-                .ReturnsAsync((object)"some-string-result"); // For string results
+                .ReturnsAsync((object)"some-string-result");
 
             var service = CreateService();
             var result = await service.GetHistoryexceedencedata(data);
 
-            Assert.Equal("some-string-result", (string)result);
+            Assert.Equal("some-string-result", (string?)result);  
         }
 
         [Fact]
@@ -107,7 +107,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             _exceedenceServiceMock
                 .Setup(s => s.GetHistoryexceedencedata(data))
-                .ReturnsAsync((object?)null); // For null results
+                .ReturnsAsync((object?)null);
 
             var service = CreateService();
             var result = await service.GetHistoryexceedencedata(data);
@@ -127,12 +127,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             _exceedenceServiceMock
                 .Setup(s => s.GetHistoryexceedencedata(data))
-                .ReturnsAsync((object)expected); // For lists or other objects
+                .ReturnsAsync((object)expected);
 
             var service = CreateService();
-            dynamic result = await service.GetHistoryexceedencedata(data);
+            dynamic? result = await service.GetHistoryexceedencedata(data);  
 
-            Assert.Equal(2, ((System.Collections.Generic.List<dynamic>)result).Count);
+            Assert.NotNull(result);  
+            Assert.Equal(2, ((System.Collections.Generic.List<dynamic>)result!).Count);  
         }
 
         // ── Passes through the exact QueryStringData instance ─────────────────
@@ -166,7 +167,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateService();
             var result = await service.GetHistoryexceedencedata(data);
 
-            Assert.Equal("Failure", (string)result);
+            Assert.Equal("Failure", (string?)result);  
         }
 
         [Fact]
@@ -181,7 +182,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateService();
             var result = await service.GetHistoryexceedencedata(data);
 
-            Assert.Equal("Failure", (string)result);
+            Assert.Equal("Failure", (string?)result);  
         }
 
         [Fact]
@@ -196,7 +197,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateService();
             var result = await service.GetHistoryexceedencedata(data);
 
-            Assert.Equal("Failure", (string)result);
+            Assert.Equal("Failure", (string?)result);  
         }
 
         [Fact]
@@ -211,7 +212,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateService();
             var result = await service.GetHistoryexceedencedata(data);
 
-            Assert.Equal("Failure", (string)result);
+            Assert.Equal("Failure", (string?)result);  
         }
 
         // ── Exception branch: logger is called with both Message and StackTrace ─
@@ -228,7 +229,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateService();
             await service.GetHistoryexceedencedata(data);
 
-            // Verify an Error log occurred and the exception message contains the expected text.
             _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Error,
@@ -251,8 +251,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateService();
             await service.GetHistoryexceedencedata(data);
 
-            // Service currently logs a single Error with exception details;
-            // assert that an Error-level log was written exactly once.
             _loggerMock.Verify(
                 x => x.Log(
                     LogLevel.Error,
@@ -299,13 +297,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateService();
             var result = await service.GetHistoryexceedencedata(data);
 
-            Assert.Equal("empty-site", (string)result);
+            Assert.Equal("empty-site", (string?)result);  
         }
 
         [Fact]
         public async Task GetHistoryexceedencedata_HandlesNullProperties_WhenSuccessful()
         {
-            var data = new QueryStringData(); // all properties null
+            var data = new QueryStringData(); 
 
             _exceedenceServiceMock
                 .Setup(s => s.GetHistoryexceedencedata(data))
@@ -314,7 +312,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateService();
             var result = await service.GetHistoryexceedencedata(data);
 
-            Assert.Equal("null-props", (string)result);
+            Assert.Equal("null-props", (string?)result);  
         }
     }
 }

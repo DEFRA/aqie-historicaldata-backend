@@ -18,7 +18,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             _service = new DailyAtomFeedExportCsv(_mockLogger.Object);
         }
 
-        private QueryStringData GetSampleQueryData() => new()
+        private static QueryStringData GetSampleQueryData() => new()
         {
             StationReadDate = DateTime.UtcNow.ToString(),
             SiteName = "Test Site",
@@ -94,7 +94,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var faultyService = new DailyAtomFeedExportCsv(_mockLogger.Object);
 
-            var result = faultyService.dailyatomfeedexport_csv(null, null);
+            var result = faultyService.dailyatomfeedexport_csv(null!, null!);
 
             Assert.Equal(new byte[] { 0x20 }, result);
             _mockLogger.Verify(

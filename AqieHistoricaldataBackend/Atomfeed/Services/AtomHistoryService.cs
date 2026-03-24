@@ -196,7 +196,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                var presignedUrlresult = await AtomDataSelectionPresignedUrlMail.GetPresignedUrlMail(data.jobId);
+                var presignedUrlresult = await AtomDataSelectionPresignedUrlMail.GetPresignedUrlMail(data.jobId ?? string.Empty);
                 return presignedUrlresult ?? string.Empty;
             }
             catch (Exception ex)

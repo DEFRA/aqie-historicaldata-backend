@@ -770,11 +770,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             return (List<FinalData>)method.Invoke(_service, new object?[] { features, pollutants, site })!;
         }
 
-        private List<FinalData> InvokeExtractFinalData(string values, string pollutantName, SiteInfo site)
+        private static List<FinalData> InvokeExtractFinalData(string values, string pollutantName, SiteInfo site)
         {
             var method = typeof(AtomDataSelectionHourlyFetchService)
-                .GetMethod("ExtractFinalData", BindingFlags.NonPublic | BindingFlags.Instance)!;
-            return (List<FinalData>)method.Invoke(_service, new object[] { values, pollutantName, site })!;
+                .GetMethod("ExtractFinalData", BindingFlags.NonPublic | BindingFlags.Static)
+                ?? throw new InvalidOperationException("Could not find ExtractFinalData via reflection.");
+            return (List<FinalData>)method.Invoke(null, new object[] { values, pollutantName, site })!;
         }
 
         // ─── XML / JObject builders ──────────────────────────────────────────────────

@@ -130,9 +130,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var filtered = allPollutants
                 .Where(p => filterList.Contains(p.PollutantName, StringComparer.OrdinalIgnoreCase))
                 .ToList();
-            // Return filtered list if any match, otherwise return all
-            return filtered.Any() ? filtered : allPollutants;
+            return filtered.Count > 0 ? filtered : allPollutants;
         }
+
         private List<FinalData> ProcessAtomData(JArray features, List<PollutantDetails> pollutants, SiteInfo siteinfo)
         {
             var finalList = new List<FinalData>();
@@ -144,7 +144,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     var feature = features[i];
                     var href = feature["om:OM_Observation"]?["om:observedProperty"]?["@xlink:href"]?.ToString();
-                    string cleanedUrl = href?.Replace("http://", "");
+                    string? cleanedUrl = href?.Replace("http://", "");
                     if (string.IsNullOrEmpty(href)) continue;
                     var match = pollutants.FirstOrDefault(p => p.PollutantMasterUrl == cleanedUrl);
                     if (match != null)
@@ -158,12 +158,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex,"Error processing ProcessAtomData feature member");
+                    Logger.LogError(ex, "Error processing ProcessAtomData feature member");
                 }
             }
             return finalList;
         }
-        private List<FinalData> ExtractFinalData(string values, string pollutantName, SiteInfo siteinfo)
+        private static List<FinalData> ExtractFinalData(string values, string pollutantName, SiteInfo siteinfo)
         {
             return values.Replace("\r\n", "").Trim().Split("@@")
                 .Select(item => item.Split(','))

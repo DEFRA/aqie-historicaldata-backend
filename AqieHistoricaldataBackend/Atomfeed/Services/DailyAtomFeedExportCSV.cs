@@ -11,6 +11,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var groupedData = GroupDataByDate(Final_list);
                 var distinctPollutants = Final_list
                     .Select(s => s.DailyPollutantName)
+                    .OfType<string>()
                     .Distinct()
                     .OrderBy(m => m)
                     .ToList();
@@ -25,12 +26,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                logger.LogError(ex,"Daily download csv Info message");
+                logger.LogError(ex, "Daily download csv Info message");
                 return new byte[] { 0x20 };
             }
         }
 
-        private List<PivotPollutant> GroupDataByDate(List<FinalData> finalList)
+        private static List<PivotPollutant> GroupDataByDate(List<FinalData> finalList)
         {
             return finalList
                 .GroupBy(x => Convert.ToDateTime(x.ReportDate).Date)
@@ -52,7 +53,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }).ToList();
         }
 
-        private void WriteMetadata(StreamWriter writer, QueryStringData data)
+        private static void WriteMetadata(StreamWriter writer, QueryStringData data)
         {
             string stationDate = Convert.ToDateTime(data.StationReadDate).ToString();
             writer.WriteLine($"Daily data from Defra on {stationDate}");
@@ -64,7 +65,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             writer.WriteLine("Notes:,[1] All Data GMT hour ending;  [2] Some shorthand is used V = Verified P = Provisionally Verified N = Not Verified S = Suspect [3] Unit of measurement (for pollutants) = ugm-3");
         }
 
-        private void WriteHeaders(StreamWriter writer, List<string> distinctPollutants)
+        private static void WriteHeaders(StreamWriter writer, List<string> distinctPollutants)
         {
             writer.Write("Date");
             foreach (var pollutant in distinctPollutants)
@@ -80,14 +81,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             writer.WriteLine();
         }
 
-        private void WriteData(StreamWriter writer, List<PivotPollutant> groupedData, List<string> distinctPollutants)
+        private static void WriteData(StreamWriter writer, List<PivotPollutant> groupedData, List<string> distinctPollutants)
         {
             foreach (var item in groupedData)
             {
                 writer.Write(item.Date);
                 foreach (var pollutant in distinctPollutants)
                 {
-                    var sub = item.SubPollutant.FirstOrDefault(s => s.PollutantName == pollutant);
+                    var sub = item.SubPollutant?.FirstOrDefault(s => s.PollutantName == pollutant);
                     writer.Write($",{sub?.PollutantValue ?? ""},{sub?.Verification ?? ""}");
                 }
                 writer.WriteLine();

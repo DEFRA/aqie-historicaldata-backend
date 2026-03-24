@@ -55,8 +55,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 x => x.Log(
                     LogLevel.Error,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("AmazonS3Exception Error:S3 error")),
-                    It.IsAny<Exception>(),   
+                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("AmazonS3Exception Error:S3 error")),
+                    It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);
         }
@@ -78,18 +78,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 x => x.Log(
                     LogLevel.Error,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Error in GeneratePreSignedURL Info message Generic error")),
-                    It.IsAny<Exception>(),  
+                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Error in GeneratePreSignedURL Info message Generic error")),
+                    It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);
             _mockLogger.Verify(
                 x => x.Log(
                     LogLevel.Error,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Error in GeneratePreSignedURL")),
-                    It.IsAny<Exception>(),   
+                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Error in GeneratePreSignedURL")),
+                    It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                Times.Once); 
+                Times.Once);
         }
 
         [Fact]

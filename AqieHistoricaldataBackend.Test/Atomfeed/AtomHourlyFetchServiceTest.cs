@@ -556,33 +556,36 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
         #region Helpers
 
-        private List<PollutantDetails> InvokeGetPollutantsToDisplay(string filter)
+        private List<PollutantDetails> InvokeGetPollutantsToDisplay(string? filter)
         {
-            return _service.GetType()
-                .GetMethod("GetPollutantsToDisplay", BindingFlags.NonPublic | BindingFlags.Instance)
-                .Invoke(_service, new object[] { filter }) as List<PollutantDetails>;
+            var method = _service.GetType()
+                .GetMethod("GetPollutantsToDisplay", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(method);
+            return method.Invoke(null, new object?[] { filter }) as List<PollutantDetails> ?? [];
         }
 
         private async Task<JArray> InvokeFetchAtomFeedAsync(string siteId, string year)
         {
             var method = _service.GetType()
                 .GetMethod("FetchAtomFeedAsync", BindingFlags.NonPublic | BindingFlags.Instance);
-
-            return await (Task<JArray>)method.Invoke(_service, new object[] { siteId, year });
+            Assert.NotNull(method);
+            return await (Task<JArray>)method.Invoke(_service, new object[] { siteId, year })!;
         }
 
         private List<FinalData> InvokeExtractFinalData(string values, string pollutantName)
         {
-            return _service.GetType()
-                .GetMethod("ExtractFinalData", BindingFlags.NonPublic | BindingFlags.Instance)
-                .Invoke(_service, new object[] { values, pollutantName }) as List<FinalData>;
+            var method = _service.GetType()
+                .GetMethod("ExtractFinalData", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(method);
+            return method.Invoke(null, new object[] { values, pollutantName }) as List<FinalData> ?? [];
         }
 
         private List<FinalData> InvokeProcessAtomData(JArray features, List<PollutantDetails> pollutants)
         {
-            return _service.GetType()
-                .GetMethod("ProcessAtomData", BindingFlags.NonPublic | BindingFlags.Instance)
-                .Invoke(_service, new object[] { features, pollutants }) as List<FinalData>;
+            var method = _service.GetType()
+                .GetMethod("ProcessAtomData", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(method);
+            return method.Invoke(_service, new object[] { features, pollutants }) as List<FinalData> ?? [];
         }
 
         private void SetupHttpClient(HttpResponseMessage response)
@@ -668,9 +671,9 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 x => x.Log(
                     level,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, _) => v.ToString().Contains(containsMessage)),
-                    It.IsAny<Exception>(),
-                    It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+                    It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains(containsMessage)),
+                    It.IsAny<Exception?>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 times);
         }
     }

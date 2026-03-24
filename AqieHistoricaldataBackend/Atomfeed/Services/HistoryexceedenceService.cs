@@ -1,6 +1,5 @@
-using Elastic.CommonSchema;
+using System.Globalization;
 using Serilog;
-using System.Collections.Generic;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
@@ -12,22 +11,22 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                string siteId = data.SiteId;
-                string year = data.Year;
+                string siteId = data.SiteId ?? string.Empty;
+                string year = data.Year ?? string.Empty;
                 string downloadfilter = "All";
 
                 var hourlyData = await AtomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
                 var distinctPollutants = GetOrderedDistinctPollutants(hourlyData);
                 var filteredHourly = GetFilteredHourlyPollutants(hourlyData);
                 var hourlyExceedances = GetHourlyExceedances(distinctPollutants, filteredHourly);
-                
+
                 var dailyData = await AtomDailyFetchService.GetAtomDailydatafetch(hourlyData, data);
                 var filteredDaily = GetFilteredDailyPollutants(dailyData);
                 var dailyExceedances = GetDailyExceedances(distinctPollutants, filteredDaily);
                 var annualExceedances = GetAnnualExceedances(dailyData);
                 var dataVerifiedTag = GetDataVerifiedTag(hourlyData);
                 var dataCapturePercentages = GetDataCapturePercentages(hourlyData, year);
-              
+
                 var mergedExceedances = MergeExceedanceData(
                     hourlyExceedances,
                     dailyExceedances,
@@ -36,22 +35,21 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     dataVerifiedTag);
 
                 return mergedExceedances;
-
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex,"Error in Atom Historyexceedencedata");
+                Logger.LogError(ex, "Error in Atom Historyexceedencedata");
                 return "Failure";
             }
         }
 
-        private List<string> GetOrderedDistinctPollutants(List<FinalData> data)
+        private static List<string> GetOrderedDistinctPollutants(List<FinalData> data)
         {
             var customOrder = new List<string> { "PM2.5", "PM10", "Nitrogen dioxide", "Ozone", "Sulphur dioxide" };
-            return data.Select(s => s.PollutantName).Distinct().OrderBy(m => customOrder.IndexOf(m)).ToList();
+            return data.Select(s => s.PollutantName).OfType<string>().Distinct().OrderBy(m => customOrder.IndexOf(m)).ToList();
         }
 
-        private List<dynamic> GetFilteredHourlyPollutants(List<FinalData> data)
+        private static List<dynamic> GetFilteredHourlyPollutants(List<FinalData> data)
         {
             return data.Where(p =>
                     (p.PollutantName == "Nitrogen dioxide" && Convert.ToDouble(p.Value) > 200.5) ||
@@ -61,7 +59,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 .ToList<dynamic>();
         }
 
-        private List<dynamic> GetHourlyExceedances(List<string> pollutants, List<dynamic> filtered)
+        private static List<dynamic> GetHourlyExceedances(List<string> pollutants, List<dynamic> filtered)
         {
             return pollutants.Select(name => new
             {
@@ -71,7 +69,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }).ToList<dynamic>();
         }
 
-        private List<dynamic> GetFilteredDailyPollutants(List<FinalData> data)
+        private static List<dynamic> GetFilteredDailyPollutants(List<FinalData> data)
         {
             return data.Where(p =>
                     (p.DailyPollutantName == "PM10" && Convert.ToDouble(p.Total) > 50.5) ||
@@ -81,7 +79,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 .ToList<dynamic>();
         }
 
-        private List<dynamic> GetDailyExceedances(List<string> pollutants, List<dynamic> filtered)
+        private static List<dynamic> GetDailyExceedances(List<string> pollutants, List<dynamic> filtered)
         {
             return pollutants.Select(name => new
             {
@@ -91,7 +89,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }).ToList<dynamic>();
         }
 
-        private List<FinalData> GetAnnualExceedances(List<FinalData> data)
+        // L94: marked static; L108: Count > 0 instead of Any()
+        private static List<FinalData> GetAnnualExceedances(List<FinalData> data)
         {
             return data.GroupBy(x => new
             {
@@ -105,12 +104,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     ReportDate = x.Key.ReportDate,
                     AnnualPollutantName = x.Key.DailyPollutantName,
-                    Total = validTotals.Any() ? Math.Round(validTotals.Average(y => Convert.ToDecimal(y.Total))) : '-'
+                    Total = validTotals.Count > 0
+                        ? Math.Round(validTotals.Average(y => Convert.ToDecimal(y.Total)))
+                        : (decimal?)null
                 };
             }).ToList();
         }
 
-        private string GetDataVerifiedTag(List<FinalData> data)
+        // L113: marked static
+        private static string GetDataVerifiedTag(List<FinalData> data)
         {
             return data.Select((pollutant, index) => new { Pollutant = pollutant, Index = index })
                 .Where(x => x.Pollutant.Verification == "2")
@@ -120,42 +122,48 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 .FirstOrDefault() ?? "Data has been verified";
         }
 
-        private List<dynamic> GetDataCapturePercentages(List<FinalData> data, string year)
+        private static List<dynamic> GetDataCapturePercentages(List<FinalData> data, string year)
         {
             DateTime today = DateTime.Today;
             int currentYear = DateTime.Now.Year;
             int yearToCheck = Convert.ToInt32(year);
 
-            DateTime startInclusive = new DateTime(yearToCheck, 1, 1);
-            DateTime endExclusive = (yearToCheck == currentYear)
-                ? today // up to yesterday (today is exclusive)
-                : new DateTime(yearToCheck + 1, 1, 1);
+            DateTime startInclusive = new DateTime(yearToCheck, 1, 1, 0, 0, 0, DateTimeKind.Local);
 
-            // Compute total days consistent with the filter window
-            int daysInWindow = (yearToCheck == currentYear)
-                ? (today - startInclusive).Days           // full days elapsed this year up to yesterday
-                : (DateTime.IsLeapYear(yearToCheck) ? 366 : 365);
+            DateTime endExclusive;
+            int daysInWindow;
+            if (yearToCheck == currentYear)
+            {
+                endExclusive = today;
+                daysInWindow = (today - startInclusive).Days;
+            }
+            else
+            {
+                endExclusive = new DateTime(yearToCheck + 1, 1, 1, 0, 0, 0, DateTimeKind.Local);
+                daysInWindow = DateTime.IsLeapYear(yearToCheck) ? 366 : 365;
+            }
 
             int totalPossibleDataPoints = daysInWindow * 24;
 
             var result = data
                 .Where(p => Convert.ToInt32(p.Validity) > 0
-                            && DateTime.TryParse(p.StartTime, out var startTimeDt)
+                            && DateTime.TryParse(p.StartTime, CultureInfo.InvariantCulture, DateTimeStyles.None, out var startTimeDt)
                             && startTimeDt >= startInclusive
-                            && startTimeDt < endExclusive) // <-- correctly bounded to the year
+                            && startTimeDt < endExclusive)
                 .GroupBy(p => p.PollutantName)
                 .Select(g => new
                 {
                     PollutantName = g.Key,
                     DataCapturePercentage =
-                        ((double)g.Select(p => DateTime.Parse(p.StartTime)).Distinct().Count() / totalPossibleDataPoints) * 100
+                        ((double)g.Select(p => DateTime.Parse(p.StartTime!, CultureInfo.InvariantCulture)).Distinct().Count()
+                            / totalPossibleDataPoints) * 100
                 })
                 .ToList<dynamic>();
 
             return result;
         }
 
-        private List<dynamic> MergeExceedanceData(
+        private static List<dynamic> MergeExceedanceData(
             List<dynamic> hourly,
             List<dynamic> daily,
             List<FinalData> annual,
@@ -177,5 +185,4 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     }).ToList<dynamic>();
         }
     }
-
 }
