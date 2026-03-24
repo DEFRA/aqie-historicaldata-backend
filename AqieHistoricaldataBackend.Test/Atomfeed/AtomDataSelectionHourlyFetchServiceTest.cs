@@ -755,7 +755,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             return (Task<JArray>)method.Invoke(_service, new object?[] { siteId, year })!;
         }
 
-        private List<PollutantDetails> InvokeGetPollutantsToDisplay(string filter)
+        private static List<PollutantDetails> InvokeGetPollutantsToDisplay(string filter)
         {
             var method = typeof(AtomDataSelectionHourlyFetchService)
                 .GetMethod("GetPollutantsToDisplay", BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance)

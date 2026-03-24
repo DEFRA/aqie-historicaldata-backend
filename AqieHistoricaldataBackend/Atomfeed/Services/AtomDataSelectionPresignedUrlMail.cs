@@ -18,6 +18,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                         ) : IAtomDataSelectionPresignedUrlMail
     {
         private IMongoCollection<eMailJobDocument>? _jobCollection;
+        private readonly string? _bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME");
 
         public async Task<string?> GetPresignedUrlMail(string jobId)
         {
@@ -87,26 +88,25 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         private async Task<string?> GetS3data(string s3Key)
         {
-            string? bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME");
-            Logger.LogInformation("Fetching S3 object. Bucket: {BucketName}, Key: {S3Key}", bucketName, s3Key);
+            Logger.LogInformation("Fetching S3 object. Bucket: {BucketName}, Key: {S3Key}", _bucketName, s3Key);
 
             try
             {
                 Logger.LogInformation("S3 bucket GetPresignedUrlMail start {Datetime}", DateTime.Now);
-                var url = await AwsPreSignedUrLService.GeneratePreSignedURL(bucketName, s3Key, 604800);
+                var url = await AwsPreSignedUrLService.GeneratePreSignedURL(_bucketName, s3Key, 604800);
                 Logger.LogInformation("S3 bucket GetPresignedUrlMail final URL {PresignedUrl}", url);
                 return url;
             }
             catch (AmazonS3Exception s3Ex)
             {
                 Logger.LogError(s3Ex, "S3 error retrieving object. Bucket: {BucketName}, Key: {S3Key}, ErrorCode: {ErrorCode}",
-                    bucketName, s3Key, s3Ex.ErrorCode);
+                    _bucketName, s3Key, s3Ex.ErrorCode);
                 return null;
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Unexpected error retrieving S3 object. Bucket: {BucketName}, Key: {S3Key}",
-                    bucketName, s3Key);
+                    _bucketName, s3Key);
                 return null;
             }
         }
