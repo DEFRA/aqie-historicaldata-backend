@@ -196,7 +196,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                // L199: data.jobId may be null — use null-coalescing to avoid passing null to a non-nullable parameter
                 var presignedUrlresult = await AtomDataSelectionPresignedUrlMail.GetPresignedUrlMail(data.jobId ?? string.Empty);
                 return presignedUrlresult ?? string.Empty;
             }

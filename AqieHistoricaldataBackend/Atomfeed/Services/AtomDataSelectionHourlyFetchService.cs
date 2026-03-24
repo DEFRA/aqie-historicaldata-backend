@@ -130,7 +130,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var filtered = allPollutants
                 .Where(p => filterList.Contains(p.PollutantName, StringComparer.OrdinalIgnoreCase))
                 .ToList();
-            // L134: prefer Count > 0 over Any() for clarity and performance
             return filtered.Count > 0 ? filtered : allPollutants;
         }
 
@@ -145,7 +144,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     var feature = features[i];
                     var href = feature["om:OM_Observation"]?["om:observedProperty"]?["@xlink:href"]?.ToString();
-                    // L147: href?.Replace() can be null — use string? to avoid converting null to non-nullable
                     string? cleanedUrl = href?.Replace("http://", "");
                     if (string.IsNullOrEmpty(href)) continue;
                     var match = pollutants.FirstOrDefault(p => p.PollutantMasterUrl == cleanedUrl);
@@ -165,8 +163,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             return finalList;
         }
-
-        // L166: does not access instance data — mark as static
         private static List<FinalData> ExtractFinalData(string values, string pollutantName, SiteInfo siteinfo)
         {
             return values.Replace("\r\n", "").Trim().Split("@@")

@@ -171,7 +171,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task GetAtomDataSelectionLocalAuthoritiesService_RegionNotOverwritten_WhenIdNotInLookup()
         {
-            // Lookup has LA_ID 99; querying LA_ID 1 – region should stay as deserialized
             var client = CreateMockHttpClient(
                 BuildAllLocalAuthoritiesJson(99, "South West"),
                 BuildSingleDtDataJson(1, "OriginalRegion"));
