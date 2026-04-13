@@ -1,3 +1,4 @@
+using Amazon.S3;
 using AqieHistoricaldataBackend.Utils.Mongo;
 using ClosedXML.Excel;
 using DocumentFormat.OpenXml.Bibliography;
@@ -13,11 +14,12 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AtomDataSelectionNonAurnNetworks(
-    ILogger<HistoryexceedenceService> Logger,
-    IMongoDbClientFactory MongoDbClientFactory,
-    IConfiguration Configuration
-) : IAtomDataSelectionNonAurnNetworks
-{
+        ILogger<HistoryexceedenceService> Logger,
+        IMongoDbClientFactory MongoDbClientFactory,
+        IConfiguration Configuration,
+        IAmazonS3 S3Client
+    ) : IAtomDataSelectionNonAurnNetworks
+    {
         const int START_YEAR = 1973;
         const int END_YEAR = 2026;
         const string URL_TEMPLATE = "https://uk-air.defra.gov.uk/data/atom-dls/non-auto/{0}/atom.en.xml";
@@ -30,6 +32,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 //Airwebextract();
                 ExceltoMongoDB();
+                ExceltoMongoDB_Station_detials();
                 return "Success";
 
                 var siteCollection = MongoDbClientFactory.GetCollection<StationDetailDocument>("aqie_atom_non_aurn_networks_station_details");
@@ -396,13 +399,20 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                string filePath = Configuration["PollutantsMasterFilePath"]
-                    ?? throw new InvalidOperationException("'PollutantsMasterFilePath' is not configured.");
+                string bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME")
+                    ?? throw new InvalidOperationException("Environment variable 'S3_BUCKET_NAME' is not configured.");
 
-                if (!File.Exists(filePath))
-                    throw new FileNotFoundException($"Pollutants master file not found at '{filePath}'.", filePath);
+                string s3Key = Environment.GetEnvironmentVariable("POLLUTANT_MASTER")
+                    ?? throw new InvalidOperationException("'PollutantsMasterS3Key' is not configured.");
 
-                using var workbook = new XLWorkbook(filePath);
+                Logger.LogInformation("Downloading '{S3Key}' from S3 bucket '{BucketName}'.", s3Key, bucketName);
+
+                using var s3Response = await S3Client.GetObjectAsync(bucketName, s3Key);
+                using var memoryStream = new MemoryStream();
+                await s3Response.ResponseStream.CopyToAsync(memoryStream);
+                memoryStream.Position = 0;
+
+                using var workbook = new XLWorkbook(memoryStream);
                 var worksheet = workbook.Worksheet(1);
                 var allRows = worksheet.RangeUsed().RowsUsed().ToList();
 
@@ -426,6 +436,98 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 // Composite unique key: all listed fields must match for an upsert
                 string[] UniqueKeyFields = ["pollutantID", "pollutantName", "pollutant_value"];
+
+                int upserted = 0;
+
+                foreach (var row in allRows.Skip(1))
+                {
+                    var doc = new BsonDocument();
+                    int i = 0;
+                    foreach (var cell in row.Cells())
+                    {
+                        if (i < headers.Length)
+                            doc[headers[i]] = cell.Value.ToString();
+                        i++;
+                    }
+
+                    // Ensure all key fields are present in the document
+                    var missingKeys = UniqueKeyFields.Where(k => !doc.Contains(k)).ToList();
+                    if (missingKeys.Count > 0)
+                    {
+                        Console.WriteLine($"Skipping row – missing key field(s): {string.Join(", ", missingKeys)}");
+                        continue;
+                    }
+
+                    // Build a combined AND filter across all unique key fields
+                    var filter = Builders<BsonDocument>.Filter.And(
+                        UniqueKeyFields.Select(k => Builders<BsonDocument>.Filter.Eq(k, doc[k]))
+                    );
+
+                    var options = new ReplaceOptions { IsUpsert = true };
+                    await collection.ReplaceOneAsync(filter, doc, options);
+                    upserted++;
+                }
+
+                Console.WriteLine($"Upserted {upserted} documents into MongoDB.");
+                Logger.LogInformation("Upserted {UpsertedCount} documents into MongoDB.", upserted);
+            }
+            catch (FileNotFoundException ex)
+            {
+                Logger.LogError(ex, "Excel file not found in ExceltoMongoDB.");
+                throw;
+            }
+            catch (MongoException ex)
+            {
+                Logger.LogError(ex, "MongoDB error in ExceltoMongoDB.");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Unexpected error in ExceltoMongoDB.");
+                throw;
+            }
+        }
+        public async Task ExceltoMongoDB_Station_detials()
+        {
+            try
+            {
+                string bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME")
+                    ?? throw new InvalidOperationException("Environment variable 'S3_BUCKET_NAME' is not configured.");
+
+                string s3Key = Environment.GetEnvironmentVariable("POLLUTANT_STATION_MASTER")
+                    ?? throw new InvalidOperationException("'StationMasterS3Key' is not configured.");
+
+                Logger.LogInformation("Downloading '{S3Key}' from S3 bucket '{BucketName}'.", s3Key, bucketName);
+
+                using var s3Response = await S3Client.GetObjectAsync(bucketName, s3Key);
+                using var memoryStream = new MemoryStream();
+                await s3Response.ResponseStream.CopyToAsync(memoryStream);
+                memoryStream.Position = 0;
+
+                using var workbook = new XLWorkbook(memoryStream);
+                var worksheet = workbook.Worksheet(1);
+                var allRows = worksheet.RangeUsed().RowsUsed().ToList();
+
+                if (allRows.Count == 0) return;
+
+                // MongoDB setup via MongoDbClientFactory
+                var collection = MongoDbClientFactory.GetCollection<BsonDocument>("aqie_atom_non_aurn_networks_station_details");
+
+                // Ensure a compound index on the unique key fields for efficient upserts
+                var indexKeys = Builders<BsonDocument>.IndexKeys
+                    .Ascending("SiteID")
+                    .Ascending("Network Type")
+                    .Ascending("Pollutant Name"); //["SiteID", "Network Type", "Pollutant Name"]
+
+                await collection.Indexes.CreateOneAsync(
+                    new CreateIndexModel<BsonDocument>(indexKeys, new CreateIndexOptions { Unique = true })
+                );
+
+                // Read headers from the first row
+                string[] headers = allRows[0].Cells().Select(c => c.Value.ToString()).ToArray();
+
+                // Composite unique key: all listed fields must match for an upsert
+                string[] UniqueKeyFields = ["SiteID", "Network Type", "Pollutant Name"];
 
                 int upserted = 0;
 
