@@ -14,9 +14,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AtomDataSelectionNonAurnNetworks(
     ILogger<HistoryexceedenceService> Logger,
-    IMongoDbClientFactory MongoDbClientFactory
-                                                ) : IAtomDataSelectionNonAurnNetworks
-    {
+    IMongoDbClientFactory MongoDbClientFactory,
+    IConfiguration Configuration
+) : IAtomDataSelectionNonAurnNetworks
+{
         const int START_YEAR = 1973;
         const int END_YEAR = 2026;
         const string URL_TEMPLATE = "https://uk-air.defra.gov.uk/data/atom-dls/non-auto/{0}/atom.en.xml";
@@ -395,7 +396,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                const string filePath = "/home/cdpshell/pollutants_master_updated_New.xlsx";
+                string filePath = Configuration["PollutantsMasterFilePath"]
+                    ?? throw new InvalidOperationException("'PollutantsMasterFilePath' is not configured.");
+
+                if (!File.Exists(filePath))
+                    throw new FileNotFoundException($"Pollutants master file not found at '{filePath}'.", filePath);
+
                 using var workbook = new XLWorkbook(filePath);
                 var worksheet = workbook.Worksheet(1);
                 var allRows = worksheet.RangeUsed().RowsUsed().ToList();
