@@ -159,7 +159,10 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAtomDataSelectionJobStatus, AtomDataSelectionJobStatus>();
     builder.Services.AddSingleton<IAtomDataSelectionEmailJobService, AtomDataSelectionEmailJobService>();
     builder.Services.AddSingleton<IAtomDataSelectionPresignedUrlMail, AtomDataSelectionPresignedUrlMail>();
-    builder.Services.AddHostedService<AtomDataSelectionEmailJobHostedService>();
+    builder.Services.AddSingleton<IAtomDataSelectionNonAurnNetworks, AtomDataSelectionNonAurnNetworks>();
+    builder.Services.AddSingleton<IAtomDataSelectionPollutantMaster, AtomDataSelectionPollutantMaster>();
+    builder.Services.AddSingleton<IAtomDataSelectionPollutantDataSource, AtomDataSelectionPollutantDataSource>();    
+    //builder.Services.AddHostedService<AtomDataSelectionEmailJobHostedService>();
 }
 
 [ExcludeFromCodeCoverage]
