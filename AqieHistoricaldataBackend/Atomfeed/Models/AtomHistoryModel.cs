@@ -1,6 +1,8 @@
+using DocumentFormat.OpenXml.Wordprocessing;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using Newtonsoft.Json;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Models
 {
@@ -58,6 +60,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? dataselectordownloadtype { get; set; }
             public string? jobId { get; set; }
             public string? email { get; set; }
+            public string? pollutantId { get; set; }
+            public string? grouppollutantId { get; set; }
         }
 
         public class PivotPollutant
@@ -296,6 +300,62 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             // Add converted coordinates
             public double Latitude { get; set; }
             public double Longitude { get; set; }
+        }
+
+        [BsonIgnoreExtraElements] // handles any extra Excel columns gracefully
+        public class StationDetailDocument
+        {
+            [BsonId]
+            [BsonRepresentation(BsonType.ObjectId)]
+            public string? Id { get; set; }
+
+            [BsonElement("SiteID")]
+            public string? SiteID { get; set; }
+
+            [BsonElement("Site Name")]
+            public string? SiteName { get; set; }
+
+            [BsonElement("Environment Type")]
+            public string? EnvironmentType { get; set; }
+
+            [BsonElement("Latitude")]
+            public string? Latitude { get; set; }
+
+            [BsonElement("Longitude")]
+            public string? Longitude { get; set; }
+
+            [BsonElement("Network Type")]
+            public string? NetworkType { get; set; }
+
+            [BsonElement("pollutantID")]
+            public string? pollutantID { get; set; }
+
+            [BsonElement("Pollutant Name")]
+            public string? PollutantName { get; set; }
+
+            [BsonElement("Start Date")]
+            public string? StartDate { get; set; }
+
+            [BsonElement("End Date")]
+            public string? EndDate { get; set; }
+        }
+        public class PollutantMasterDocument
+        {
+            [BsonId]
+            [BsonRepresentation(BsonType.ObjectId)]
+            public string? Id { get; set; }
+
+            [BsonElement("pollutantID")]
+            public string? pollutantID { get; set; }
+
+            [BsonElement("pollutantName")]
+            public string? pollutantName { get; set; }
+
+            [BsonElement("pollutant_Abbreviation")]
+            public string? pollutant_Abbreviation { get; set; }
+
+            [BsonElement("pollutant_value")]
+            public string? pollutant_value { get; set; }
         }
     }
 }

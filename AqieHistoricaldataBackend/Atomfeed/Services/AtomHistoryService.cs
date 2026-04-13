@@ -45,7 +45,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         IAtomDataSelectionJobStatus AtomDataSelectionJobStatus,
         IAtomDataSelectionEmailJobService AtomDataSelectionEmailJobService,
         IHistoryexceedenceService HistoryexceedenceService,
-        IAtomDataSelectionPresignedUrlMail AtomDataSelectionPresignedUrlMail) : IAtomHistoryService
+        IAtomDataSelectionPresignedUrlMail AtomDataSelectionPresignedUrlMail,
+        IAtomDataSelectionNonAurnNetworks AtomDataSelectionNonAurnNetworks,
+        IAtomDataSelectionPollutantMaster AtomDataSelectionPollutantMaster,
+        IAtomDataSelectionPollutantDataSource AtomDataSelectionPollutantDataSource) : IAtomHistoryService
     {
         
         public async Task<string> AtomHealthcheck()
@@ -202,6 +205,46 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error in Atom GetPresignedUrlMail");
+                return "Failure";
+            }
+        }
+
+        public async Task<dynamic> GetAtomDataSelectionNonAurnNetworks(QueryStringData data)
+        {
+            try
+            {
+                var atomNonAurnNetworks = await AtomDataSelectionNonAurnNetworks.GetAtomNonAurnNetworks(data);
+                return atomNonAurnNetworks ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error in Atom GetAtomNonAurnNetworks");
+                return "Failure";
+            }
+        }
+        public async Task<dynamic> GetAtomPollutantMaster()
+        {
+            try
+            {
+                var atompollutantmaster = await AtomDataSelectionPollutantMaster.GetPollutantMaster();
+                return atompollutantmaster ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error in Atom GetAtomPollutantMaster");
+                return "Failure";
+            }
+        }
+        public async Task<dynamic> GetAtomDataSelectionPollutantDataSource(QueryStringData data)
+        {
+            try
+            {
+                var atomNonAurnNetworks = await AtomDataSelectionPollutantDataSource.GetAtomPollutantDataSource(data);
+                return atomNonAurnNetworks ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error in Atom GetAtomDataSelectionPollutantDataSource");
                 return "Failure";
             }
         }

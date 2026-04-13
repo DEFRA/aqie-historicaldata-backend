@@ -13,5 +13,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         public Task<JobInfoDto?> GetAtomDataSelectionJobStatusdata(QueryStringData data);
         public Task<dynamic> GetAtomemailjobDataSelection(QueryStringData data);
         public Task<string> GetAtomDataSelectionPresignedUrlMail(QueryStringData data);
+        public Task<dynamic> GetAtomDataSelectionNonAurnNetworks(QueryStringData data);
+        public Task<dynamic> GetAtomPollutantMaster();
+        public Task<dynamic> GetAtomDataSelectionPollutantDataSource(QueryStringData data);
     }
 }

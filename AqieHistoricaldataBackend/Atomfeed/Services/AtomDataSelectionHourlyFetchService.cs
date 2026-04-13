@@ -1,6 +1,7 @@
 using Hangfire;
 using Newtonsoft.Json.Linq;
 using System.Collections.Concurrent;
+using System.Data.Common;
 using System.Diagnostics;
 using System.Xml;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
@@ -10,10 +11,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionHourlyFetchService(ILogger<HistoryexceedenceService> Logger,
     IHttpClientFactory httpClientFactory) : IAtomDataSelectionHourlyFetchService
     {
-        public async Task<List<FinalData>> GetAtomDataSelectionHourlyFetchService(List<SiteInfo> filteredstationpollutant, string pollutantName, string filteryear)
+        public async Task<List<FinalData>> GetAtomDataSelectionHourlyFetchService(List<SiteInfo> filteredstationpollutant, string pollutantName, string filteryear, QueryStringData data)
         {
             try
             {
+                
                 List<FinalData> Final_list1 = new List<FinalData>();
                 var years = filteryear.Split(',');
                 var stopwatch = Stopwatch.StartNew();
@@ -27,7 +29,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     try
                     {
-                        var atomJsonCollection = await FetchAtomFeedAsync(pair.siteinfo.LocalSiteId, pair.year);
+                        var atomJsonCollection = await FetchAtomFeedAsync(pair.siteinfo.LocalSiteId, pair.year, data.dataSource);
                         var result = ProcessAtomData(atomJsonCollection, pollutantsToDisplay, pair.siteinfo);
                         foreach (var item in result)
                             resultsBag.Add(item);
@@ -56,7 +58,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        private async Task<JArray> FetchAtomFeedAsync(string? siteID, string year)
+        private async Task<JArray> FetchAtomFeedAsync(string? siteID, string year,string? dataSource)
         {
             if (string.IsNullOrWhiteSpace(siteID) || string.IsNullOrWhiteSpace(year))
             {
@@ -64,7 +66,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return new JArray();
             }
             var client = httpClientFactory.CreateClient("Atomfeed");
-            var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
+            string url;
+            if (dataSource == "AURN") 
+            { 
+                url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
+            }
+            else
+            {
+                url = $"data/atom-dls/observations/non-auto/GB_FixedObservations_{year}_{siteID}.xml";
+            }
             try
             {
                 var response = await client.GetAsync(url);
@@ -113,8 +123,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var allPollutants = new List<PollutantDetails>
             {
                 new PollutantDetails { PollutantName = "Nitrogen dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/8" },
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" },
-                new PollutantDetails { PollutantName = "PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/6001" },
+                new PollutantDetails { PollutantName = "Particulate matter", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" },
+                new PollutantDetails { PollutantName = "Fine particulate matter", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/6001" },
                 new PollutantDetails { PollutantName = "Ozone", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/7" },
                 new PollutantDetails { PollutantName = "Sulphur dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1" },
                 new PollutantDetails { PollutantName = "Nitrogen oxides as nitrogen dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/9" },

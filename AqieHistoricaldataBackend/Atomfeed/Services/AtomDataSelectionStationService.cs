@@ -93,7 +93,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     Logger.LogWarning("GetAtomDataSelectionStation called with null or empty pollutantName or year.");
                     return "Failure";
                 }
-
+                List<SiteInfo> filteredSites = new List<SiteInfo>();
                 var queryStringData = new AtomHistoryModel.QueryStringData
                 {
                     pollutantName = pollutantName,
@@ -106,10 +106,19 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     email = email
                 };
 
-                var token = await GetRicardoToken();
-                var sitemetadatainfo = await FetchSiteMetadata(token);
+                var resolvedPollutantName = await ResolvePollutantNameAsync(pollutantName);
+                if (datasource == "AURN")
+                {
+                    var token = await GetRicardoToken();
+                    var sitemetadatainfo = await FetchSiteMetadata(token);
+                    filteredSites = FilterSitesByPollutants(sitemetadatainfo, resolvedPollutantName, Logger);
+                }
 
-                var filteredSites = FilterSitesByPollutants(sitemetadatainfo, pollutantName, Logger);
+                if (datasource == "NON-AURN")
+                {
+                    filteredSites = await GetSiteInfoAsync(pollutantName);
+                }
+
                 var filterpollutantyear = FilterSitesByYearRanges(filteredSites, year);
 
                 var stationData = await atomDataSelectionServices.StationBoundry.GetAtomDataSelectionStationBoundryService(
@@ -122,7 +131,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     return stationcountresult.ToString();
                 }
-
+                pollutantName = resolvedPollutantName;
                 if (dataselectorfiltertype == "dataSelectorHourly")
                 {
                     return await HandleHourlyDataSelection(stationData, pollutantName, year, queryStringData, dataselectordownloadtype ?? string.Empty);
@@ -152,7 +161,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         private static List<SiteInfo> FilterSitesByPollutants(List<SiteInfo> sites, string pollutantName, ILogger logger)
         {
-            var mappedPollutants = GetMappedPollutants(pollutantName,logger, includeUnknowns: true);
+            var mappedPollutants = GetMappedPollutants(pollutantName, logger, includeUnknowns: true);
 
             return sites
                 .Select(site => new SiteInfo
@@ -218,18 +227,18 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     : startDate <= range.End);
         }
 
-        private async Task<string> HandleHourlyDataSelection(List<SiteInfo> stationData, string pollutantName, 
+        private async Task<string> HandleHourlyDataSelection(List<SiteInfo> stationData, string pollutantName,
             string year, QueryStringData queryStringData, string dataselectordownloadtype)
         {
             if (dataselectordownloadtype == "dataSelectorSingle")
             {
                 return await CreateAndEnqueueJob(stationData, pollutantName, year, queryStringData, dataselectordownloadtype);
             }
-            
+
             return await ProcessEmailDownload(stationData, pollutantName, year, queryStringData, dataselectordownloadtype);
         }
 
-        private async Task<string> CreateAndEnqueueJob(List<SiteInfo> stationData, string pollutantName, 
+        private async Task<string> CreateAndEnqueueJob(List<SiteInfo> stationData, string pollutantName,
             string year, QueryStringData queryStringData, string dataselectordownloadtype)
         {
             _jobCollection = MongoDbClientFactory.GetCollection<JobDocument>("aqie_csvexport_jobs");
@@ -269,13 +278,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return jobId;
         }
 
-        private async Task<string> ProcessEmailDownload(List<SiteInfo> stationData, string pollutantName, 
+        private async Task<string> ProcessEmailDownload(List<SiteInfo> stationData, string pollutantName,
             string year, QueryStringData queryStringData, string dataselectordownloadtype)
         {
             Logger.LogInformation("Mail job strated generating CSV data");
-            var csvData = await atomDataSelectionServices.HourlyFetch.GetAtomDataSelectionHourlyFetchService(stationData, pollutantName, year);
+            var csvData = await atomDataSelectionServices.HourlyFetch.GetAtomDataSelectionHourlyFetchService(stationData, pollutantName, year, queryStringData);
             Logger.LogInformation("Mail job completed generating CSV data of count {Count}", csvData.Count);
-            
+
             Logger.LogInformation("Mail job presigned strated WriteCsvToAwsS3BucketAsync");
             var presignedUrl = await AWSS3BucketService.WriteCsvToAwsS3BucketAsync(csvData, queryStringData, dataselectordownloadtype);
             Logger.LogInformation("Mail job presigned completed WriteCsvToAwsS3BucketAsync");
@@ -373,7 +382,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var pollutantMap = new Dictionary<string, List<string>>
             {
                 { "Ozone", new List<string> { "Ozone" } },
-                { "PM2.5", new List<string>
+                { "Fine particulate matter", new List<string>
                     {
                         "PM<sub>2.5</sub> (Hourly measured)",
                         "Volatile PM<sub>2.5</sub> (Hourly measured)",
@@ -381,7 +390,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         "PM<sub>2.5</sub> particulate matter (Hourly measured)"
                     }
                 },
-                { "PM10", new List<string>
+                { "Particulate matter", new List<string>
                     {
                         "PM<sub>10</sub> (Hourly measured)",
                         "Volatile PM<sub>10</sub> (Hourly measured)",
@@ -451,7 +460,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 try
                 {
                     // 1) generate csv bytes in background by fetching hourly data
-                    var csvData = await atomDataSelectionServices.HourlyFetch.GetAtomDataSelectionHourlyFetchService(job.StationData!, job.PollutantName!, job.Year!);
+                    var csvData = await atomDataSelectionServices.HourlyFetch.GetAtomDataSelectionHourlyFetchService(job.StationData!, job.PollutantName!, job.Year!,job.Data!);
                     Logger.LogInformation("ProcessQueueAsync Background job {JobId} generated CSV data of count {Count}", job.JobId, csvData.Count);
 
                     // 2) write CSV to S3 and get presigned url
@@ -480,8 +489,89 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
             }
         }
+        private static (string? AreaType, string? SiteType) SplitEnvironmentType(string? environmentType)
+        {
+            if (string.IsNullOrWhiteSpace(environmentType))
+                return (null, null);
 
+            var lastSpace = environmentType.LastIndexOf(' ');
+            if (lastSpace < 0)
+                return (null, environmentType.Trim()); // single word — treat as SiteType only
 
+            return (
+                environmentType[..lastSpace].Trim(),
+                environmentType[lastSpace..].Trim()
+            );
+        }
+
+        public async Task<string> ResolvePollutantNameAsync(string pollutantName)
+        {
+            // Parse the comma-separated pollutant IDs: "44,40,36,46,47" → ["44","40","36","46","47"]
+            var pollutantIds = pollutantName
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            var pollutantCollection = MongoDbClientFactory.GetCollection<PollutantMasterDocument>(
+                "aqie_atom_non_aurn_networks_pollutant_master");
+
+            // Filter documents whose pollutantID is in the provided list
+            var idFilter = Builders<PollutantMasterDocument>.Filter
+                .In(d => d.pollutantID, pollutantIds);
+
+            var matchedPollutants = await pollutantCollection.Find(idFilter).ToListAsync();
+
+            // Extract the resolved pollutant names as a comma-separated string
+            var resolvedPollutantName = string.Join(",",
+                matchedPollutants
+                    .Where(p => !string.IsNullOrEmpty(p.pollutantName))
+                    .Select(p => p.pollutantName!));
+
+            Logger.LogInformation("Resolved pollutant names: {Names}", resolvedPollutantName);
+            return resolvedPollutantName;
+        }
+
+        public async Task<List<SiteInfo>> GetSiteInfoAsync(string pollutantName)
+        {
+            // Implementation for fetching site info
+            var siteCollection = MongoDbClientFactory.GetCollection<StationDetailDocument>("aqie_atom_non_aurn_networks_station_details");
+
+            var pollutantIds = pollutantName
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            var pollutantFilter = Builders<StationDetailDocument>.Filter
+                .In(d => d.pollutantID, pollutantIds);
+
+            var documents = await siteCollection.Find(pollutantFilter).ToListAsync();
+
+            var filteredSites = documents
+                        .GroupBy(d => d.SiteID)
+                        .Select(g =>
+                        {
+                            var first = g.First();
+                            var (areaType, siteType) = SplitEnvironmentType(first.EnvironmentType);
+                            return new SiteInfo
+                            {
+                                LocalSiteId = first.SiteID,
+                                SiteName = first.SiteName,
+                                AreaType = areaType,
+                                SiteType = siteType,
+                                Latitude = first.Latitude,
+                                Longitude = first.Longitude,
+                                Pollutants = g
+                                    .Where(d => d.PollutantName != null)
+                                    .Select(d => new PollutantInfo
+                                    {
+                                        Name = d.PollutantName,
+                                        StartDate = d.StartDate,
+                                        EndDate = d.EndDate
+                                    })
+                                    .ToList()
+                            };
+                        })
+                        .ToList();
+            return filteredSites;
+        }
     }
 
 

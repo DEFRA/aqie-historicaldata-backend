@@ -19,6 +19,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             app.MapPost("AtomDataSelectionJobStatus", GetAtomDataSelectionJobStatus);
             app.MapPost("AtomEmailJobDataSelection", GetAtomemailjobDataSelection);
             app.MapPost("AtomDataSelectionPresignedUrlMail", GetAtomDataSelectionPresignedUrlMail);
+            app.MapPost("AtomDataSelectionNonAurnNetworks", GetAtomDataSelectionNonAurnNetworks);
+            app.MapGet("AtomDataSelectionPollutantMaster", GetAtomDataSelectionPollutantMaster);
+            app.MapPost("AtomDataSelectionPollutantDataSource", GetAtomDataSelectionPollutantDataSource);            
         }
         private static async Task<IResult> GetHistorydataById([FromBody] QueryStringData data,IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {
@@ -36,8 +39,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             }
             catch(Exception ex)
             {
-                logger.LogError("Error GetHistorydataById endpoints Info message {Error}", ex.Message);
-                logger.LogError("Error GetHistorydataById endpoints Info stacktrace {Error}", ex.StackTrace);
+                logger.LogError(ex,"Error GetHistorydataById endpoints Info message {Error}", ex);
                 return Results.NotFound();
 
             }
@@ -58,8 +60,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             }
             catch (Exception ex)
             {
-                logger.LogError("Error GetHistoryexceedence endpoints Info message {Error}", ex.Message);
-                logger.LogError("Error GetHistoryexceedence endpoints Info stacktrace {Error}", ex.StackTrace);
+                logger.LogError(ex,"Error GetHistoryexceedence endpoints Info message {Error}", ex);
                 return Results.NotFound();
 
             }
@@ -80,8 +81,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             }
             catch (Exception ex)
             {
-                logger.LogError("Error GetAtomDataSelection endpoints Info message {Error}", ex.Message);
-                logger.LogError("Error GetAtomDataSelection endpoints Info stacktrace {Error}", ex.StackTrace);
+                logger.LogError(ex,"Error GetAtomDataSelection endpoints Info message {Error}", ex);
                 return Results.NotFound();
 
             }
@@ -102,8 +102,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             }
             catch (Exception ex)
             {
-                logger.LogError("Error GetAtomDataSelectionJobStatus endpoints Info message {Error}", ex.Message);
-                logger.LogError("Error GetAtomDataSelectionJobStatus endpoints Info stacktrace {Error}", ex.StackTrace);
+                logger.LogError(ex,"Error GetAtomDataSelectionJobStatus endpoints Info message {Error}", ex);
                 return Results.NotFound();
 
             }
@@ -125,8 +124,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             }
             catch (Exception ex)
             {
-                logger.LogError("Error GetAtomemailjobDataSelection endpoints Info message {Error}", ex.Message);
-                logger.LogError("Error GetAtomemailjobDataSelection endpoints Info stacktrace {Error}", ex.StackTrace);
+                logger.LogError(ex,"Error GetAtomemailjobDataSelection endpoints Info message {Error}", ex);
                 return Results.NotFound();
 
             }
@@ -148,8 +146,65 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             }
             catch (Exception ex)
             {
-                logger.LogError("Error GetAtomDataSelectionPresignedUrlMail endpoints Info message {Error}", ex.Message);
-                logger.LogError("Error GetAtomDataSelectionPresignedUrlMail endpoints Info stacktrace {Error}", ex.StackTrace);
+                logger.LogError(ex,"Error GetAtomDataSelectionPresignedUrlMail endpoints Info message {Error}", ex);
+                return Results.NotFound();
+
+            }
+        }
+        private static async Task<IResult> GetAtomDataSelectionNonAurnNetworks([FromBody] QueryStringData data, IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
+        {
+            try
+            {
+                if (data is not null)
+                {
+                    var atomDataSelectionNonAurnNetworksresult = await Persistence.GetAtomDataSelectionNonAurnNetworks(data);
+                    return atomDataSelectionNonAurnNetworksresult is not null ? Results.Ok(atomDataSelectionNonAurnNetworksresult) : Results.NotFound();
+                }
+                else
+                {
+                    return Results.NotFound();
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,"Error GetAtomDataSelectionNonAurnNetworks endpoints Info message {Error}", ex);
+                return Results.NotFound();
+
+            }
+        }
+        private static async Task<IResult> GetAtomDataSelectionPollutantMaster(IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
+        {
+            try
+            {
+
+                    var atompollutantmasterresult = await Persistence.GetAtomPollutantMaster();
+                    return atompollutantmasterresult is not null ? Results.Ok(atompollutantmasterresult) : Results.NotFound();
+
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error GetAtomDataSelectionPollutantMaster endpoints Info message {Error}", ex);
+                return Results.NotFound();
+
+            }
+        }
+        private static async Task<IResult> GetAtomDataSelectionPollutantDataSource([FromBody] QueryStringData data, IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
+        {
+            try
+            {
+                if (data is not null)
+                {
+                    var atomDataSelectionPollutantDataSourceresult = await Persistence.GetAtomDataSelectionPollutantDataSource(data);
+                    return atomDataSelectionPollutantDataSourceresult is not null ? Results.Ok(atomDataSelectionPollutantDataSourceresult) : Results.NotFound();
+                }
+                else
+                {
+                    return Results.NotFound();
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error GetAtomDataSelectionPollutantDataSource endpoints Info message {Error}", ex);
                 return Results.NotFound();
 
             }
