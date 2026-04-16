@@ -127,9 +127,35 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     regiontype ?? string.Empty);
                 var stationcountresult = stationData.Count;
 
-                if (dataselectorfiltertype == "dataSelectorCount")
+                if (dataselectorfiltertype == "dataSelectorCount" && datasource == "AURN")
                 {
                     return stationcountresult.ToString();
+                }
+                if (dataselectorfiltertype == "dataSelectorCount" && datasource == "NON-AURN")
+                {
+                    var networkTypeCounts = stationData
+                        .GroupBy(s => s.NetworkType ?? "Unknown")
+                        .Select(g => new
+                        {
+                            NetworkType = g.Key,
+                            Count = g.Count()
+                        })
+                        .ToList();
+
+                    //return networkTypeCounts.Any()
+                    //    ? string.Join(", ",
+                    //        networkTypeCounts.Select(nc =>
+                    //            $"{{NetworkType:\"{nc.NetworkType}\",Count:\"{nc.Count}\"}}"))
+                    //    : $"{{NetworkType:\"Unknown\",Count:\"{stationcountresult}\"}}";
+
+                    return networkTypeCounts.Any()
+                            ? string.Join(", ", networkTypeCounts.Select(nc => $"NetworkType:\"{nc.NetworkType}\",Count:\"{nc.Count}\""))
+                            : $"NetworkType:\"Unknown\",Count:\"{stationcountresult}\"";
+                    //return type as "UKEAP - Rural NO2 Network: 11"
+                    //return networkTypeCounts.Any()
+                    //    ? string.Join(", ", networkTypeCounts.Select(nc => $"{nc.NetworkType}: {nc.Count}"))
+                    //    : "Unknown: " + stationcountresult.ToString();
+                    //return stationcountresult.ToString();
                 }
                 pollutantName = resolvedPollutantName;
                 if (dataselectorfiltertype == "dataSelectorHourly")
@@ -558,6 +584,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                 SiteType = siteType,
                                 Latitude = first.Latitude,
                                 Longitude = first.Longitude,
+                                NetworkType = first.NetworkType,
                                 Pollutants = g
                                     .Where(d => d.PollutantName != null)
                                     .Select(d => new PollutantInfo

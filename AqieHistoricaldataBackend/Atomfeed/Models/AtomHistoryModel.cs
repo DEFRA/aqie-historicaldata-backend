@@ -108,6 +108,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? ZoneRegion { get; init; }
             public string? Latitude { get; init; }
             public string? Longitude { get; init; }
+            public string? NetworkType { get; set; }
             public List<PollutantInfo>? Pollutants { get; set; } = new List<PollutantInfo>();
             public string? Country { get; set; }
         }
