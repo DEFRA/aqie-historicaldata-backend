@@ -197,6 +197,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task ExecuteAsync_LogsError_WhenJobServiceThrowsNonCancellationException()
         {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var callCount = 0;
 
             _emailJobServiceMock
@@ -206,13 +207,17 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     callCount++;
                     if (callCount == 1)
                         throw new InvalidOperationException("job exploded");
+                    // Signal that the second call has been reached
+                    tcs.TrySetResult();
                     return Task.CompletedTask;
                 });
 
             using var cts = new CancellationTokenSource();
             await _service.StartAsync(cts.Token);
-            // Allow time for first (failing) + second (succeeding) iteration
-            await Task.Delay(100);
+
+            // Wait until the second call is confirmed; 5 s timeout guards against hanging
+            await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+
             await cts.CancelAsync();
             await _service.StopAsync(CancellationToken.None);
 
