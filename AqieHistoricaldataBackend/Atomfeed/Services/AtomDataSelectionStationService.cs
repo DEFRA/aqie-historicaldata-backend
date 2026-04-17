@@ -84,7 +84,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         // Primary constructor parameters are available as fields by the primary-constructor syntax used in this project.
         // (Logger, httpClientFactory, atomDataSelectionServices, AWSS3BucketService, AuthService)
 
-        public async Task<string> GetAtomDataSelectionStation(string? pollutantName, string? datasource, string? year, string? region, string? regiontype, string? dataselectorfiltertype, string? dataselectordownloadtype, string? email)
+        public async Task<object> GetAtomDataSelectionStation(string? pollutantName, string? datasource, string? year, string? region, string? regiontype, string? dataselectorfiltertype, string? dataselectordownloadtype, string? email)
         {
             try
             {
@@ -142,20 +142,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         })
                         .ToList();
 
-                    //return networkTypeCounts.Any()
-                    //    ? string.Join(", ",
-                    //        networkTypeCounts.Select(nc =>
-                    //            $"{{NetworkType:\"{nc.NetworkType}\",Count:\"{nc.Count}\"}}"))
-                    //    : $"{{NetworkType:\"Unknown\",Count:\"{stationcountresult}\"}}";
-
-                    return networkTypeCounts.Any()
-                            ? string.Join(", ", networkTypeCounts.Select(nc => $"NetworkType:\"{nc.NetworkType}\",Count:\"{nc.Count}\""))
-                            : $"NetworkType:\"Unknown\",Count:\"{stationcountresult}\"";
-                    //return type as "UKEAP - Rural NO2 Network: 11"
-                    //return networkTypeCounts.Any()
-                    //    ? string.Join(", ", networkTypeCounts.Select(nc => $"{nc.NetworkType}: {nc.Count}"))
-                    //    : "Unknown: " + stationcountresult.ToString();
-                    //return stationcountresult.ToString();
+                    return networkTypeCounts.Count > 0
+                        ? networkTypeCounts
+                        : new[] { new { NetworkType = "Unknown", Count = stationcountresult } }.ToList();              
                 }
                 pollutantName = resolvedPollutantName;
                 if (dataselectorfiltertype == "dataSelectorHourly")

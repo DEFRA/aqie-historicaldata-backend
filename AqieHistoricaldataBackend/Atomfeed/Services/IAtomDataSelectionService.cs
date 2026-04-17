@@ -6,6 +6,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public interface IAtomDataSelectionService
     {
         [ExcludeFromCodeCoverage]
-        Task<string> GetatomDataSelectiondata(QueryStringData data);
+        Task<object> GetatomDataSelectiondata(QueryStringData data);
     }
 }

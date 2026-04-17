@@ -5,7 +5,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionService(ILogger<HistoryexceedenceService> Logger,
     IAtomDataSelectionStationService AtomDataSelectionStationService) : IAtomDataSelectionService
     {
-        public async Task<string> GetatomDataSelectiondata(QueryStringData data)
+        public async Task<object> GetatomDataSelectiondata(QueryStringData data)
         {
             try
             {

@@ -72,9 +72,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
                 if (data is not null)
                 {
                     var atomDataSelectionresult = await Persistence.GetatomDataSelectiondata(data);
-                    return atomDataSelectionresult is not null
-                        ? Results.Text(atomDataSelectionresult, "text/plain")
-                        : Results.NotFound();
+                    return atomDataSelectionresult is not null ? Results.Ok(atomDataSelectionresult) : Results.NotFound();
                 }
                 else
                 {
