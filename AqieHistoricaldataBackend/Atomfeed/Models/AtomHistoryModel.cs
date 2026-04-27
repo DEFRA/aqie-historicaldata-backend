@@ -358,5 +358,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             [BsonElement("pollutant_value")]
             public string? pollutant_value { get; set; }
         }
+
+        public class PollutantMasterProjection
+        {
+           public string? pollutantID { get; set; }
+            public string? pollutantName { get; set; }
+            public string? pollutant_Abbreviation { get; set; }
+            public string? pollutant_value { get; set; }
+        }
     }
 }

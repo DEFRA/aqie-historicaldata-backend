@@ -4,10 +4,10 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
+
     public class AtomDataSelectionPollutantMaster(
         ILogger<HistoryexceedenceService> Logger,
-        IMongoDbClientFactory MongoDbClientFactory
-                                                ) : IAtomDataSelectionPollutantMaster
+        IMongoDbClientFactory MongoDbClientFactory) : IAtomDataSelectionPollutantMaster
     {
         public async Task<dynamic> GetPollutantMaster()
         {
@@ -17,18 +17,18 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 var pollutantList = await pollutantCollection
                     .Find(_ => true)
-                    .Project(x => new
+                    .Project(x => new PollutantMasterProjection
                     {
-                        x.pollutantID,
-                        x.pollutantName,
-                        x.pollutant_Abbreviation,
-                        x.pollutant_value
+                        pollutantID = x.pollutantID,
+                        pollutantName = x.pollutantName,
+                        pollutant_Abbreviation = x.pollutant_Abbreviation,
+                        pollutant_value = x.pollutant_value
                     })
                     .ToListAsync();
 
                 if (pollutantList.Count != 0)
                 {
-                    return  pollutantList;
+                    return pollutantList;
                 }
                 else
                 {
