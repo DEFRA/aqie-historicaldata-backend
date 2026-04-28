@@ -7,5 +7,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     {
         [ExcludeFromCodeCoverage]
         Task<object> GetatomDataSelectiondata(QueryStringData data);
+
     }
 }
