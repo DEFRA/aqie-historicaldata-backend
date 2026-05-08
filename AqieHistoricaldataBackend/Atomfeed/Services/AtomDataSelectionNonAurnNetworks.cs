@@ -24,8 +24,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-                ExceltoMongoDB();
-                ExceltoMongoDB_Station_detials();
+                if (data.SiteName == "Pollutant")
+                {
+                    ExceltoMongoDB(data.pollutantName);
+                }
+                else { 
+                    ExceltoMongoDB_Station_detials(data.pollutantName);
+                }
+                
                 return "Success";
 
             }
@@ -35,18 +41,20 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return "Failure";
             }
         }
-        public async Task ExceltoMongoDB()
+        public async Task ExceltoMongoDB(string pollutantName)
         {
             try
             {
                 string bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME")
                     ?? throw new InvalidOperationException("Environment variable 'S3_BUCKET_NAME' is not configured.");
 
-                string s3Key = Environment.GetEnvironmentVariable("POLLUTANT_MASTER")
+                string s3Key1 = Environment.GetEnvironmentVariable("POLLUTANT_MASTER")
                     ?? throw new InvalidOperationException("'PollutantsMasterS3Key' is not configured.");
 
-                Logger.LogInformation("Downloading '{S3Key}' from S3 bucket '{BucketName}'.", s3Key, bucketName);
+                Logger.LogInformation("Downloading '{S3Key}' from S3 bucket '{BucketName}'.", s3Key1, bucketName);
 
+                string s3Key = pollutantName;
+                Logger.LogInformation("Pollutant Master '{S3Key}' from S3 bucket '{BucketName}'.", s3Key, bucketName);
                 using var s3Response = await S3Client.GetObjectAsync(bucketName, s3Key);
                 using var memoryStream = new MemoryStream();
                 await s3Response.ResponseStream.CopyToAsync(memoryStream);
@@ -127,17 +135,19 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 throw new InvalidOperationException("An unexpected error occurred while processing pollutant master data.", ex);
             }
         }
-        public async Task ExceltoMongoDB_Station_detials()
+        public async Task ExceltoMongoDB_Station_detials(string pollutantName)
         {
             try
             {
                 string bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME")
                     ?? throw new InvalidOperationException("Environment variable 'S3_BUCKET_NAME' is not configured.");
 
-                string s3Key = Environment.GetEnvironmentVariable("POLLUTANT_STATION_MASTER")
+                string s3Key1 = Environment.GetEnvironmentVariable("POLLUTANT_STATION_MASTER")
                     ?? throw new InvalidOperationException("'StationMasterS3Key' is not configured.");
 
-                Logger.LogInformation("Downloading '{S3Key}' from S3 bucket '{BucketName}'.", s3Key, bucketName);
+                Logger.LogInformation("Downloading '{S3Key}' from S3 bucket '{BucketName}'.", s3Key1, bucketName);
+
+                string s3Key = pollutantName;
 
                 using var s3Response = await S3Client.GetObjectAsync(bucketName, s3Key);
                 using var memoryStream = new MemoryStream();
