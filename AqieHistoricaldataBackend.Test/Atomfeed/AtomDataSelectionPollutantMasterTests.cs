@@ -38,11 +38,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
         // ─── Helpers ────────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Mocks collection.FindAsync&lt;PollutantMasterProjection&gt;, which is the real
-        /// interface method invoked when the fluent Find().Project().ToListAsync() chain
-        /// is evaluated.
-        /// </summary>
         private void SetupFindAsyncReturns(List<PollutantMasterProjection> items)
         {
             var cursorMock = new Mock<IAsyncCursor<PollutantMasterProjection>>();
@@ -72,22 +67,27 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ThrowsAsync(exception);
         }
 
+        /// <summary>
+        /// All items have isValid = 1, matching the filter applied in the service.
+        /// </summary>
         private static List<PollutantMasterProjection> BuildProjectionList() =>
             new()
             {
                 new PollutantMasterProjection
                 {
-                    pollutantID          = "1",
-                    pollutantName        = "Nitrogen Dioxide",
+                    pollutantID            = "1",
+                    pollutantName          = "Nitrogen Dioxide",
                     pollutant_Abbreviation = "NO2",
-                    pollutant_value      = "no2"
+                    pollutant_value        = "no2",
+                    isValid                = 1
                 },
                 new PollutantMasterProjection
                 {
-                    pollutantID          = "2",
-                    pollutantName        = "Ozone",
+                    pollutantID            = "2",
+                    pollutantName          = "Ozone",
                     pollutant_Abbreviation = "O3",
-                    pollutant_value      = "o3"
+                    pollutant_value        = "o3",
+                    isValid                = 1
                 }
             };
 
@@ -105,6 +105,21 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             // Assert
             ((List<PollutantMasterProjection>)result).Should().BeEquivalentTo(expected);
+        }
+
+        [Fact]
+        public async Task GetPollutantMaster_ReturnsListWithIsValidOne_WhenCollectionHasDocuments()
+        {
+            // Arrange
+            SetupFindAsyncReturns(BuildProjectionList());
+
+            // Act
+            var result = await _sut.GetPollutantMaster();
+
+            // Assert
+            ((List<PollutantMasterProjection>)result)
+                .Should().OnlyContain(p => p.isValid == 1,
+                    "the service filters on isValid == 1");
         }
 
         [Fact]
