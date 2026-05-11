@@ -14,16 +14,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 var pollutantCollection = MongoDbClientFactory.GetCollection<PollutantMasterDocument>("aqie_atom_non_aurn_networks_pollutant_master");
-
+                
                 var pollutantList = await pollutantCollection
-                    .Find(x => x.isValid == 1)
+                    .Find(x => x.isValid == "1")
                     .Project(x => new PollutantMasterProjection
                     {
                         pollutantID = x.pollutantID,
                         pollutantName = x.pollutantName,
                         pollutant_Abbreviation = x.pollutant_Abbreviation,
-                        pollutant_value = x.pollutant_value,
-                        isValid = x.isValid
+                        pollutant_value = x.pollutant_value
                     })
                     .ToListAsync();
 

@@ -67,9 +67,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ThrowsAsync(exception);
         }
 
-        /// <summary>
-        /// All items have isValid = 1, matching the filter applied in the service.
-        /// </summary>
         private static List<PollutantMasterProjection> BuildProjectionList() =>
             new()
             {
@@ -78,16 +75,14 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     pollutantID            = "1",
                     pollutantName          = "Nitrogen Dioxide",
                     pollutant_Abbreviation = "NO2",
-                    pollutant_value        = "no2",
-                    isValid                = 1
+                    pollutant_value        = "no2"
                 },
                 new PollutantMasterProjection
                 {
                     pollutantID            = "2",
                     pollutantName          = "Ozone",
                     pollutant_Abbreviation = "O3",
-                    pollutant_value        = "o3",
-                    isValid                = 1
+                    pollutant_value        = "o3"
                 }
             };
 
@@ -108,18 +103,23 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         [Fact]
-        public async Task GetPollutantMaster_ReturnsListWithIsValidOne_WhenCollectionHasDocuments()
+        public async Task GetPollutantMaster_ReturnsCorrectProjectionFields_WhenCollectionHasDocuments()
         {
             // Arrange
-            SetupFindAsyncReturns(BuildProjectionList());
+            var expected = BuildProjectionList();
+            SetupFindAsyncReturns(expected);
 
             // Act
             var result = await _sut.GetPollutantMaster();
 
             // Assert
-            ((List<PollutantMasterProjection>)result)
-                .Should().OnlyContain(p => p.isValid == 1,
-                    "the service filters on isValid == 1");
+            var list = (List<PollutantMasterProjection>)result;
+            list.Should().OnlyContain(p =>
+                p.pollutantID != null &&
+                p.pollutantName != null &&
+                p.pollutant_Abbreviation != null &&
+                p.pollutant_value != null,
+                "all projected fields should be populated");
         }
 
         [Fact]
