@@ -299,7 +299,9 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 Year = "2022"
             };
             _dataSelectionHourlyMock
-                .Setup(x => x.dataSelectionHourlyAtomFeedExportCSV(It.IsAny<List<FinalData>>(), data))
+                .Setup(x => x.dataSelectionHourlyAtomFeedExportCSV(
+                    It.IsAny<List<FinalData>>(),
+                    It.Is<QueryStringData>(d => d == data)))
                 .ReturnsAsync(SampleCsvBytes);
 
             var result = await CreateService().WriteCsvToAwsS3BucketAsync(new List<FinalData>(), data, "Hourly");

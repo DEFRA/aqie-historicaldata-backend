@@ -54,7 +54,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 Logger.LogInformation("Downloading '{S3Key}' from S3 bucket '{BucketName}'.", s3Key1, bucketName);
 
-                string s3Key = pollutantName;
+                string s3Key = Environment.GetEnvironmentVariable("POLLUTANT_MASTER_KEY");
                 Logger.LogInformation("Pollutant Master '{S3Key}' from S3 bucket '{BucketName}'.", s3Key, bucketName);
                 using var s3Response = await S3Client.GetObjectAsync(bucketName, s3Key);
                 using var memoryStream = new MemoryStream();
@@ -148,7 +148,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 Logger.LogInformation("Downloading '{S3Key}' from S3 bucket '{BucketName}'.", s3Key1, bucketName);
 
-                string s3Key = pollutantName;
+                string s3Key = Environment.GetEnvironmentVariable("POLLUTANT_STATION_MASTER_KEY");
 
                 using var s3Response = await S3Client.GetObjectAsync(bucketName, s3Key);
                 using var memoryStream = new MemoryStream();

@@ -163,6 +163,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAtomDataSelectionPollutantMaster, AtomDataSelectionPollutantMaster>();
     builder.Services.AddSingleton<IAtomDataSelectionPollutantDataSource, AtomDataSelectionPollutantDataSource>();
     builder.Services.AddHostedService<AtomDataSelectionEmailJobHostedService>();
+    builder.Services.AddHostedService<AtomNonAurnNetworksSeedHostedService>();
 }
 
 [ExcludeFromCodeCoverage]
