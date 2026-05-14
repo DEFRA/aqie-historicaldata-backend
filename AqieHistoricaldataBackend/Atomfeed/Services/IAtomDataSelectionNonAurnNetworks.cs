@@ -7,5 +7,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     {
         [ExcludeFromCodeCoverage]
         Task<dynamic> GetAtomNonAurnNetworks(QueryStringData data);
+        Task ExceltoMongoDB(string pollutantName);               
+        Task ExceltoMongoDB_Station_detials(string pollutantName);
     }
 }

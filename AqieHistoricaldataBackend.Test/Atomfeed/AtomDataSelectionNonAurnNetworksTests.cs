@@ -27,9 +27,9 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
         private const string BucketName = "test-bucket";
 
-        // These are the pollutantName values passed into the methods (used as S3 keys)
-        private const string PollutantS3Key = "pollutant-master.xlsx";
-        private const string StationS3Key = "station-master.xlsx";
+        // Env-var values for the two S3 key env vars the SUT actually reads
+        private const string PollutantMasterKey = "pollutant-master-key.xlsx";
+        private const string StationMasterKey = "station-master-key.xlsx";
 
         private static readonly string[] PollutantUniqueKeys = ["pollutantID", "pollutantName", "pollutant_value"];
         private static readonly string[] StationUniqueKeys = ["SiteID", "Network Type", "Pollutant Name"];
@@ -93,16 +93,21 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 _configMock.Object,
                 _s3Mock.Object);
 
+            // Required env vars
             Environment.SetEnvironmentVariable("S3_BUCKET_NAME", BucketName);
             Environment.SetEnvironmentVariable("POLLUTANT_MASTER", "env-pollutant-master.xlsx");
+            Environment.SetEnvironmentVariable("POLLUTANT_MASTER_KEY", PollutantMasterKey);
             Environment.SetEnvironmentVariable("POLLUTANT_STATION_MASTER", "env-station-master.xlsx");
+            Environment.SetEnvironmentVariable("POLLUTANT_STATION_MASTER_KEY", StationMasterKey);
         }
 
         public void Dispose()
         {
             Environment.SetEnvironmentVariable("S3_BUCKET_NAME", null);
             Environment.SetEnvironmentVariable("POLLUTANT_MASTER", null);
+            Environment.SetEnvironmentVariable("POLLUTANT_MASTER_KEY", null);
             Environment.SetEnvironmentVariable("POLLUTANT_STATION_MASTER", null);
+            Environment.SetEnvironmentVariable("POLLUTANT_STATION_MASTER_KEY", null);
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────────
@@ -129,15 +134,15 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             return ms;
         }
 
-        // S3 setups use the pollutantName parameter value as the S3 key (matches SUT behaviour)
+        // S3 setups use the actual S3 key read from POLLUTANT_MASTER_KEY / POLLUTANT_STATION_MASTER_KEY
         private void SetupS3ForPollutant(MemoryStream stream) =>
             _s3Mock
-                .Setup(s => s.GetObjectAsync(BucketName, PollutantS3Key, It.IsAny<CancellationToken>()))
+                .Setup(s => s.GetObjectAsync(BucketName, PollutantMasterKey, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new GetObjectResponse { ResponseStream = stream });
 
         private void SetupS3ForStation(MemoryStream stream) =>
             _s3Mock
-                .Setup(s => s.GetObjectAsync(BucketName, StationS3Key, It.IsAny<CancellationToken>()))
+                .Setup(s => s.GetObjectAsync(BucketName, StationMasterKey, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new GetObjectResponse { ResponseStream = stream });
 
         // ── GetAtomNonAurnNetworks – branching ────────────────────────────────────
@@ -147,12 +152,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             // Arrange
             SetupS3ForPollutant(CreateExcelStream(PollutantUniqueKeys));
-            var data = new QueryStringData { SiteName = "Pollutant", pollutantName = PollutantS3Key };
+            var data = new QueryStringData { SiteName = "Pollutant", pollutantName = "any" };
 
             // Act
             var result = await _sut.GetAtomNonAurnNetworks(data);
 
-            // Assert – always returns "Success"; tasks are fire-and-forget
+            // Assert – always returns "Success"; inner tasks are fire-and-forget
             Assert.Equal("Success", (string)result);
         }
 
@@ -161,7 +166,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             // Arrange
             SetupS3ForStation(CreateExcelStream(StationUniqueKeys));
-            var data = new QueryStringData { SiteName = "Station", pollutantName = StationS3Key };
+            var data = new QueryStringData { SiteName = "Station", pollutantName = "any" };
 
             // Act
             var result = await _sut.GetAtomNonAurnNetworks(data);
@@ -178,7 +183,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Environment.SetEnvironmentVariable("S3_BUCKET_NAME", null);
 
             await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB(PollutantS3Key));
+                () => _sut.ExceltoMongoDB("any"));
         }
 
         [Fact]
@@ -187,7 +192,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Environment.SetEnvironmentVariable("POLLUTANT_MASTER", null);
 
             await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB(PollutantS3Key));
+                () => _sut.ExceltoMongoDB("any"));
         }
 
         // ── ExceltoMongoDB – header-only worksheet (no data rows) ─────────────────
@@ -199,7 +204,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupS3ForPollutant(CreateExcelStream(PollutantUniqueKeys));
 
             // Act
-            await _sut.ExceltoMongoDB(PollutantS3Key);
+            await _sut.ExceltoMongoDB("any");
 
             // Assert
             _pollutantCollectionMock.Verify(
@@ -221,7 +226,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupS3ForPollutant(CreateExcelStream(PollutantUniqueKeys, rows));
 
             // Act
-            await _sut.ExceltoMongoDB(PollutantS3Key);
+            await _sut.ExceltoMongoDB("any");
 
             // Assert – exactly one upsert
             _pollutantCollectionMock.Verify(
@@ -246,7 +251,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupS3ForPollutant(CreateExcelStream(PollutantUniqueKeys, rows));
 
             // Act
-            await _sut.ExceltoMongoDB(PollutantS3Key);
+            await _sut.ExceltoMongoDB("any");
 
             // Assert
             _pollutantCollectionMock.Verify(
@@ -269,7 +274,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupS3ForPollutant(CreateExcelStream(headers, rows));
 
             // Act
-            await _sut.ExceltoMongoDB(PollutantS3Key);
+            await _sut.ExceltoMongoDB("any");
 
             // Assert
             _pollutantCollectionMock.Verify(
@@ -284,13 +289,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task ExceltoMongoDB_SkipsInvalidRows_AndUpsertsValidOnes()
         {
-            // Arrange – one row missing two key fields, followed by one fully valid row
+            // Arrange – row is missing pollutantName + pollutant_value
             var headers = new[] { "pollutantID", "extra1", "extra2" };
-            var rows = new[] { new[] { "only_id", "val1", "val2" } }; // missing pollutantName + pollutant_value
+            var rows = new[] { new[] { "only_id", "val1", "val2" } };
             SetupS3ForPollutant(CreateExcelStream(headers, rows));
 
             // Act
-            await _sut.ExceltoMongoDB(PollutantS3Key);
+            await _sut.ExceltoMongoDB("any");
 
             // Assert – skipped row results in zero upserts
             _pollutantCollectionMock.Verify(
@@ -321,7 +326,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             // Act & Assert
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB(PollutantS3Key));
+                () => _sut.ExceltoMongoDB("any"));
             Assert.IsType<MongoException>(ex.InnerException);
             Assert.Equal("Mongo failure", ex.InnerException!.Message);
         }
@@ -331,12 +336,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             // Arrange
             _s3Mock
-                .Setup(s => s.GetObjectAsync(BucketName, PollutantS3Key, It.IsAny<CancellationToken>()))
+                .Setup(s => s.GetObjectAsync(BucketName, PollutantMasterKey, It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new Exception("S3 unavailable"));
 
             // Act & Assert
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB(PollutantS3Key));
+                () => _sut.ExceltoMongoDB("any"));
             Assert.NotNull(ex.InnerException);
             Assert.Equal("S3 unavailable", ex.InnerException!.Message);
         }
@@ -356,7 +361,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             // Act & Assert
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB(PollutantS3Key));
+                () => _sut.ExceltoMongoDB("any"));
             Assert.IsType<MongoException>(ex.InnerException);
             Assert.Equal("Index creation failed", ex.InnerException!.Message);
         }
@@ -369,7 +374,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Environment.SetEnvironmentVariable("S3_BUCKET_NAME", null);
 
             await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB_Station_detials(StationS3Key));
+                () => _sut.ExceltoMongoDB_Station_detials("any"));
         }
 
         [Fact]
@@ -378,7 +383,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Environment.SetEnvironmentVariable("POLLUTANT_STATION_MASTER", null);
 
             await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB_Station_detials(StationS3Key));
+                () => _sut.ExceltoMongoDB_Station_detials("any"));
         }
 
         // ── ExceltoMongoDB_Station_detials – header-only worksheet ────────────────
@@ -388,7 +393,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             SetupS3ForStation(CreateExcelStream(StationUniqueKeys));
 
-            await _sut.ExceltoMongoDB_Station_detials(StationS3Key);
+            await _sut.ExceltoMongoDB_Station_detials("any");
 
             _stationCollectionMock.Verify(
                 c => c.ReplaceOneAsync(
@@ -409,7 +414,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupS3ForStation(CreateExcelStream(StationUniqueKeys, rows));
 
             // Act
-            await _sut.ExceltoMongoDB_Station_detials(StationS3Key);
+            await _sut.ExceltoMongoDB_Station_detials("any");
 
             // Assert
             _stationCollectionMock.Verify(
@@ -434,7 +439,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupS3ForStation(CreateExcelStream(StationUniqueKeys, rows));
 
             // Act
-            await _sut.ExceltoMongoDB_Station_detials(StationS3Key);
+            await _sut.ExceltoMongoDB_Station_detials("any");
 
             // Assert
             _stationCollectionMock.Verify(
@@ -457,7 +462,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupS3ForStation(CreateExcelStream(headers, rows));
 
             // Act
-            await _sut.ExceltoMongoDB_Station_detials(StationS3Key);
+            await _sut.ExceltoMongoDB_Station_detials("any");
 
             // Assert
             _stationCollectionMock.Verify(
@@ -488,7 +493,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             // Act & Assert
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB_Station_detials(StationS3Key));
+                () => _sut.ExceltoMongoDB_Station_detials("any"));
             Assert.IsType<MongoException>(ex.InnerException);
             Assert.Equal("Mongo failure", ex.InnerException!.Message);
         }
@@ -498,12 +503,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             // Arrange
             _s3Mock
-                .Setup(s => s.GetObjectAsync(BucketName, StationS3Key, It.IsAny<CancellationToken>()))
+                .Setup(s => s.GetObjectAsync(BucketName, StationMasterKey, It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new Exception("S3 unavailable"));
 
             // Act & Assert
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB_Station_detials(StationS3Key));
+                () => _sut.ExceltoMongoDB_Station_detials("any"));
             Assert.NotNull(ex.InnerException);
             Assert.Equal("S3 unavailable", ex.InnerException!.Message);
         }
@@ -523,7 +528,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             // Act & Assert
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB_Station_detials(StationS3Key));
+                () => _sut.ExceltoMongoDB_Station_detials("any"));
             Assert.IsType<MongoException>(ex.InnerException);
             Assert.Equal("Index creation failed", ex.InnerException!.Message);
         }
