@@ -16,7 +16,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionNonAurnNetworks(
         ILogger<HistoryexceedenceService> Logger,
         IMongoDbClientFactory MongoDbClientFactory,
-        IConfiguration Configuration,
         IAmazonS3 S3Client
     ) : IAtomDataSelectionNonAurnNetworks
     {
@@ -24,38 +23,38 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
+                string pollutantName = data.pollutantName ?? string.Empty;
+
                 if (data.SiteName == "Pollutant")
                 {
-                    ExceltoMongoDB(data.pollutantName);
+                    await ExceltoMongoDB(pollutantName);
                 }
                 else
                 {
-                    ExceltoMongoDB_Station_detials(data.pollutantName);
+                    await ExceltoMongoDB_Station_detials(pollutantName);
                 }
 
                 return "Success";
-
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error in Atom GetAtomNonAurnNetworks"); 
+                Logger.LogError(ex, "Error in Atom GetAtomNonAurnNetworks");
                 return "Failure";
             }
         }
+
         public async Task ExceltoMongoDB(string pollutantName)
         {
             try
             {
+                Logger.LogInformation("Pollutant Master ExceltoMongoDB Started");
+
                 string bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME")
                     ?? throw new InvalidOperationException("Environment variable 'S3_BUCKET_NAME' is not configured.");
 
-                string s3Key1 = Environment.GetEnvironmentVariable("POLLUTANT_MASTER")
-                    ?? throw new InvalidOperationException("'PollutantsMasterS3Key' is not configured.");
+                string s3Key = Environment.GetEnvironmentVariable("POLLUTANT_MASTER_KEY")
+                    ?? throw new InvalidOperationException("Environment variable 'POLLUTANT_MASTER_KEY' is not configured.");
 
-                Logger.LogInformation("Downloading '{S3Key}' from S3 bucket '{BucketName}'.", s3Key1, bucketName);
-
-                string s3Key = Environment.GetEnvironmentVariable("POLLUTANT_MASTER_KEY");
-                Logger.LogInformation("Pollutant Master '{S3Key}' from S3 bucket '{BucketName}'.", s3Key, bucketName);
                 using var s3Response = await S3Client.GetObjectAsync(bucketName, s3Key);
                 using var memoryStream = new MemoryStream();
                 await s3Response.ResponseStream.CopyToAsync(memoryStream);
@@ -67,10 +66,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 if (allRows.Count == 0) return;
 
-                // MongoDB setup via MongoDbClientFactory
                 var collection = MongoDbClientFactory.GetCollection<BsonDocument>("aqie_atom_non_aurn_networks_pollutant_master");
 
-                // Ensure a compound index on the unique key fields for efficient upserts
                 var indexKeys = Builders<BsonDocument>.IndexKeys
                     .Ascending("pollutantID")
                     .Ascending("pollutantName")
@@ -80,10 +77,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     new CreateIndexModel<BsonDocument>(indexKeys, new CreateIndexOptions { Unique = true })
                 );
 
-                // Read headers from the first row
                 string[] headers = allRows[0].Cells().Select(c => c.Value.ToString()).ToArray();
-
-                // Composite unique key: all listed fields must match for an upsert
                 string[] UniqueKeyFields = ["pollutantID", "pollutantName", "pollutant_value"];
 
                 int upserted = 0;
@@ -99,7 +93,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         i++;
                     }
 
-                    // Ensure all key fields are present in the document
                     var missingKeys = UniqueKeyFields.Where(k => !doc.Contains(k)).ToList();
                     if (missingKeys.Count > 0)
                     {
@@ -107,7 +100,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         continue;
                     }
 
-                    // Build a combined AND filter across all unique key fields
                     var filter = Builders<BsonDocument>.Filter.And(
                         UniqueKeyFields.Select(k => Builders<BsonDocument>.Filter.Eq(k, doc[k]))
                     );
@@ -118,7 +110,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
 
                 Console.WriteLine($"Upserted {upserted} documents into MongoDB.");
-                Logger.LogInformation("Upserted {UpsertedCount} documents into MongoDB.", upserted);
+                Logger.LogInformation("Upserted ExceltoMongoDB {UpsertedCount} documents into MongoDB.", upserted);
             }
             catch (FileNotFoundException ex)
             {
@@ -136,19 +128,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 throw new InvalidOperationException("An unexpected error occurred while processing pollutant master data.", ex);
             }
         }
+
         public async Task ExceltoMongoDB_Station_detials(string pollutantName)
         {
             try
             {
+                Logger.LogInformation("Pollutant Station Master ExceltoMongoDB Started");
                 string bucketName = Environment.GetEnvironmentVariable("S3_BUCKET_NAME")
                     ?? throw new InvalidOperationException("Environment variable 'S3_BUCKET_NAME' is not configured.");
 
-                string s3Key1 = Environment.GetEnvironmentVariable("POLLUTANT_STATION_MASTER")
-                    ?? throw new InvalidOperationException("'StationMasterS3Key' is not configured.");
-
-                Logger.LogInformation("Downloading '{S3Key}' from S3 bucket '{BucketName}'.", s3Key1, bucketName);
-
-                string s3Key = Environment.GetEnvironmentVariable("POLLUTANT_STATION_MASTER_KEY");
+                string s3Key = Environment.GetEnvironmentVariable("POLLUTANT_STATION_MASTER_KEY")
+                    ?? throw new InvalidOperationException("Environment variable 'POLLUTANT_STATION_MASTER_KEY' is not configured.");
 
                 using var s3Response = await S3Client.GetObjectAsync(bucketName, s3Key);
                 using var memoryStream = new MemoryStream();
@@ -161,23 +151,18 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 if (allRows.Count == 0) return;
 
-                // MongoDB setup via MongoDbClientFactory
                 var collection = MongoDbClientFactory.GetCollection<BsonDocument>("aqie_atom_non_aurn_networks_station_details");
 
-                // Ensure a compound index on the unique key fields for efficient upserts
                 var indexKeys = Builders<BsonDocument>.IndexKeys
                     .Ascending("SiteID")
                     .Ascending("Network Type")
-                    .Ascending("Pollutant Name"); //["SiteID", "Network Type", "Pollutant Name"]
+                    .Ascending("Pollutant Name");
 
                 await collection.Indexes.CreateOneAsync(
                     new CreateIndexModel<BsonDocument>(indexKeys, new CreateIndexOptions { Unique = true })
                 );
 
-                // Read headers from the first row
                 string[] headers = allRows[0].Cells().Select(c => c.Value.ToString()).ToArray();
-
-                // Composite unique key: all listed fields must match for an upsert
                 string[] UniqueKeyFields = ["SiteID", "Network Type", "Pollutant Name"];
 
                 int upserted = 0;
@@ -193,7 +178,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         i++;
                     }
 
-                    // Ensure all key fields are present in the document
                     var missingKeys = UniqueKeyFields.Where(k => !doc.Contains(k)).ToList();
                     if (missingKeys.Count > 0)
                     {
@@ -201,7 +185,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         continue;
                     }
 
-                    // Build a combined AND filter across all unique key fields
                     var filter = Builders<BsonDocument>.Filter.And(
                         UniqueKeyFields.Select(k => Builders<BsonDocument>.Filter.Eq(k, doc[k]))
                     );
@@ -212,14 +195,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
 
                 Console.WriteLine($"Upserted {upserted} documents into MongoDB.");
-                Logger.LogInformation("Upserted {UpsertedCount} documents into MongoDB.", upserted);
+                Logger.LogInformation("Upserted ExceltoMongoDB_Station_detials {UpsertedCount} documents into MongoDB.", upserted);
             }
             catch (FileNotFoundException ex)
             {
                 Logger.LogError(ex, "Excel file not found in ExceltoMongoDB_Station_detials.");
                 throw new InvalidOperationException("Failed to load station master data from S3.", ex);
             }
-            catch (MongoException ex)   
+            catch (MongoException ex)
             {
                 Logger.LogError(ex, "MongoDB error in ExceltoMongoDB_Station_detials.");
                 throw new InvalidOperationException("Failed to upsert station master data to MongoDB.", ex);
@@ -230,7 +213,5 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 throw new InvalidOperationException("An unexpected error occurred while processing station master data.", ex);
             }
         }
-
-
     }
 }
