@@ -56,8 +56,9 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task StopAsync_CompletesImmediately()
         {
-            await _sut.StopAsync(CancellationToken.None);
-            // No exception — StopAsync returns Task.CompletedTask
+            var exception = await Record.ExceptionAsync(() => _sut.StopAsync(CancellationToken.None));
+
+            Assert.Null(exception);
         }
 
         // ── Happy path ────────────────────────────────────────────────────────────

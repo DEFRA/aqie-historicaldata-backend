@@ -3,7 +3,6 @@ using Amazon.S3.Model;
 using AqieHistoricaldataBackend.Atomfeed.Services;
 using AqieHistoricaldataBackend.Utils.Mongo;
 using ClosedXML.Excel;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -17,7 +16,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
     {
         private readonly Mock<ILogger<HistoryexceedenceService>> _loggerMock;
         private readonly Mock<IMongoDbClientFactory> _mongoFactoryMock;
-        private readonly Mock<IConfiguration> _configMock;
         private readonly Mock<IAmazonS3> _s3Mock;
         private readonly Mock<IMongoCollection<BsonDocument>> _pollutantCollectionMock;
         private readonly Mock<IMongoCollection<BsonDocument>> _stationCollectionMock;
@@ -26,8 +24,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         private readonly AtomDataSelectionNonAurnNetworks _sut;
 
         private const string BucketName = "test-bucket";
-
-        // Env-var values for the two S3 key env vars the SUT actually reads
         private const string PollutantMasterKey = "pollutant-master-key.xlsx";
         private const string StationMasterKey = "station-master-key.xlsx";
 
@@ -38,7 +34,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             _loggerMock = new Mock<ILogger<HistoryexceedenceService>>();
             _mongoFactoryMock = new Mock<IMongoDbClientFactory>();
-            _configMock = new Mock<IConfiguration>();
             _s3Mock = new Mock<IAmazonS3>();
 
             _pollutantCollectionMock = new Mock<IMongoCollection<BsonDocument>>();
@@ -90,31 +85,31 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             _sut = new AtomDataSelectionNonAurnNetworks(
                 _loggerMock.Object,
                 _mongoFactoryMock.Object,
-                _configMock.Object,
                 _s3Mock.Object);
 
-            // Required env vars
             Environment.SetEnvironmentVariable("S3_BUCKET_NAME", BucketName);
-            Environment.SetEnvironmentVariable("POLLUTANT_MASTER", "env-pollutant-master.xlsx");
             Environment.SetEnvironmentVariable("POLLUTANT_MASTER_KEY", PollutantMasterKey);
-            Environment.SetEnvironmentVariable("POLLUTANT_STATION_MASTER", "env-station-master.xlsx");
             Environment.SetEnvironmentVariable("POLLUTANT_STATION_MASTER_KEY", StationMasterKey);
         }
 
         public void Dispose()
         {
-            Environment.SetEnvironmentVariable("S3_BUCKET_NAME", null);
-            Environment.SetEnvironmentVariable("POLLUTANT_MASTER", null);
-            Environment.SetEnvironmentVariable("POLLUTANT_MASTER_KEY", null);
-            Environment.SetEnvironmentVariable("POLLUTANT_STATION_MASTER", null);
-            Environment.SetEnvironmentVariable("POLLUTANT_STATION_MASTER_KEY", null);
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Environment.SetEnvironmentVariable("S3_BUCKET_NAME", null);
+                Environment.SetEnvironmentVariable("POLLUTANT_MASTER_KEY", null);
+                Environment.SetEnvironmentVariable("POLLUTANT_STATION_MASTER_KEY", null);
+            }
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Creates an in-memory Excel stream with the given headers and optional data rows.
-        /// </summary>
         private static MemoryStream CreateExcelStream(string[] headers, string[][]? rows = null)
         {
             using var workbook = new XLWorkbook();
@@ -134,7 +129,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             return ms;
         }
 
-        // S3 setups use the actual S3 key read from POLLUTANT_MASTER_KEY / POLLUTANT_STATION_MASTER_KEY
         private void SetupS3ForPollutant(MemoryStream stream) =>
             _s3Mock
                 .Setup(s => s.GetObjectAsync(BucketName, PollutantMasterKey, It.IsAny<CancellationToken>()))
@@ -175,6 +169,21 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Assert.Equal("Success", (string)result);
         }
 
+        [Fact]
+        public async Task GetAtomNonAurnNetworks_ReturnsFailure_WhenExceptionIsThrown()
+        {
+            // S3 not set up → GetObjectAsync throws → outer catch returns "Failure"
+            _s3Mock
+                .Setup(s => s.GetObjectAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new Exception("unexpected"));
+
+            var data = new QueryStringData { SiteName = "Pollutant", pollutantName = "any" };
+
+            var result = await _sut.GetAtomNonAurnNetworks(data);
+
+            Assert.Equal("Failure", (string)result);
+        }
+
         // ── ExceltoMongoDB – environment-variable guards ──────────────────────────
 
         [Fact]
@@ -187,15 +196,16 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         [Fact]
-        public async Task ExceltoMongoDB_Throws_WhenPollutantMasterEnvKeyMissing()
+        public async Task ExceltoMongoDB_Throws_WhenPollutantMasterKeyMissing()
         {
-            Environment.SetEnvironmentVariable("POLLUTANT_MASTER", null);
+            // The SUT reads POLLUTANT_MASTER_KEY (not POLLUTANT_MASTER)
+            Environment.SetEnvironmentVariable("POLLUTANT_MASTER_KEY", null);
 
             await Assert.ThrowsAsync<InvalidOperationException>(
                 () => _sut.ExceltoMongoDB("any"));
         }
 
-        // ── ExceltoMongoDB – header-only worksheet (no data rows) ─────────────────
+        // ── ExceltoMongoDB – header-only worksheet ────────────────────────────────
 
         [Fact]
         public async Task ExceltoMongoDB_DoesNotUpsert_WhenWorksheetHasOnlyHeaderRow()
@@ -233,7 +243,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 c => c.ReplaceOneAsync(
                     It.IsAny<FilterDefinition<BsonDocument>>(),
                     It.IsAny<BsonDocument>(),
-                    It.Is<ReplaceOptions>(o => o.IsUpsert == true),
+                    It.Is<ReplaceOptions>(o => o.IsUpsert),
                     It.IsAny<CancellationToken>()),
                 Times.Once);
         }
@@ -378,9 +388,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         [Fact]
-        public async Task ExceltoMongoDB_StationDetails_Throws_WhenStationMasterEnvKeyMissing()
+        public async Task ExceltoMongoDB_StationDetails_Throws_WhenStationMasterKeyMissing()
         {
-            Environment.SetEnvironmentVariable("POLLUTANT_STATION_MASTER", null);
+            // The SUT reads POLLUTANT_STATION_MASTER_KEY (not POLLUTANT_STATION_MASTER)
+            Environment.SetEnvironmentVariable("POLLUTANT_STATION_MASTER_KEY", null);
 
             await Assert.ThrowsAsync<InvalidOperationException>(
                 () => _sut.ExceltoMongoDB_Station_detials("any"));
@@ -391,10 +402,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task ExceltoMongoDB_StationDetails_DoesNotUpsert_WhenWorksheetHasOnlyHeaderRow()
         {
+            // Arrange
             SetupS3ForStation(CreateExcelStream(StationUniqueKeys));
 
+            // Act
             await _sut.ExceltoMongoDB_Station_detials("any");
 
+            // Assert
             _stationCollectionMock.Verify(
                 c => c.ReplaceOneAsync(
                     It.IsAny<FilterDefinition<BsonDocument>>(),
@@ -421,7 +435,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 c => c.ReplaceOneAsync(
                     It.IsAny<FilterDefinition<BsonDocument>>(),
                     It.IsAny<BsonDocument>(),
-                    It.Is<ReplaceOptions>(o => o.IsUpsert == true),
+                    It.Is<ReplaceOptions>(o => o.IsUpsert),
                     It.IsAny<CancellationToken>()),
                 Times.Once);
         }
