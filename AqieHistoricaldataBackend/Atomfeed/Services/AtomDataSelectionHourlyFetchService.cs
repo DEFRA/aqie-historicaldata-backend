@@ -129,7 +129,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 new PollutantDetails { PollutantName = "Sulphur dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1" },
                 new PollutantDetails { PollutantName = "Nitrogen oxides as nitrogen dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/9" },
                 new PollutantDetails { PollutantName = "Carbon monoxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/10" },
-                new PollutantDetails { PollutantName = "Nitric oxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/38" }
+                new PollutantDetails { PollutantName = "Nitric oxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/38" },
+                new PollutantDetails { PollutantName = "Particulate calcium", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/629" },
+                new PollutantDetails { PollutantName = "Particulate chloride", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/631" },
+                new PollutantDetails { PollutantName = "Particulate magnesium", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/659" },
+                new PollutantDetails { PollutantName = "Particulate sodium", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/668" },
+                new PollutantDetails { PollutantName = "Particulate nitrite", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/999004" },
+                new PollutantDetails { PollutantName = "Particulate nitrate", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/46" },
+                new PollutantDetails { PollutantName = "Particulate sulphate", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/47" },
+                new PollutantDetails { PollutantName = "Gaseous hydrochloric acid", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/39" },
+                new PollutantDetails { PollutantName = "Gaseous nitric acid", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/50" },
+                new PollutantDetails { PollutantName = "Gaseous nitrous acid", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/999005" }
             };
             // Split and normalize the filter string
             var filterList = (filter ?? string.Empty)

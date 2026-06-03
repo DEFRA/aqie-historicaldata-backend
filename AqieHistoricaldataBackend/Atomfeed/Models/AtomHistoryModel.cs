@@ -61,6 +61,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? jobId { get; set; }
             public string? email { get; set; }
             public string? pollutantId { get; set; }
+            public string? networkId { get; set; }
             public string? grouppollutantId { get; set; }
         }
 
@@ -188,6 +189,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string JobId { get; set; } = string.Empty;
             [BsonElement("pollutantName")]
             public string PollutantName { get; set; } = string.Empty;
+            [BsonElement("networkId")]
+            public string NetworkId { get; set; } = string.Empty;
             [BsonElement("dataSource")]
             public string DataSource { get; set; } = string.Empty;
             [BsonElement("year")]
@@ -316,6 +319,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             [BsonElement("Site Name")]
             public string? SiteName { get; set; }
 
+            [BsonElement("Region")]
+            public string? Region { get; set; }
+
             [BsonElement("Environment Type")]
             public string? EnvironmentType { get; set; }
 
@@ -324,6 +330,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
 
             [BsonElement("Longitude")]
             public string? Longitude { get; set; }
+
+            [BsonElement("NetworkID")]
+            public string? NetworkID { get; set; }
 
             [BsonElement("Network Type")]
             public string? NetworkType { get; set; }

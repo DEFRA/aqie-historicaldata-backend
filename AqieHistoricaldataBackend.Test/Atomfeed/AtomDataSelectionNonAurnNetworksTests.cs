@@ -21,6 +21,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         private readonly Mock<IMongoCollection<BsonDocument>> _stationCollectionMock;
         private readonly Mock<IMongoIndexManager<BsonDocument>> _pollutantIndexMock;
         private readonly Mock<IMongoIndexManager<BsonDocument>> _stationIndexMock;
+        private readonly Mock<IMongoDatabase> _pollutantDatabaseMock;  // added
+        private readonly Mock<IMongoDatabase> _stationDatabaseMock;    // added
         private readonly AtomDataSelectionNonAurnNetworks _sut;
 
         private const string BucketName = "test-bucket";
@@ -40,6 +42,24 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             _stationCollectionMock = new Mock<IMongoCollection<BsonDocument>>();
             _pollutantIndexMock = new Mock<IMongoIndexManager<BsonDocument>>();
             _stationIndexMock = new Mock<IMongoIndexManager<BsonDocument>>();
+            _pollutantDatabaseMock = new Mock<IMongoDatabase>();  // added
+            _stationDatabaseMock = new Mock<IMongoDatabase>();    // added
+
+            // Wire up Database property so DropCollectionAsync doesn't throw
+            _pollutantCollectionMock.Setup(c => c.Database).Returns(_pollutantDatabaseMock.Object);
+            _stationCollectionMock.Setup(c => c.Database).Returns(_stationDatabaseMock.Object);
+
+            _pollutantDatabaseMock
+                .Setup(d => d.DropCollectionAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
+            _stationDatabaseMock
+                .Setup(d => d.DropCollectionAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
 
             _pollutantCollectionMock.Setup(c => c.Indexes).Returns(_pollutantIndexMock.Object);
             _stationCollectionMock.Setup(c => c.Indexes).Returns(_stationIndexMock.Object);

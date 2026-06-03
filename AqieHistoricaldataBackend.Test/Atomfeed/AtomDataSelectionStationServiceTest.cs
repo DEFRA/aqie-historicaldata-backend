@@ -207,6 +207,44 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .Returns(collMock.Object);
         }
 
+        /// <summary>
+        /// Sets up a job collection mock that signals <paramref name="tcs"/> once the
+        /// second UpdateOneAsync call completes (Processing → Completed/Failed).
+        /// </summary>
+        private void SetupJobCollectionWithSignal(TaskCompletionSource tcs)
+        {
+            var indexManagerMock = new Mock<IMongoIndexManager<JobDocument>>();
+            indexManagerMock
+                .Setup(i => i.CreateOneAsync(
+                    It.IsAny<CreateIndexModel<JobDocument>>(),
+                    It.IsAny<CreateOneIndexOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync("index_name");
+
+            int updateCount = 0;
+
+            var collMock = new Mock<IMongoCollection<JobDocument>>();
+            collMock.Setup(c => c.Indexes).Returns(indexManagerMock.Object);
+            collMock.Setup(c => c.InsertOneAsync(It.IsAny<JobDocument>(), null, default))
+                    .Returns(Task.CompletedTask);
+            collMock
+                .Setup(c => c.UpdateOneAsync(
+                    It.IsAny<FilterDefinition<JobDocument>>(),
+                    It.IsAny<UpdateDefinition<JobDocument>>(),
+                    It.IsAny<UpdateOptions>(),
+                    default))
+                .Callback(() =>
+                {
+                    if (Interlocked.Increment(ref updateCount) >= 2)
+                        tcs.TrySetResult();
+                })
+                .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
+
+            _mongoFactoryMock
+                .Setup(m => m.GetCollection<JobDocument>(It.IsAny<string>()))
+                .Returns(collMock.Object);
+        }
+
         // ------------------------------------------------------------------
         // HTTP / site-meta helpers
         // ------------------------------------------------------------------
@@ -240,10 +278,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             });
         }
 
-        /// <summary>
-        /// Sets up the HTTP mock (for the AURN site-meta call) and the auth service mock.
-        /// For non-AURN tests the HTTP client is never called, so this is optional there.
-        /// </summary>
         private void SetupHttpFactory(string siteMetaJson)
         {
             _authServiceMock
@@ -283,7 +317,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenPollutantNameIsNull()
         {
             var result = await CreateService().GetAtomDataSelectionStation(
-                null, "AURN", "2023", "England", "Country",
+                null, null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("Failure", result);
@@ -293,7 +327,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenPollutantNameIsEmpty()
         {
             var result = await CreateService().GetAtomDataSelectionStation(
-                "", "AURN", "2023", "England", "Country",
+                "", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("Failure", result);
@@ -303,7 +337,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenYearIsNull()
         {
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", null, "England", "Country",
+                "NO2", null, "AURN", null, "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("Failure", result);
@@ -313,7 +347,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenYearIsEmpty()
         {
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "", "England", "Country",
+                "NO2", null, "AURN", "", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("Failure", result);
@@ -323,7 +357,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetAtomDataSelectionStation_LogsWarning_WhenPollutantNameIsNull()
         {
             await CreateService().GetAtomDataSelectionStation(
-                null, "AURN", "2023", "England", "Country",
+                null, null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             _loggerMock.Verify(
@@ -338,8 +372,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
         // ------------------------------------------------------------------
         // dataSelectorCount + datasource == "AURN"
-        // (env vars absent → GetRicardoToken returns "Failure" string and logs error;
-        //  FetchSiteMetadata is still called with the "Failure" bearer token)
         // ------------------------------------------------------------------
 
         [Fact]
@@ -356,7 +388,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "2023", "England", "Country",
+                "NO2", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("1", result);
@@ -373,14 +405,14 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo>());
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "2023", "England", "Country",
+                "NO2", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("0", result);
         }
 
         // ------------------------------------------------------------------
-        // GetRicardoToken branches (requires controlling RICARDO_API_* env vars)
+        // GetRicardoToken branches
         // ------------------------------------------------------------------
 
         [Fact]
@@ -394,7 +426,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService();
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "2023", "England", "Country",
+                "NO2", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             _loggerMock.Verify(
@@ -422,7 +454,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 SetupBoundaryService();
 
                 await CreateService().GetAtomDataSelectionStation(
-                    "NO2", "AURN", "2023", "England", "Country",
+                    "NO2", null, "AURN", "2023", "England", "Country",
                     "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
                 _loggerMock.Verify(
@@ -453,14 +485,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     .Setup(a => a.GetTokenAsync("test@test.com", "pass"))
                     .ReturnsAsync("real_token");
                 SetupHttpFactory(BuildSiteMetaJson());
-                // Override after SetupHttpFactory so the "real_token" setup wins
                 _authServiceMock
                     .Setup(a => a.GetTokenAsync("test@test.com", "pass"))
                     .ReturnsAsync("real_token");
                 SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
                 var result = await CreateService().GetAtomDataSelectionStation(
-                    "NO2", "AURN", "2023", "England", "Country",
+                    "NO2", null, "AURN", "2023", "England", "Country",
                     "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
                 Assert.Equal("1", result);
@@ -473,7 +504,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         // ------------------------------------------------------------------
-        // HTTP 500 on site-meta call → EnsureSuccessStatusCode throws → "Failure"
+        // HTTP 500 on site-meta → EnsureSuccessStatusCode throws → "Failure"
         // ------------------------------------------------------------------
 
         [Fact]
@@ -501,7 +532,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 _httpClientFactoryMock.Setup(f => f.CreateClient("RicardoNewAPI")).Returns(client);
 
                 var result = await CreateService().GetAtomDataSelectionStation(
-                    "NO2", "AURN", "2023", "England", "Country",
+                    "NO2", null, "AURN", "2023", "England", "Country",
                     "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
                 Assert.Equal("Failure", result);
@@ -530,12 +561,11 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "NON-AURN", "2023", "England", "Country",
+                "NO2", null, "NON-AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
-            // Should return a list of { NetworkType, Count } objects
             var items = Assert.IsAssignableFrom<IEnumerable>(result).Cast<object>().ToList();
-            Assert.Equal(2, items.Count); // AURN group + LAQN group
+            Assert.Equal(2, items.Count);
         }
 
         [Fact]
@@ -546,10 +576,9 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo>());
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "NON-AURN", "2023", "England", "Country",
+                "NO2", null, "NON-AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
-            // stationData is empty → networkTypeCounts.Count == 0 → fallback Unknown
             var items = Assert.IsAssignableFrom<IEnumerable>(result).Cast<object>().ToList();
             Assert.Single(items);
         }
@@ -565,17 +594,15 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "NON-AURN", "2023", "England", "Country",
+                "NO2", null, "NON-AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
-            // null NetworkType → grouped under "Unknown"
             var items = Assert.IsAssignableFrom<IEnumerable>(result).Cast<object>().ToList();
             Assert.Single(items);
         }
 
         // ------------------------------------------------------------------
-        // dataSelectorHourly + dataSelectorMultiple (presigned URL)
-        // (datasource irrelevant for the dataSelectorHourly branch)
+        // dataSelectorHourly + dataSelectorMultiple (email download / presigned URL)
         // ------------------------------------------------------------------
 
         [Fact]
@@ -596,14 +623,14 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync("https://s3.example.com/file.zip");
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "src", "2023", "England", "Country",
+                "NO2", null, "src", "2023", "England", "Country",
                 "dataSelectorHourly", "dataSelectorMultiple", "u@t.com");
 
             Assert.Equal("https://s3.example.com/file.zip", result);
         }
 
         // ------------------------------------------------------------------
-        // dataSelectorHourly + dataSelectorSingle (job queue)
+        // dataSelectorHourly + dataSelectorSingle (job queue — enqueue only)
         // ------------------------------------------------------------------
 
         [Fact]
@@ -614,11 +641,112 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "src", "2023", "England", "Country",
+                "NO2", null, "src", "2023", "England", "Country",
                 "dataSelectorHourly", "dataSelectorSingle", "u@t.com");
 
             Assert.NotNull(result);
             Assert.Matches("^[a-f0-9]{32}$", result.ToString()!);
+        }
+
+        // ------------------------------------------------------------------
+        // ProcessQueueAsync — Completed path
+        // ------------------------------------------------------------------
+
+        [Fact]
+        public async Task ProcessQueueAsync_UpdatesJobAsCompleted_WhenProcessingSucceeds()
+        {
+            SetupPollutantMasterCollection();
+            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
+
+            _hourlyFetchMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<QueryStringData>()))
+                .ReturnsAsync(new List<FinalData>());
+
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .ReturnsAsync("https://s3.example.com/result.zip");
+
+            var completedTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            SetupJobCollectionWithSignal(completedTcs);
+
+            var result = await CreateService().GetAtomDataSelectionStation(
+                "NO2", null, "src", "2023", "England", "Country",
+                "dataSelectorHourly", "dataSelectorSingle", "u@t.com");
+
+            Assert.Matches("^[a-f0-9]{32}$", result.ToString()!);
+
+            // Wait for the background processor to reach the Completed update
+            await completedTcs.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+
+        // ------------------------------------------------------------------
+        // ProcessQueueAsync — Failed path
+        // ------------------------------------------------------------------
+
+        [Fact]
+        public async Task ProcessQueueAsync_UpdatesJobAsFailed_WhenHourlyFetchThrows()
+        {
+            SetupPollutantMasterCollection();
+            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
+
+            _hourlyFetchMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(),
+                    It.IsAny<QueryStringData>()))
+                .ThrowsAsync(new Exception("hourly fetch failed"));
+
+            var failedTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            SetupJobCollectionWithSignal(failedTcs);
+
+            var result = await CreateService().GetAtomDataSelectionStation(
+                "NO2", null, "src", "2023", "England", "Country",
+                "dataSelectorHourly", "dataSelectorSingle", "u@t.com");
+
+            Assert.Matches("^[a-f0-9]{32}$", result.ToString()!);
+
+            // Wait for the background processor to reach the Failed update
+            await failedTcs.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            _loggerMock.Verify(
+                x => x.Log(
+                    LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((v, _) => true),
+                    It.IsAny<Exception?>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.AtLeastOnce);
+        }
+
+        // ------------------------------------------------------------------
+        // EnsureQueueProcessorStartedAsync — reuse branch (processor still running)
+        // ------------------------------------------------------------------
+
+        [Fact]
+        public async Task EnsureQueueProcessorStartedAsync_ReusesExistingTask_WhenProcessorStillRunning()
+        {
+            SetupPollutantMasterCollection();
+            SetupJobCollection();
+            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
+
+            var svc = CreateService();
+
+            // First call — starts the processor (it blocks waiting for more channel items)
+            var jobId1 = (await svc.GetAtomDataSelectionStation(
+                "NO2", null, "src", "2023", "England", "Country",
+                "dataSelectorHourly", "dataSelectorSingle", "u@t.com")).ToString();
+
+            // Second call — processor is still running; EnsureQueueProcessorStartedAsync
+            // should return the existing task rather than spawning a new one
+            var jobId2 = (await svc.GetAtomDataSelectionStation(
+                "NO2", null, "src", "2023", "England", "Country",
+                "dataSelectorHourly", "dataSelectorSingle", "u@t.com")).ToString();
+
+            Assert.Matches("^[a-f0-9]{32}$", jobId1!);
+            Assert.Matches("^[a-f0-9]{32}$", jobId2!);
+            Assert.NotEqual(jobId1, jobId2); // two distinct jobs enqueued
         }
 
         // ------------------------------------------------------------------
@@ -644,7 +772,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync("https://s3.example.com/nonaurn.zip");
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "NON-AURN", "2023", "England", "Country",
+                "NO2", null, "NON-AURN", "2023", "England", "Country",
                 "dataSelectorHourly", "dataSelectorMultiple", "u@t.com");
 
             Assert.Equal("https://s3.example.com/nonaurn.zip", result);
@@ -659,7 +787,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "S1" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "NON-AURN", "2023", "England", "Country",
+                "NO2", null, "NON-AURN", "2023", "England", "Country",
                 "dataSelectorHourly", "dataSelectorSingle", "u@t.com");
 
             Assert.NotNull(result);
@@ -677,26 +805,25 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService();
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "src", "2023", "England", "Country",
+                "NO2", null, "src", "2023", "England", "Country",
                 "unknownFilterType", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("Failure", result);
         }
 
         // ------------------------------------------------------------------
-        // Exception thrown anywhere → "Failure"
+        // Exception thrown anywhere → "Failure" + error logged
         // ------------------------------------------------------------------
 
         [Fact]
         public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenExceptionThrown()
         {
-            // Make ResolvePollutantNameAsync throw immediately
             _mongoFactoryMock
                 .Setup(m => m.GetCollection<PollutantMasterDocument>(It.IsAny<string>()))
                 .Throws(new Exception("unexpected"));
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "src", "2023", "England", "Country",
+                "NO2", null, "src", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("Failure", result);
@@ -712,7 +839,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ThrowsAsync(new Exception("boundary error"));
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "src", "2023", "England", "Country",
+                "NO2", null, "src", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("Failure", result);
@@ -736,15 +863,11 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ThrowsAsync(new Exception("S3 error"));
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "src", "2023", "England", "Country",
+                "NO2", null, "src", "2023", "England", "Country",
                 "dataSelectorHourly", "dataSelectorMultiple", "u@t.com");
 
             Assert.Equal("Failure", result);
         }
-
-        // ------------------------------------------------------------------
-        // Logging: error logged on exception
-        // ------------------------------------------------------------------
 
         [Fact]
         public async Task GetAtomDataSelectionStation_LogsError_WhenExceptionThrown()
@@ -754,7 +877,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .Throws(new Exception("unexpected"));
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", "src", "2023", "England", "Country",
+                "NO2", null, "src", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             _loggerMock.Verify(
@@ -768,7 +891,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         // ------------------------------------------------------------------
-        // ResolvePollutantNameAsync: mongo returns actual documents
+        // ResolvePollutantNameAsync: Mongo returns actual documents
         // ------------------------------------------------------------------
 
         [Fact]
@@ -781,20 +904,16 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupStationDetailCollection();
             SetupBoundaryService();
 
-            // "44" resolves to "NO2"; GetMappedPollutants("NO2") → ["Nitrogen dioxide"]
-            // No station detail docs → filteredSites empty → NON-AURN count fallback
             var result = await CreateService().GetAtomDataSelectionStation(
-                "44", "NON-AURN", "2023", "England", "Country",
+                "44", null, "NON-AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             var items = Assert.IsAssignableFrom<IEnumerable>(result).Cast<object>().ToList();
-            Assert.Single(items); // fallback unknown
+            Assert.Single(items); // fallback Unknown
         }
 
         // ------------------------------------------------------------------
-        // Pollutant mapping: known keys map to full names (AURN path)
-        // Mongo maps pollutantInput → pollutantInput so GetMappedPollutants
-        // can look it up by the short key.
+        // Pollutant mapping: all known short keys
         // ------------------------------------------------------------------
 
         [Theory]
@@ -810,7 +929,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
             Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
 
-            // Mongo maps the short key back to itself so GetMappedPollutants can use it as a key
             SetupPollutantMasterCollection(new[]
             {
                 new PollutantMasterDocument { pollutantID = pollutantInput, pollutantName = pollutantInput }
@@ -819,7 +937,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                pollutantInput, "AURN", "2023", "England", "Country",
+                pollutantInput, null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("1", result);
@@ -843,7 +961,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "SomeFuturePollutant", "AURN", "2023", "England", "Country",
+                "SomeFuturePollutant", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("1", result);
@@ -863,7 +981,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
             Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
 
-            // Mongo maps "PM2.5" → "Fine particulate matter" (the pollutantMap key)
             SetupPollutantMasterCollection(new[]
             {
                 new PollutantMasterDocument { pollutantID = "PM2.5", pollutantName = "Fine particulate matter" }
@@ -872,7 +989,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "PM2.5", "AURN", "2023", "England", "Country",
+                "PM2.5", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("1", result);
@@ -900,7 +1017,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "PM10", "AURN", "2023", "England", "Country",
+                "PM10", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("1", result);
@@ -916,8 +1033,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
             Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
 
-            // Mongo maps "NO2" → "NO2"; GetMappedPollutants("NO2") → ["Nitrogen dioxide"]
-            // Pollutant ended in 2020; request year 2023 → filtered out by year
             SetupPollutantMasterCollection(new[]
             {
                 new PollutantMasterDocument { pollutantID = "NO2", pollutantName = "NO2" }
@@ -932,7 +1047,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "2023", "England", "Country",
+                "NO2", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("0", result);
@@ -967,7 +1082,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE002" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "2023", "England", "Country",
+                "NO2", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("1", result);
@@ -980,7 +1095,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
 
             SetupPollutantMasterCollection();
-            // Invalid startDate format → IsPollutantInYearRange returns false → site excluded
             SetupHttpFactory(BuildSiteMetaJson(startDate: "not-a-date", endDate: "31/12/2023"));
 
             List<SiteInfo>? capturedSites = null;
@@ -991,7 +1105,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "2023", "England", "Country",
+                "NO2", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.NotNull(capturedSites);
@@ -1009,10 +1123,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "2021,2022,2023", "England", "Country",
+                "NO2", null, "AURN", "2021,2022,2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
-            Assert.Equal("1", result); // year 2022 overlaps
+            Assert.Equal("1", result);
         }
 
         [Fact]
@@ -1034,18 +1148,17 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .Callback<List<SiteInfo>, string, string>((s, _, __) => capturedSites = s)
                 .ReturnsAsync(new List<SiteInfo>());
 
-            // "abc" is not a valid year → only "2023" is parsed; site IS in range
+            // "abc" is skipped; "2023" is valid → site is in range
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "abc,2023", "England", "Country",
+                "NO2", null, "AURN", "abc,2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
-            // Site has valid 2023 dates and "abc" is skipped; site reaches boundary service
             Assert.NotNull(capturedSites);
             Assert.Single(capturedSites!);
         }
 
         // ------------------------------------------------------------------
-        // Deduplication: duplicate LocalSiteId entries are reduced to one
+        // Deduplication: duplicate LocalSiteId entries are collapsed to one
         // ------------------------------------------------------------------
 
         [Fact]
@@ -1099,7 +1212,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "2023", "England", "Country",
+                "NO2", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.NotNull(capturedSites);
@@ -1132,7 +1245,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "2023", "England", "Country",
+                "NO2", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.NotNull(capturedSites);
@@ -1154,7 +1267,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService();
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "2023", "England", "Country",
+                "NO2", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("0", result);
@@ -1171,7 +1284,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService();
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "2023", "England", "Country",
+                "NO2", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("0", result);
@@ -1204,7 +1317,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService();
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", "AURN", "2023", "England", "Country",
+                "NO2", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("0", result);
@@ -1231,7 +1344,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             // Requesting NO2,SO2 → SO2 site should match
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2,SO2", "AURN", "2023", "England", "Country",
+                "NO2,SO2", null, "AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             Assert.Equal("1", result);
@@ -1264,7 +1377,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", "NON-AURN", "2023", "England", "Country",
+                "NO2", null, "NON-AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             var site = capturedSites?.FirstOrDefault(s => s.LocalSiteId == "S1");
@@ -1296,7 +1409,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", "NON-AURN", "2023", "England", "Country",
+                "NO2", null, "NON-AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             var site = capturedSites?.FirstOrDefault(s => s.LocalSiteId == "S2");
@@ -1328,7 +1441,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", "NON-AURN", "2023", "England", "Country",
+                "NO2", null, "NON-AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             var site = capturedSites?.FirstOrDefault(s => s.LocalSiteId == "S3");
@@ -1359,7 +1472,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", "NON-AURN", "2023", "England", "Country",
+                "NO2", null, "NON-AURN", "2023", "England", "Country",
                 "dataSelectorCount", "dataSelectorSingle", "u@t.com");
 
             var site = capturedSites?.FirstOrDefault(s => s.LocalSiteId == "S4");

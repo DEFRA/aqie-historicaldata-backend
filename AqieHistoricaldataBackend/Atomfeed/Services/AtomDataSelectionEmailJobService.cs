@@ -1,16 +1,6 @@
-using Amazon.Runtime.Internal.Endpoints.StandardLibrary;
 using AqieHistoricaldataBackend.Utils.Mongo;
-using Elastic.CommonSchema;
-using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using MongoDB.Driver;
-using System.Globalization;
-using System.Net;
-using System.Net.Http;
 using System.Net.Http.Json;
-using System.Net.Mail;
-using System.Text;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
@@ -26,20 +16,18 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-
                 var jobCollection = MongoDbClientFactory.GetCollection<eMailJobDocument>("aqie_csvemailexport_jobs");
 
-                // ensure index on JobId for quick lookup
                 var indexKeys = Builders<eMailJobDocument>.IndexKeys.Ascending(j => j.JobId);
                 await jobCollection.Indexes.CreateOneAsync(new CreateIndexModel<eMailJobDocument>(indexKeys));
 
-                // create GUID and persist job in MongoDB as Pending, then enqueue background work
                 var jobId = Guid.NewGuid().ToString("N");
 
                 var jobDoc = new eMailJobDocument
                 {
                     JobId = jobId,
                     PollutantName = data.pollutantName ?? string.Empty,
+                    NetworkId = data.networkId ?? string.Empty,
                     DataSource = data.dataSource ?? string.Empty,
                     Year = data.Year ?? string.Empty,
                     Region = data.Region ?? string.Empty,
@@ -62,7 +50,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error in Atom GetAtomemailjobDataSelection"); // called exactly once
+                Logger.LogError(ex, "Error in Atom GetAtomemailjobDataSelection");
                 return "Failure";
             }
         }
@@ -71,13 +59,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             try
             {
-
-
-
                 Logger.LogInformation("ProcessPendingEmailJobsAsync entered.");
                 var jobCollection = MongoDbClientFactory.GetCollection<eMailJobDocument>("aqie_csvemailexport_jobs");
 
-                // Filter: Status == Pending, email is not null/empty, mailSent is null
                 var filter = Builders<eMailJobDocument>.Filter.And(
                     Builders<eMailJobDocument>.Filter.Eq(j => j.Status, JobStatusEnum.Pending),
                     Builders<eMailJobDocument>.Filter.Ne(j => j.Email, null),
@@ -98,7 +82,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     try
                     {
-                        // Atomically claim the job — only succeeds if Status is still Pending
                         var claimFilter = Builders<eMailJobDocument>.Filter.And(
                             Builders<eMailJobDocument>.Filter.Eq(j => j.JobId, job.JobId),
                             Builders<eMailJobDocument>.Filter.Eq(j => j.Status, JobStatusEnum.Pending)
@@ -114,15 +97,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             cancellationToken: stoppingToken
                         );
 
-                        // If claimedJob is null, another process already claimed it
                         if (claimedJob == null)
                         {
                             Logger.LogInformation("Job {JobId} already claimed by another process.", job.JobId);
                             continue;
-                        }                   
+                        }
 
                         var resultUrl = await AtomDataSelectionStationService.GetAtomDataSelectionStation(
                             job.PollutantName,
+                            job.NetworkId,
                             job.DataSource,
                             job.Year,
                             job.Region,
@@ -198,11 +181,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex,"Error in ProcessPendingEmailJobsAsync");
+                Logger.LogError(ex, "Error in ProcessPendingEmailJobsAsync");
             }
         }
 
-        public async Task<string> MailService(string email, string frameurl)
+        /// <summary>
+        /// Hook for unit tests: override to supply a pre-configured <see cref="HttpClient"/>.
+        /// Production code creates a new instance on every call.
+        /// </summary>
+        protected virtual HttpClient CreateHttpClient() => new HttpClient();
+
+        public virtual async Task<string> MailService(string email, string frameurl)
         {
             try
             {
@@ -215,12 +204,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     return "Configuration error: NOTIFY_BASEADDRESS not set";
                 }
 
-                using var client = new HttpClient
-                {
-                    BaseAddress = new Uri(notifyBaseAddress)
-                };
+                var client = CreateHttpClient();
+                client.BaseAddress = new Uri(notifyBaseAddress);
 
-                // Ensure the URL doesn't have leading slash if BaseAddress has trailing slash
                 var url = Environment.GetEnvironmentVariable("NOTIFY_URL");
 
                 var notificationRequest = new
@@ -237,7 +223,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 var response = await client.PostAsJsonAsync(url, notificationRequest);
 
-                // Log the status code to help diagnose the issue
                 Logger.LogInformation("Response status: {StatusCode}", response.StatusCode);
 
                 if (response.IsSuccessStatusCode)
@@ -252,16 +237,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         email, response.StatusCode, errorContent);
                     return errorContent;
                 }
-
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex,"Error in mailservice");
+                Logger.LogError(ex, "Error in mailservice");
                 return ex.Message;
             }
         }
 
-        private string? Getmilisecond(DateTime createdAt)
+        protected virtual string? Getmilisecond(DateTime createdAt)
         {
             try
             {
@@ -269,11 +253,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     createdAt = DateTime.SpecifyKind(createdAt, DateTimeKind.Utc);
 
                 return new DateTimeOffset(createdAt).ToUnixTimeMilliseconds().ToString();
-
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex,"Error in Getmilisecond");
+                Logger.LogError(ex, "Error in Getmilisecond");
                 return null;
             }
         }
