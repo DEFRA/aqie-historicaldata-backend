@@ -1,6 +1,5 @@
 using AqieHistoricaldataBackend.Utils.Mongo;
 using MongoDB.Driver;
-using System.Diagnostics.CodeAnalysis;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
@@ -11,15 +10,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     {
         private static readonly HashSet<string> AurnPollutantIds = ["36", "37", "38", "39", "40", "44", "45", "46"];
 
-        private static readonly List<string> AurnHardcodedSources =
-        [
-            "Near real-time data from Defra",
-            "Automatic Urban and Rural Network (AURN)"
-        ];
-
+        private const string AurnCategory = "Near real-time data from Defra";
+        private const string AurnNetworkName = "Automatic Urban and Rural Network (AURN)";
         private const string OtherDataFromDefra = "Other data from Defra";
 
-        [ExcludeFromCodeCoverage]
         public async Task<dynamic> GetAtomPollutantDataSource(QueryStringData data)
         {
             try
@@ -32,35 +26,44 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 var filter = Builders<StationDetailDocument>.Filter.In(x => x.pollutantID, pollutantIds);
 
-                var dataSourceList = await siteCollection
+                var rawResults = await siteCollection
                     .Find(filter)
-                    .Project(x => x.NetworkType)
                     .ToListAsync();
 
                 var hasAurnPollutants = pollutantIds.Any(AurnPollutantIds.Contains);
-                var dbResults = dataSourceList.Where(x => x is not null).Distinct().ToList();
-                var hasResults = dbResults.Count > 0;
 
-                IEnumerable<string> prefixSources;
+                var dbNetworks = rawResults
+                    .Where(x => x.NetworkType is not null)
+                    .DistinctBy(x => x.NetworkType)
+                    .Select(x => new
+                    {
+                        name = x.NetworkType!,
+                        id   = int.TryParse(x.NetworkID, out var parsed) ? parsed : -2
+                    })
+                    .ToList<dynamic>();
+
+                var hasResults = dbNetworks.Count > 0;
+                var result = new List<dynamic>();
+
                 if (hasAurnPollutants)
                 {
-                    prefixSources = [.. AurnHardcodedSources, OtherDataFromDefra];
-                }
-                else if (hasResults)
-                {
-                    prefixSources = [OtherDataFromDefra];
-                }
-                else
-                {
-                    prefixSources = [];
+                    result.Add(new
+                    {
+                        category = AurnCategory,
+                        networks = (object)new List<string> { AurnNetworkName }
+                    });
                 }
 
-                var finalList = prefixSources
-                    .Concat(dbResults!)
-                    .Distinct()
-                    .ToList();
+                if (hasResults)
+                {
+                    result.Add(new
+                    {
+                        category = OtherDataFromDefra,
+                        networks = (object)dbNetworks
+                    });
+                }
 
-                return finalList;
+                return result;
             }
             catch (Exception ex)
             {

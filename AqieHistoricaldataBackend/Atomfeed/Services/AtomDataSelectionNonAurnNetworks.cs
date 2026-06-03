@@ -65,8 +65,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var allRows = worksheet.RangeUsed().RowsUsed().ToList();
 
                 if (allRows.Count == 0) return;
-
+                
+                // Get collection and drop it before reloading
                 var collection = MongoDbClientFactory.GetCollection<BsonDocument>("aqie_atom_non_aurn_networks_pollutant_master");
+                await collection.Database.DropCollectionAsync("aqie_atom_non_aurn_networks_pollutant_master");
+                
+                // Recreate the collection with the same reference
+                collection = MongoDbClientFactory.GetCollection<BsonDocument>("aqie_atom_non_aurn_networks_pollutant_master");
 
                 var indexKeys = Builders<BsonDocument>.IndexKeys
                     .Ascending("pollutantID")
@@ -150,8 +155,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var allRows = worksheet.RangeUsed().RowsUsed().ToList();
 
                 if (allRows.Count == 0) return;
-
+                // Get collection and drop it before reloading
                 var collection = MongoDbClientFactory.GetCollection<BsonDocument>("aqie_atom_non_aurn_networks_station_details");
+                await collection.Database.DropCollectionAsync("aqie_atom_non_aurn_networks_station_details");
+
+                // Recreate the collection with the same reference
+                collection = MongoDbClientFactory.GetCollection<BsonDocument>("aqie_atom_non_aurn_networks_station_details");
 
                 var indexKeys = Builders<BsonDocument>.IndexKeys
                     .Ascending("SiteID")

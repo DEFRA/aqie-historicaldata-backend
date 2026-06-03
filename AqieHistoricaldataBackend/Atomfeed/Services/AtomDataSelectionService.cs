@@ -10,6 +10,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 string? pollutantName = data.pollutantName;
+                string? networkId = data.networkId;
                 string? datasource = data.dataSource;
                 string? year = data.Year;
                 string? region = data.Region;
@@ -18,7 +19,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 string? dataselectordownloadtype = data.dataselectordownloadtype;
                 string? email = data.email;
 
-                var stationresultcountData = await AtomDataSelectionStationService.GetAtomDataSelectionStation(pollutantName, datasource, year, region, regiontype, dataselectorfiltertype, dataselectordownloadtype, email);
+                var stationresultcountData = await AtomDataSelectionStationService.GetAtomDataSelectionStation(pollutantName, networkId, datasource, year, region, regiontype, dataselectorfiltertype, dataselectordownloadtype, email);
                 return stationresultcountData;
             }
             catch (Exception ex)

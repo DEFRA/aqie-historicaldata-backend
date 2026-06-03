@@ -103,6 +103,21 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
             "<gml:FeatureCollection xmlns:gml=\"http://www.opengis.net/gml/3.2\"/>";
 
+        /// <summary>Root element is NOT gml:FeatureCollection → JObject.Parse(json)["gml:FeatureCollection"]
+        /// returns null, exercising the featureCollection?. null-conditional operator.</summary>
+        private const string XmlNonFeatureCollectionRoot =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+            "<root xmlns:gml=\"http://www.opengis.net/gml/3.2\"><item/></root>";
+
+        /// <summary>Exactly ONE gml:featureMember — Newtonsoft serialises it as a JObject, not a JArray.
+        /// The "as JArray" cast returns null, exercising the ?? new JArray() branch via a non-null left operand.</summary>
+        private const string XmlSingleFeatureMember =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+            "<gml:FeatureCollection xmlns:gml=\"http://www.opengis.net/gml/3.2\"" +
+            "                       xmlns:om=\"http://www.opengis.net/om/2.0\">" +
+            "  <gml:featureMember><om:OM_Observation/></gml:featureMember>" +
+            "</gml:FeatureCollection>";
+
         // ── Shared test data ──────────────────────────────────────────────────────────
 
         private static readonly SiteInfo DefaultSite = new()
@@ -132,10 +147,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
         private void SetupHttpClient(HttpResponseMessage response)
         {
-            // Capture the XML once so we can re-create a fresh HttpResponseMessage for
-            // every SendAsync call. A single HttpResponseMessage can only have its content
-            // stream read ONCE; reusing it across parallel calls causes subsequent reads
-            // to return empty content, making multi-site / multi-year tests fail.
             var statusCode = response.StatusCode;
             string? xmlBody = null;
             if (response.Content is StringContent sc)
@@ -205,7 +216,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
         /// <summary>Invokes the private ProcessAtomData via reflection.</summary>
         private List<FinalData> InvokeProcessAtomData(
-            JArray features, List<PollutantDetails> pollutants, SiteInfo site)
+            JArray? features, List<PollutantDetails> pollutants, SiteInfo site)
         {
             var method = typeof(AtomDataSelectionHourlyFetchService)
                 .GetMethod("ProcessAtomData",
@@ -350,7 +361,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task GetAtomData_ReturnsEmpty_WhenLocalSiteIdIsNull()
         {
-            // Covers the IsNullOrWhiteSpace(siteID) guard in FetchAtomFeedAsync
             var result = await _service.GetAtomDataSelectionHourlyFetchService(
                 [new SiteInfo { LocalSiteId = null }], "Nitrogen dioxide", "2024", AurnData);
 
@@ -360,7 +370,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task GetAtomData_ReturnsEmpty_WhenYearIsWhitespace()
         {
-            // " ".Split(',') → [" "] which is whitespace → IsNullOrWhiteSpace guard in FetchAtomFeedAsync
             var result = await _service.GetAtomDataSelectionHourlyFetchService(
                 [DefaultSite], "Nitrogen dioxide", " ", AurnData);
 
@@ -374,8 +383,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task GetAtomData_OuterCatch_ReturnsEmpty_WhenFilteryearIsNull()
         {
-            // null.Split(',') throws NullReferenceException before the parallel loop,
-            // falling through to the outer catch block.
             var result = await _service.GetAtomDataSelectionHourlyFetchService(
                 [DefaultSite], "Nitrogen dioxide", null!, AurnData);
 
@@ -452,10 +459,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task GetAtomData_LogsError_WhenSiteProcessingFails()
         {
-            // The exception is swallowed inside FetchAtomFeedAsync's own catch block,
-            // which logs "Error FetchAtomFeedAsync fetching Atom feed...".
-            // The Parallel.ForEachAsync "Error processing site" path is unreachable from
-            // the public API because FetchAtomFeedAsync never lets exceptions escape.
             SetupHttpClientThrows(new Exception("Processing failure"));
 
             await _service.GetAtomDataSelectionHourlyFetchService(
@@ -497,6 +500,17 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [InlineData("Nitrogen oxides as nitrogen dioxide")]
         [InlineData("Carbon monoxide")]
         [InlineData("Nitric oxide")]
+        // ── Extra pollutants from GetPollutantsToDisplay (previously uncovered) ────────
+        [InlineData("Particulate calcium")]
+        [InlineData("Particulate chloride")]
+        [InlineData("Particulate magnesium")]
+        [InlineData("Particulate sodium")]
+        [InlineData("Particulate nitrite")]
+        [InlineData("Particulate nitrate")]
+        [InlineData("Particulate sulphate")]
+        [InlineData("Gaseous hydrochloric acid")]
+        [InlineData("Gaseous nitric acid")]
+        [InlineData("Gaseous nitrous acid")]
         public async Task GetAtomData_HandlesAllKnownPollutants_WithoutThrowing(string pollutant)
         {
             SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
@@ -513,7 +527,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task GetAtomData_ReturnsAllPollutants_WhenFilterDoesNotMatch()
         {
-            // "UnknownPollutant" matches nothing → GetPollutantsToDisplay returns all 8
             SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(ValidXml, Encoding.UTF8, "application/xml")
@@ -522,14 +535,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var result = await _service.GetAtomDataSelectionHourlyFetchService(
                 [DefaultSite], "UnknownPollutant", "2024", AurnData);
 
-            // NO2 URL still matches one of the 8 default pollutants
             result.Should().NotBeEmpty();
         }
 
         [Fact]
         public async Task GetAtomData_HandlesNullPollutantFilter()
         {
-            // null filter → Split produces [""] → no match → returns all pollutants
             SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(ValidXml, Encoding.UTF8, "application/xml")
@@ -604,7 +615,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task GetAtomData_FiltersOutRows_WithFewerThanFiveParts()
         {
-            // "a,b,c" has 3 parts → filtered; valid row has 5 parts → kept
             SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(XmlInsufficientParts, Encoding.UTF8, "application/xml")
@@ -751,13 +761,54 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         // ═══════════════════════════════════════════════════════════════════════════════
+        // FetchAtomFeedAsync – XML / JObject structure branches (via reflection)
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        [Fact]
+        public async Task FetchAtomFeedAsync_ReturnsEmptyJArray_WhenFeatureMemberIsAbsent()
+        {
+            // featureCollection["gml:featureMember"] is null → as JArray → null → ?? new JArray()
+            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(XmlNoFeatureMembers, Encoding.UTF8, "application/xml")
+            });
+            var result = await InvokeFetchAtomFeedAsync("AH", "2024");
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task FetchAtomFeedAsync_ReturnsEmptyJArray_WhenFeatureMemberIsJObject()
+        {
+            // Exactly one featureMember → Newtonsoft serialises as JObject, not JArray.
+            // "as JArray" returns null → ?? new JArray() branch via a non-null left operand.
+            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(XmlSingleFeatureMember, Encoding.UTF8, "application/xml")
+            });
+            var result = await InvokeFetchAtomFeedAsync("AH", "2024");
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task FetchAtomFeedAsync_ReturnsEmptyJArray_WhenRootIsNotFeatureCollection()
+        {
+            // JObject.Parse(json)["gml:FeatureCollection"] returns null.
+            // featureCollection?["gml:featureMember"] exercises the ?. null-conditional path.
+            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(XmlNonFeatureCollectionRoot, Encoding.UTF8, "application/xml")
+            });
+            var result = await InvokeFetchAtomFeedAsync("AH", "2024");
+            result.Should().BeEmpty();
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════════
         // FetchAtomFeedAsync – exception catch branches (via reflection)
         // ═══════════════════════════════════════════════════════════════════════════════
 
         [Fact]
         public async Task FetchAtomFeedAsync_ReturnsEmpty_OnHttpRequestException_With404StatusCode()
         {
-            // Covers catch (HttpRequestException ex) when (ex.StatusCode == NotFound)
             SetupHttpClientThrows(
                 new HttpRequestException("not found", null, HttpStatusCode.NotFound));
             var result = await InvokeFetchAtomFeedAsync("AH", "2024");
@@ -784,7 +835,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task FetchAtomFeedAsync_ReturnsEmpty_OnHttpRequestException_NonNotFound()
         {
-            // Covers catch (HttpRequestException ex) – generic branch
             SetupHttpClientThrows(new HttpRequestException("Network failure"));
             var result = await InvokeFetchAtomFeedAsync("AH", "2024");
             result.Should().BeEmpty();
@@ -830,20 +880,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 Times.Once);
         }
 
-        [Fact]
-        public async Task FetchAtomFeedAsync_ReturnsEmptyJArray_WhenFeatureMemberIsAbsent()
-        {
-            // Covers featureCollection?["gml:featureMember"] as JArray ?? new JArray()
-            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(XmlNoFeatureMembers, Encoding.UTF8, "application/xml")
-            });
-            var result = await InvokeFetchAtomFeedAsync("AH", "2024");
-            result.Should().BeEmpty();
-        }
-
         // ═══════════════════════════════════════════════════════════════════════════════
-        // ProcessAtomData – via reflection (exception branch inside the for-loop)
+        // ProcessAtomData – via reflection
         // ═══════════════════════════════════════════════════════════════════════════════
 
         [Fact]
@@ -854,13 +892,21 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         [Fact]
+        public void ProcessAtomData_ReturnsEmpty_WhenFeaturesIsNull()
+        {
+            // Covers the "features == null" branch of the null-or-empty guard.
+            var result = InvokeProcessAtomData(null, No2Pollutants(), DefaultSite);
+            result.Should().BeEmpty();
+        }
+
+        [Fact]
         public void ProcessAtomData_LogsError_WhenFeatureCausesException()
         {
             // A JValue at index 1 (not a JObject) causes a property access exception
             // inside the for-loop, triggering the catch block that calls LogError.
             var badFeatures = new JArray
             {
-                new JObject(), // index 0 – skipped
+                new JObject(),          // index 0 – skipped
                 new JValue("bad-token") // index 1 – accessing ["om:OM_Observation"] throws
             };
 
