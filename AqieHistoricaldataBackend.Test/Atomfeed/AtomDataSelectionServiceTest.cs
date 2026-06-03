@@ -47,9 +47,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             };
 
             _stationServiceMock
-                .Setup(s => s.GetAtomDataSelectionStation(
-                    pollutant, networkId, source, year,
-                    region, regiontype, filtertype, dltype, email))
+                .Setup(s => s.GetAtomDataSelectionStation(It.IsAny<QueryStringData>()))
                 .ReturnsAsync(stationReturn);
 
             var result = await _service.GetatomDataSelectiondata(data);
@@ -78,11 +76,16 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             };
 
             _stationServiceMock
-                .Setup(s => s.GetAtomDataSelectionStation(
-                    "CO", "NET_X", "AURN", "2020",
-                    "Scotland", "country",
-                    "dataSelectorHourly", "dataSelectorMultiple",
-                    "verify@mapping.com"))
+                .Setup(s => s.GetAtomDataSelectionStation(It.Is<QueryStringData>(d =>
+                    d.pollutantName == "CO" &&
+                    d.networkId == "NET_X" &&
+                    d.dataSource == "AURN" &&
+                    d.Year == "2020" &&
+                    d.Region == "Scotland" &&
+                    d.regiontype == "country" &&
+                    d.dataselectorfiltertype == "dataSelectorHourly" &&
+                    d.dataselectordownloadtype == "dataSelectorMultiple" &&
+                    d.email == "verify@mapping.com")))
                 .ReturnsAsync("ok")
                 .Verifiable();
 
@@ -98,10 +101,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetatomDataSelectiondata_ReturnsFailure_WhenStationServiceThrows()
         {
             _stationServiceMock
-                .Setup(s => s.GetAtomDataSelectionStation(
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Setup(s => s.GetAtomDataSelectionStation(It.IsAny<QueryStringData>()))
                 .ThrowsAsync(new Exception("station error"));
 
             var result = await _service.GetatomDataSelectiondata(new QueryStringData());
@@ -118,10 +118,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var exception = new InvalidOperationException("critical failure");
 
             _stationServiceMock
-                .Setup(s => s.GetAtomDataSelectionStation(
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Setup(s => s.GetAtomDataSelectionStation(It.IsAny<QueryStringData>()))
                 .ThrowsAsync(exception);
 
             await _service.GetatomDataSelectiondata(new QueryStringData());

@@ -15,11 +15,6 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Test.Atomfeed
 {
-    // ---------------------------------------------------------------------------
-    // Testable subclass — injects a controllable HttpClient via CreateHttpClient().
-    // MailService is no longer shadowed, so ProcessPendingEmailJobsAsync dispatches
-    // through the real (virtual) base implementation using the mock transport.
-    // ---------------------------------------------------------------------------
     public class TestableAtomDataSelectionEmailJobService : AtomDataSelectionEmailJobService
     {
         private readonly HttpClient _httpClient;
@@ -37,10 +32,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         protected override HttpClient CreateHttpClient() => _httpClient;
     }
 
-    // ---------------------------------------------------------------------------
-    // Subclass that forces Getmilisecond to return null so the ms == null branch
-    // inside ProcessPendingEmailJobsAsync can be exercised.
-    // ---------------------------------------------------------------------------
     public class NullMillisecondEmailJobService : AtomDataSelectionEmailJobService
     {
         public NullMillisecondEmailJobService(
@@ -346,10 +337,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             await CreateService().ProcessPendingEmailJobsAsync(CancellationToken.None);
 
             _stationServiceMock.Verify(
-                s => s.GetAtomDataSelectionStation(
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()),
+                s => s.GetAtomDataSelectionStation(It.IsAny<QueryStringData>()),
                 Times.Never);
         }
 
@@ -370,7 +358,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateTestableService(CreateMockHttpClient(HttpStatusCode.OK));
             await service.ProcessPendingEmailJobsAsync(CancellationToken.None);
 
-            // endTime update + Completed status update
             _collectionMock.Verify(
                 c => c.UpdateOneAsync(
                     It.IsAny<FilterDefinition<eMailJobDocument>>(),
@@ -397,7 +384,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateTestableService(CreateMockHttpClient(HttpStatusCode.BadRequest, "Bad request error"));
             await service.ProcessPendingEmailJobsAsync(CancellationToken.None);
 
-            // endTime update + Failed status update
             _collectionMock.Verify(
                 c => c.UpdateOneAsync(
                     It.IsAny<FilterDefinition<eMailJobDocument>>(),
@@ -419,10 +405,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupClaimReturning(job);
 
             _stationServiceMock
-                .Setup(s => s.GetAtomDataSelectionStation(
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Setup(s => s.GetAtomDataSelectionStation(It.IsAny<QueryStringData>()))
                 .ThrowsAsync(new Exception("S3 error"));
 
             SetupUpdateOneSucceeds();
@@ -454,7 +437,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var service = CreateNullMsService();
             await service.ProcessPendingEmailJobsAsync(CancellationToken.None);
 
-            // Only the endTime UpdateOneAsync fires; the MailService step is skipped
             _collectionMock.Verify(
                 c => c.UpdateOneAsync(
                     It.IsAny<FilterDefinition<eMailJobDocument>>(),
@@ -471,7 +453,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task ProcessPendingEmailJobsAsync_HandlesNonUtcCreatedAt()
         {
-            // Local kind triggers the SpecifyKind branch inside Getmilisecond
             var job = BuildPendingJob("job-006", "localtime@test.com",
                 createdAt: new DateTime(2024, 6, 1, 12, 0, 0, DateTimeKind.Local));
             SetupFindReturning([job]);
@@ -481,7 +462,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetNotifyEnvVars();
 
             var service = CreateTestableService(CreateMockHttpClient(HttpStatusCode.OK));
-            // Should complete without exception; the non-UTC branch is covered
             await service.ProcessPendingEmailJobsAsync(CancellationToken.None);
 
             _collectionMock.Verify(
@@ -504,7 +484,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .Setup(f => f.GetCollection<eMailJobDocument>(It.IsAny<string>()))
                 .Throws(new Exception("DB unavailable"));
 
-            // Should not propagate — swallowed by the outer catch
             await CreateService().ProcessPendingEmailJobsAsync(CancellationToken.None);
 
             _loggerMock.Verify(
@@ -545,10 +524,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             await service.ProcessPendingEmailJobsAsync(CancellationToken.None);
 
             _stationServiceMock.Verify(
-                s => s.GetAtomDataSelectionStation(
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()),
+                s => s.GetAtomDataSelectionStation(It.IsAny<QueryStringData>()),
                 Times.Exactly(2));
         }
 
@@ -576,7 +552,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task MailService_ReturnsConfigError_WhenBaseAddressIsEmptyString()
         {
-            // Covers the IsNullOrEmpty "empty string" sub-branch
             Environment.SetEnvironmentVariable("NOTIFY_BASEADDRESS", "");
 
             var result = await CreateService().MailService("user@test.com", "frame/123");
@@ -727,10 +702,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         private void SetupStationServiceReturning(string url)
         {
             _stationServiceMock
-                .Setup(s => s.GetAtomDataSelectionStation(
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Setup(s => s.GetAtomDataSelectionStation(It.IsAny<QueryStringData>()))
                 .ReturnsAsync(url);
         }
 
