@@ -8,7 +8,6 @@ using MongoDB.Driver.Core.Connections;
 using MongoDB.Driver.Core.Servers;
 using Moq;
 using System.Net;
-using System.Reflection;
 using Xunit;
 
 namespace AqieHistoricaldataBackend.Test.Atomfeed
@@ -18,19 +17,19 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         private const string LockCollection = "aqie_atom_seed_locks";
 
         private readonly Mock<ILogger<AtomNonAurnNetworksSeedHostedService>> _loggerMock;
-        private readonly Mock<IAtomDataSelectionNonAurnNetworks> _nonAurnServiceMock;
-        private readonly Mock<IMongoDbClientFactory> _mongoFactoryMock;
-        private readonly Mock<IMongoCollection<BsonDocument>> _collectionMock;
-        private readonly Mock<IMongoIndexManager<BsonDocument>> _indexMock;
-        private readonly AtomNonAurnNetworksSeedHostedService _sut;
+        private readonly Mock<IAtomDataSelectionNonAurnNetworks>             _nonAurnServiceMock;
+        private readonly Mock<IMongoDbClientFactory>                         _mongoFactoryMock;
+        private readonly Mock<IMongoCollection<BsonDocument>>                _collectionMock;
+        private readonly Mock<IMongoIndexManager<BsonDocument>>              _indexMock;
+        private readonly AtomNonAurnNetworksSeedHostedService                _sut;
 
         public AtomNonAurnNetworksSeedHostedServiceTests()
         {
-            _loggerMock        = new Mock<ILogger<AtomNonAurnNetworksSeedHostedService>>();
+            _loggerMock         = new Mock<ILogger<AtomNonAurnNetworksSeedHostedService>>();
             _nonAurnServiceMock = new Mock<IAtomDataSelectionNonAurnNetworks>();
-            _mongoFactoryMock  = new Mock<IMongoDbClientFactory>();
-            _collectionMock    = new Mock<IMongoCollection<BsonDocument>>();
-            _indexMock         = new Mock<IMongoIndexManager<BsonDocument>>();
+            _mongoFactoryMock   = new Mock<IMongoDbClientFactory>();
+            _collectionMock     = new Mock<IMongoCollection<BsonDocument>>();
+            _indexMock          = new Mock<IMongoIndexManager<BsonDocument>>();
 
             _collectionMock.Setup(c => c.Indexes).Returns(_indexMock.Object);
 
@@ -66,15 +65,15 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task StartAsync_SeedsAndMarksCompleted_WhenLockIsAcquired()
         {
-            // Arrange
-            SetupInsertOneSucceeds();
+            // Arrange — FindOneAndUpdate succeeds (lock acquired) on a "completed" or absent doc
+            SetupFindOneAndUpdateSucceeds();
             SetupUpdateOneSucceeds();
 
             // Act
             await _sut.StartAsync(CancellationToken.None);
 
             // Assert
-            _nonAurnServiceMock.Verify(s => s.ExceltoMongoDB(string.Empty), Times.Once);
+            _nonAurnServiceMock.Verify(s => s.ExceltoMongoDB(string.Empty),               Times.Once);
             _nonAurnServiceMock.Verify(s => s.ExceltoMongoDB_Station_detials(string.Empty), Times.Once);
             _collectionMock.Verify(c => c.UpdateOneAsync(
                 It.IsAny<FilterDefinition<BsonDocument>>(),
@@ -89,7 +88,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task StartAsync_RemovesLock_WhenExceltoMongoDBThrows()
         {
             // Arrange
-            SetupInsertOneSucceeds();
+            SetupFindOneAndUpdateSucceeds();
             _nonAurnServiceMock
                 .Setup(s => s.ExceltoMongoDB(It.IsAny<string>()))
                 .ThrowsAsync(new Exception("pollutant seed failed"));
@@ -98,7 +97,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             // Act
             await _sut.StartAsync(CancellationToken.None);
 
-            // Assert
+            // Assert — lock removed, completion never written
             _collectionMock.Verify(c => c.DeleteOneAsync(
                 It.IsAny<FilterDefinition<BsonDocument>>(),
                 It.IsAny<CancellationToken>()), Times.Once);
@@ -113,7 +112,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task StartAsync_RemovesLock_WhenExceltoMongoDBStationDetailsThrows()
         {
             // Arrange
-            SetupInsertOneSucceeds();
+            SetupFindOneAndUpdateSucceeds();
             _nonAurnServiceMock
                 .Setup(s => s.ExceltoMongoDB_Station_detials(It.IsAny<string>()))
                 .ThrowsAsync(new Exception("station seed failed"));
@@ -131,8 +130,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task StartAsync_LogsError_AndDoesNotThrow_WhenRemoveLockAlsoFails()
         {
-            // Arrange — seed fails AND DeleteOneAsync also throws (swallowed by catch in RemoveLockAsync)
-            SetupInsertOneSucceeds();
+            // Arrange — seed fails AND DeleteOneAsync also throws (swallowed by RemoveLockAsync)
+            SetupFindOneAndUpdateSucceeds();
             _nonAurnServiceMock
                 .Setup(s => s.ExceltoMongoDB(It.IsAny<string>()))
                 .ThrowsAsync(new Exception("seed failed"));
@@ -148,61 +147,39 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Assert.Null(exception);
         }
 
-        // ── DuplicateKey — another instance holds the lock ────────────────────────
+        // ── DuplicateKey — another instance is actively seeding ───────────────────
+        // The new locking strategy uses FindOneAndUpdateAsync + upsert.
+        // When another instance holds the "locked" doc, the upsert throws
+        // MongoCommandException with CodeName "DuplicateKey".
 
         [Fact]
-        public async Task StartAsync_Skips_WhenLockDocExistsWithStatusLocked()
+        public async Task StartAsync_Skips_WhenAnotherInstanceHoldsLock()
         {
-            // Arrange
-            SetupInsertOneThrowsDuplicateKey();
-            SetupFindReturnsStatus("locked");
+            // Arrange — upsert conflicts because "locked" doc already exists
+            SetupFindOneAndUpdateThrowsDuplicateKey();
 
             // Act
             await _sut.StartAsync(CancellationToken.None);
 
-            // Assert — no seeding attempted
-            _nonAurnServiceMock.Verify(s => s.ExceltoMongoDB(It.IsAny<string>()), Times.Never);
+            // Assert — no seeding, no lock removal
+            _nonAurnServiceMock.Verify(s => s.ExceltoMongoDB(It.IsAny<string>()),               Times.Never);
             _nonAurnServiceMock.Verify(s => s.ExceltoMongoDB_Station_detials(It.IsAny<string>()), Times.Never);
-        }
-
-        [Fact]
-        public async Task StartAsync_Skips_WhenLockDocExistsWithStatusCompleted()
-        {
-            // Arrange
-            SetupInsertOneThrowsDuplicateKey();
-            SetupFindReturnsStatus("completed");
-
-            // Act
-            await _sut.StartAsync(CancellationToken.None);
-
-            // Assert
-            _nonAurnServiceMock.Verify(s => s.ExceltoMongoDB(It.IsAny<string>()), Times.Never);
-        }
-
-        [Fact]
-        public async Task StartAsync_Skips_WhenDuplicateKeyButDocNotFound()
-        {
-            // Arrange — race: another instance inserted then immediately removed the doc
-            SetupInsertOneThrowsDuplicateKey();
-            SetupFindReturnsEmpty();
-
-            // Act
-            await _sut.StartAsync(CancellationToken.None);
-
-            // Assert — status logged as "unknown"; no seeding
-            _nonAurnServiceMock.Verify(s => s.ExceltoMongoDB(It.IsAny<string>()), Times.Never);
+            _collectionMock.Verify(c => c.DeleteOneAsync(
+                It.IsAny<FilterDefinition<BsonDocument>>(),
+                It.IsAny<CancellationToken>()), Times.Never);
         }
 
         // ── Generic exception during lock acquisition ─────────────────────────────
 
         [Fact]
-        public async Task StartAsync_Skips_WhenInsertOneThrowsGenericException()
+        public async Task StartAsync_Skips_WhenFindOneAndUpdateThrowsGenericException()
         {
             // Arrange
             _collectionMock
-                .Setup(c => c.InsertOneAsync(
-                    It.IsAny<BsonDocument>(),
-                    It.IsAny<InsertOneOptions>(),
+                .Setup(c => c.FindOneAndUpdateAsync(
+                    It.IsAny<FilterDefinition<BsonDocument>>(),
+                    It.IsAny<UpdateDefinition<BsonDocument>>(),
+                    It.IsAny<FindOneAndUpdateOptions<BsonDocument, BsonDocument>>(),
                     It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new TimeoutException("mongo timeout"));
 
@@ -216,7 +193,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task StartAsync_Skips_WhenCreateIndexThrowsGenericException()
         {
-            // Arrange — index creation fails before InsertOne is even reached
+            // Arrange — index creation fails before FindOneAndUpdate is reached
             _indexMock
                 .Setup(i => i.CreateOneAsync(
                     It.IsAny<CreateIndexModel<BsonDocument>>(),
@@ -233,13 +210,23 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
         // ── Helpers ───────────────────────────────────────────────────────────────
 
-        private void SetupInsertOneSucceeds() =>
+        private void SetupFindOneAndUpdateSucceeds() =>
             _collectionMock
-                .Setup(c => c.InsertOneAsync(
-                    It.IsAny<BsonDocument>(),
-                    It.IsAny<InsertOneOptions>(),
+                .Setup(c => c.FindOneAndUpdateAsync(
+                    It.IsAny<FilterDefinition<BsonDocument>>(),
+                    It.IsAny<UpdateDefinition<BsonDocument>>(),
+                    It.IsAny<FindOneAndUpdateOptions<BsonDocument, BsonDocument>>(),
                     It.IsAny<CancellationToken>()))
-                .Returns(Task.CompletedTask);
+                .ReturnsAsync(new BsonDocument { ["status"] = "locked" });
+
+        private void SetupFindOneAndUpdateThrowsDuplicateKey() =>
+            _collectionMock
+                .Setup(c => c.FindOneAndUpdateAsync(
+                    It.IsAny<FilterDefinition<BsonDocument>>(),
+                    It.IsAny<UpdateDefinition<BsonDocument>>(),
+                    It.IsAny<FindOneAndUpdateOptions<BsonDocument, BsonDocument>>(),
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(CreateDuplicateKeyCommandException());
 
         private void SetupUpdateOneSucceeds() =>
             _collectionMock
@@ -257,64 +244,24 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new DeleteResult.Acknowledged(1));
 
-        private void SetupInsertOneThrowsDuplicateKey() =>
-            _collectionMock
-                .Setup(c => c.InsertOneAsync(
-                    It.IsAny<BsonDocument>(),
-                    It.IsAny<InsertOneOptions>(),
-                    It.IsAny<CancellationToken>()))
-                .ThrowsAsync(CreateDuplicateKeyException());
-
-        private void SetupFindReturnsStatus(string status)
-        {
-            var doc    = new BsonDocument { ["_id"] = "non_aurn_networks_seed", ["status"] = status };
-            var cursor = new Mock<IAsyncCursor<BsonDocument>>();
-            cursor.SetupSequence(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
-                  .ReturnsAsync(true)
-                  .ReturnsAsync(false);
-            cursor.Setup(c => c.Current).Returns(new[] { doc });
-
-            _collectionMock
-                .Setup(c => c.FindAsync(
-                    It.IsAny<FilterDefinition<BsonDocument>>(),
-                    It.IsAny<FindOptions<BsonDocument, BsonDocument>>(),
-                    It.IsAny<CancellationToken>()))
-                .ReturnsAsync(cursor.Object);
-        }
-
-        private void SetupFindReturnsEmpty()
-        {
-            var cursor = new Mock<IAsyncCursor<BsonDocument>>();
-            cursor.Setup(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
-                  .ReturnsAsync(false);
-            cursor.Setup(c => c.Current).Returns(Array.Empty<BsonDocument>());
-
-            _collectionMock
-                .Setup(c => c.FindAsync(
-                    It.IsAny<FilterDefinition<BsonDocument>>(),
-                    It.IsAny<FindOptions<BsonDocument, BsonDocument>>(),
-                    It.IsAny<CancellationToken>()))
-                .ReturnsAsync(cursor.Object);
-        }
-
         /// <summary>
-        /// Builds a real <see cref="MongoWriteException"/> whose WriteError.Category is
-        /// <see cref="ServerErrorCategory.DuplicateKey"/> (error code 11000).
-        /// WriteError has an internal constructor, so reflection is required.
+        /// Builds a <see cref="MongoCommandException"/> whose <see cref="MongoCommandException.CodeName"/>
+        /// is "DuplicateKey" — matching the catch filter in <c>TryAcquireLockAsync</c>.
         /// </summary>
-        private static MongoWriteException CreateDuplicateKeyException()
+        private static MongoCommandException CreateDuplicateKeyCommandException()
         {
             var connectionId = new ConnectionId(
                 new ServerId(new ClusterId(), new DnsEndPoint("localhost", 27017)));
 
-            var writeError = (WriteError)Activator.CreateInstance(
-                typeof(WriteError),
-                BindingFlags.NonPublic | BindingFlags.Instance,
-                binder: null,
-                args: new object[] { ServerErrorCategory.DuplicateKey, 11000, "E11000 duplicate key error", new BsonDocument() },
-                culture: null)!;
+            var result = new BsonDocument
+            {
+                ["ok"]       = 0,
+                ["code"]     = 11000,
+                ["codeName"] = "DuplicateKey",
+                ["errmsg"]   = "E11000 duplicate key error"
+            };
 
-            return new MongoWriteException(connectionId, writeError, writeConcernError: null, new Exception("dup key"));
+            return new MongoCommandException(connectionId, "E11000 duplicate key error", result);
         }
     }
 }

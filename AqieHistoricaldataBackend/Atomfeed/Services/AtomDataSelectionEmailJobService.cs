@@ -103,17 +103,20 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                             continue;
                         }
 
-                        var resultUrl = await AtomDataSelectionStationService.GetAtomDataSelectionStation(
-                            job.PollutantName,
-                            job.NetworkId,
-                            job.DataSource,
-                            job.Year,
-                            job.Region,
-                            job.Regiontype,
-                            job.Dataselectorfiltertype,
-                            job.Dataselectordownloadtype,
-                            job.Email
-                        );
+                        var queryData = new QueryStringData
+                        {
+                            pollutantName = job.PollutantName,
+                            networkId = job.NetworkId,
+                            dataSource = job.DataSource,
+                            Year = job.Year,
+                            Region = job.Region,
+                            regiontype = job.Regiontype,
+                            dataselectorfiltertype = job.Dataselectorfiltertype,
+                            dataselectordownloadtype = job.Dataselectordownloadtype,
+                            email = job.Email
+                        };
+
+                        var resultUrl = await AtomDataSelectionStationService.GetAtomDataSelectionStation(queryData);
 
                         Logger.LogInformation("ProcessPendingEmailJobsAsync presigned url {ResultUrl}", resultUrl);
 

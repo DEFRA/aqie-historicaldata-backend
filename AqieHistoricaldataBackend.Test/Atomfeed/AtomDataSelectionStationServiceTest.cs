@@ -317,8 +317,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenPollutantNameIsNull()
         {
             var result = await CreateService().GetAtomDataSelectionStation(
-                null, null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = null,
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("Failure", result);
         }
@@ -327,8 +337,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenPollutantNameIsEmpty()
         {
             var result = await CreateService().GetAtomDataSelectionStation(
-                "", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("Failure", result);
         }
@@ -337,8 +357,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenYearIsNull()
         {
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", null, "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = null,
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("Failure", result);
         }
@@ -347,8 +377,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenYearIsEmpty()
         {
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("Failure", result);
         }
@@ -357,8 +397,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public async Task GetAtomDataSelectionStation_LogsWarning_WhenPollutantNameIsNull()
         {
             await CreateService().GetAtomDataSelectionStation(
-                null, null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = null,
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             _loggerMock.Verify(
                 x => x.Log(
@@ -388,8 +438,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("1", result);
         }
@@ -405,8 +465,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo>());
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("0", result);
         }
@@ -426,8 +496,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService();
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             _loggerMock.Verify(
                 x => x.Log(
@@ -454,8 +534,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 SetupBoundaryService();
 
                 await CreateService().GetAtomDataSelectionStation(
-                    "NO2", null, "AURN", "2023", "England", "Country",
-                    "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                    new QueryStringData
+                    {
+                        pollutantName = "NO2",
+                        networkId = null,
+                        dataSource = "AURN",
+                        Year = "2023",
+                        Region = "England",
+                        regiontype = "Country",
+                        dataselectorfiltertype = "dataSelectorCount",
+                        dataselectordownloadtype = "dataSelectorSingle",
+                        email = "u@t.com"
+                    });
 
                 _loggerMock.Verify(
                     x => x.Log(
@@ -491,8 +581,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
                 var result = await CreateService().GetAtomDataSelectionStation(
-                    "NO2", null, "AURN", "2023", "England", "Country",
-                    "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                    new QueryStringData
+                    {
+                        pollutantName = "NO2",
+                        networkId = null,
+                        dataSource = "AURN",
+                        Year = "2023",
+                        Region = "England",
+                        regiontype = "Country",
+                        dataselectorfiltertype = "dataSelectorCount",
+                        dataselectordownloadtype = "dataSelectorSingle",
+                        email = "u@t.com"
+                    });
 
                 Assert.Equal("1", result);
             }
@@ -532,8 +632,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 _httpClientFactoryMock.Setup(f => f.CreateClient("RicardoNewAPI")).Returns(client);
 
                 var result = await CreateService().GetAtomDataSelectionStation(
-                    "NO2", null, "AURN", "2023", "England", "Country",
-                    "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                    new QueryStringData
+                    {
+                        pollutantName = "NO2",
+                        networkId = null,
+                        dataSource = "AURN",
+                        Year = "2023",
+                        Region = "England",
+                        regiontype = "Country",
+                        dataselectorfiltertype = "dataSelectorCount",
+                        dataselectordownloadtype = "dataSelectorSingle",
+                        email = "u@t.com"
+                    });
 
                 Assert.Equal("Failure", result);
             }
@@ -561,8 +671,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "NON-AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "NON-AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             var items = Assert.IsAssignableFrom<IEnumerable>(result).Cast<object>().ToList();
             Assert.Equal(2, items.Count);
@@ -576,8 +696,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo>());
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "NON-AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "NON-AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             var items = Assert.IsAssignableFrom<IEnumerable>(result).Cast<object>().ToList();
             Assert.Single(items);
@@ -594,8 +724,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "NON-AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "NON-AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             var items = Assert.IsAssignableFrom<IEnumerable>(result).Cast<object>().ToList();
             Assert.Single(items);
@@ -623,8 +763,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync("https://s3.example.com/file.zip");
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "src", "2023", "England", "Country",
-                "dataSelectorHourly", "dataSelectorMultiple", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "src",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorHourly",
+                    dataselectordownloadtype = "dataSelectorMultiple",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("https://s3.example.com/file.zip", result);
         }
@@ -641,8 +791,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "src", "2023", "England", "Country",
-                "dataSelectorHourly", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "src",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorHourly",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.NotNull(result);
             Assert.Matches("^[a-f0-9]{32}$", result.ToString()!);
@@ -673,8 +833,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupJobCollectionWithSignal(completedTcs);
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "src", "2023", "England", "Country",
-                "dataSelectorHourly", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "src",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorHourly",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Matches("^[a-f0-9]{32}$", result.ToString()!);
 
@@ -702,8 +872,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupJobCollectionWithSignal(failedTcs);
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "src", "2023", "England", "Country",
-                "dataSelectorHourly", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "src",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorHourly",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Matches("^[a-f0-9]{32}$", result.ToString()!);
 
@@ -735,14 +915,34 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             // First call — starts the processor (it blocks waiting for more channel items)
             var jobId1 = (await svc.GetAtomDataSelectionStation(
-                "NO2", null, "src", "2023", "England", "Country",
-                "dataSelectorHourly", "dataSelectorSingle", "u@t.com")).ToString();
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "src",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorHourly",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                })).ToString();
 
             // Second call — processor is still running; EnsureQueueProcessorStartedAsync
             // should return the existing task rather than spawning a new one
             var jobId2 = (await svc.GetAtomDataSelectionStation(
-                "NO2", null, "src", "2023", "England", "Country",
-                "dataSelectorHourly", "dataSelectorSingle", "u@t.com")).ToString();
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "src",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorHourly",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                })).ToString();
 
             Assert.Matches("^[a-f0-9]{32}$", jobId1!);
             Assert.Matches("^[a-f0-9]{32}$", jobId2!);
@@ -772,8 +972,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync("https://s3.example.com/nonaurn.zip");
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "NON-AURN", "2023", "England", "Country",
-                "dataSelectorHourly", "dataSelectorMultiple", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "NON-AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorHourly",
+                    dataselectordownloadtype = "dataSelectorMultiple",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("https://s3.example.com/nonaurn.zip", result);
         }
@@ -787,8 +997,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "S1" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "NON-AURN", "2023", "England", "Country",
-                "dataSelectorHourly", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "NON-AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorHourly",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.NotNull(result);
             Assert.Matches("^[a-f0-9]{32}$", result.ToString()!);
@@ -805,8 +1025,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService();
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "src", "2023", "England", "Country",
-                "unknownFilterType", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "src",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "unknownFilterType",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("Failure", result);
         }
@@ -823,8 +1053,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .Throws(new Exception("unexpected"));
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "src", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "src",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("Failure", result);
         }
@@ -839,8 +1079,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ThrowsAsync(new Exception("boundary error"));
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "src", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "src",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("Failure", result);
         }
@@ -863,8 +1113,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ThrowsAsync(new Exception("S3 error"));
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "src", "2023", "England", "Country",
-                "dataSelectorHourly", "dataSelectorMultiple", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "src",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorHourly",
+                    dataselectordownloadtype = "dataSelectorMultiple",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("Failure", result);
         }
@@ -877,8 +1137,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .Throws(new Exception("unexpected"));
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "src", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "src",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             _loggerMock.Verify(
                 x => x.Log(
@@ -905,8 +1175,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService();
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "44", null, "NON-AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "44",
+                    networkId = null,
+                    dataSource = "NON-AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             var items = Assert.IsAssignableFrom<IEnumerable>(result).Cast<object>().ToList();
             Assert.Single(items); // fallback Unknown
@@ -937,8 +1217,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                pollutantInput, null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = pollutantInput,
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("1", result);
         }
@@ -961,8 +1251,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "SomeFuturePollutant", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "SomeFuturePollutant",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("1", result);
         }
@@ -989,8 +1289,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "PM2.5", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "PM2.5",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("1", result);
         }
@@ -1017,8 +1327,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "PM10", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "PM10",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("1", result);
         }
@@ -1047,8 +1367,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("0", result);
             Assert.NotNull(capturedSites);
@@ -1082,8 +1412,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE002" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("1", result);
         }
@@ -1105,8 +1445,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.NotNull(capturedSites);
             Assert.Empty(capturedSites!);
@@ -1123,8 +1473,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "2021,2022,2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2021,2022,2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("1", result);
         }
@@ -1150,8 +1510,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             // "abc" is skipped; "2023" is valid → site is in range
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "abc,2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "abc,2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.NotNull(capturedSites);
             Assert.Single(capturedSites!);
@@ -1212,8 +1582,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.NotNull(capturedSites);
             Assert.Single(capturedSites!);
@@ -1245,8 +1625,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.NotNull(capturedSites);
             Assert.Empty(capturedSites!);
@@ -1267,8 +1657,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService();
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("0", result);
         }
@@ -1284,8 +1684,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService();
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("0", result);
         }
@@ -1317,8 +1727,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupBoundaryService();
 
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("0", result);
         }
@@ -1344,8 +1764,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             // Requesting NO2,SO2 → SO2 site should match
             var result = await CreateService().GetAtomDataSelectionStation(
-                "NO2,SO2", null, "AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2,SO2",
+                    networkId = null,
+                    dataSource = "AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             Assert.Equal("1", result);
         }
@@ -1377,8 +1807,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "NON-AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "NON-AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             var site = capturedSites?.FirstOrDefault(s => s.LocalSiteId == "S1");
             Assert.NotNull(site);
@@ -1409,8 +1849,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "NON-AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "NON-AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             var site = capturedSites?.FirstOrDefault(s => s.LocalSiteId == "S2");
             Assert.NotNull(site);
@@ -1441,8 +1891,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "NON-AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "NON-AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             var site = capturedSites?.FirstOrDefault(s => s.LocalSiteId == "S3");
             Assert.NotNull(site);
@@ -1472,8 +1932,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             await CreateService().GetAtomDataSelectionStation(
-                "NO2", null, "NON-AURN", "2023", "England", "Country",
-                "dataSelectorCount", "dataSelectorSingle", "u@t.com");
+                new QueryStringData
+                {
+                    pollutantName = "NO2",
+                    networkId = null,
+                    dataSource = "NON-AURN",
+                    Year = "2023",
+                    Region = "England",
+                    regiontype = "Country",
+                    dataselectorfiltertype = "dataSelectorCount",
+                    dataselectordownloadtype = "dataSelectorSingle",
+                    email = "u@t.com"
+                });
 
             var site = capturedSites?.FirstOrDefault(s => s.LocalSiteId == "S4");
             Assert.NotNull(site);

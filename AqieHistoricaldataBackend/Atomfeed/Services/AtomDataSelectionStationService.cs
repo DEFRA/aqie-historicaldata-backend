@@ -81,28 +81,25 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         private Task? _processorTask;
         private readonly object _processorLock = new();
 
-        public async Task<object> GetAtomDataSelectionStation(string? pollutantName, string? networkId, string? datasource, string? year, string? region, string? regiontype, string? dataselectorfiltertype, string? dataselectordownloadtype, string? email)
+        public async Task<object> GetAtomDataSelectionStation(AtomHistoryModel.QueryStringData queryStringData)
         {
             try
             {
+                string? pollutantName = queryStringData.pollutantName;
+                string? networkId = queryStringData.networkId;
+                string? datasource = queryStringData.dataSource;
+                string? year = queryStringData.Year;
+                string? region = queryStringData.Region;
+                string? regiontype = queryStringData.regiontype;
+                string? dataselectorfiltertype = queryStringData.dataselectorfiltertype;
+                string? dataselectordownloadtype = queryStringData.dataselectordownloadtype;
+
                 if (string.IsNullOrEmpty(pollutantName) || string.IsNullOrEmpty(year))
                 {
                     Logger.LogWarning("GetAtomDataSelectionStation called with null or empty pollutantName or year.");
                     return "Failure";
                 }
                 List<SiteInfo> filteredSites = new List<SiteInfo>();
-                var queryStringData = new AtomHistoryModel.QueryStringData
-                {
-                    pollutantName = pollutantName,
-                    networkId = networkId,
-                    dataSource = datasource,
-                    Year = year,
-                    Region = region,
-                    regiontype = regiontype,
-                    dataselectorfiltertype = dataselectorfiltertype,
-                    dataselectordownloadtype = dataselectordownloadtype,
-                    email = email
-                };
 
                 var resolvedPollutantName = await ResolvePollutantNameAsync(pollutantName);
                 if (datasource == "AURN")
@@ -462,16 +459,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             await foreach (var job in _jobChannel.Reader.ReadAllAsync())
             {
-                // Defensive null guard — channel is non-nullable, so this is unreachable
-                // in normal operation but kept as a safety net.
-                if (job == null)
-                {
-                    [ExcludeFromCodeCoverage]
-                    static void Skip() { }
-                    Skip();
-                    continue;
-                }
-
                 if (_jobCollection == null)
                 {
                     // _jobCollection is always assigned before items reach the channel,
