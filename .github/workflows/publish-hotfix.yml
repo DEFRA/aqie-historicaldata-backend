@@ -3,10 +3,7 @@ name: Publish Hot Fix
 on:
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: write
-  pull-requests: write
+permissions: {}
 
 env:
   AWS_REGION: eu-west-2
@@ -16,6 +13,10 @@ jobs:
   build:
     name: CDP-build-hotfix-workflow
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
     steps:
       - name: Check out code
         uses: actions/checkout@v5
@@ -33,4 +34,6 @@ jobs:
     name: CDP SonarCloud Scan
     uses: ./.github/workflows/sonarcloud.yml
     needs: build
+    permissions:
+      contents: read
     secrets: inherit
