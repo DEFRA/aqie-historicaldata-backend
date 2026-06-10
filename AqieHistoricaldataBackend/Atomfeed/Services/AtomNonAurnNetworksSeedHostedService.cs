@@ -12,6 +12,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     {
         private const string LockCollection = "aqie_atom_seed_locks";
         private const string LockId         = "non_aurn_networks_seed";
+        private const string StatusField    = "status";
         private const string StatusLocked   = "locked";
         private const string StatusDone     = "completed";
         private static readonly TimeSpan LockTtl = TimeSpan.FromMinutes(10);
@@ -44,21 +45,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        // ── Atomic lock acquisition ──────────────────────────────────────────
-        // Uses FindOneAndUpdate with upsert.
-        // - Matches any doc that is NOT currently "locked" (i.e. "completed" or absent).
-        //   → Every new deployment re-runs the seed, even after a prior "completed".
-        // - If the doc IS "locked" (another instance is mid-seed), the filter won't
-        //   match and the upsert throws DuplicateKey — that instance safely skips.
-
         private async Task<bool> TryAcquireLockAsync(CancellationToken cancellationToken)
         {
             try
             {
                 var collection = MongoDbClientFactory.GetCollection<BsonDocument>(LockCollection);
 
-                // TTL index: auto-deletes a stale "locked" doc after LockTtl
-                // if the instance crashes before ReleaseLock/MarkCompleted.
                 await collection.Indexes.CreateOneAsync(
                     new CreateIndexModel<BsonDocument>(
                         Builders<BsonDocument>.IndexKeys.Ascending("acquiredAt"),
@@ -71,17 +63,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     cancellationToken: cancellationToken
                 );
 
-                // Atomically acquire the lock only when no other instance is actively seeding.
-                // Matches: doc does not exist (upsert) OR status != "locked" (e.g. "completed").
                 var filter = Builders<BsonDocument>.Filter.And(
                     Builders<BsonDocument>.Filter.Eq("_id", LockId),
-                    Builders<BsonDocument>.Filter.Ne("status", StatusLocked)
+                    Builders<BsonDocument>.Filter.Ne(StatusField, StatusLocked)
                 );
 
                 var update = Builders<BsonDocument>.Update
-                    .Set("status",      StatusLocked)
-                    .Set("acquiredAt",  DateTime.UtcNow)
-                    .Set("instanceId",  Environment.MachineName)
+                    .Set(StatusField,    StatusLocked)
+                    .Set("acquiredAt",   DateTime.UtcNow)
+                    .Set("instanceId",   Environment.MachineName)
                     .Unset("completedAt");
 
                 var options = new FindOneAndUpdateOptions<BsonDocument>
@@ -100,11 +90,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             catch (MongoCommandException ex) when (ex.CodeName == "DuplicateKey")
             {
-                // Upsert tried to insert a new doc but another instance already holds
-                // the "locked" doc — safe to skip.
-                Logger.LogInformation(
-                    "NonAurnNetworksSeedHostedService: Skipping — another instance is currently seeding."
-                );
+                Logger.LogInformation(ex,"NonAurnNetworksSeedHostedService: Skipping — another instance is currently seeding.");
                 return false;
             }
             catch (Exception ex)
@@ -114,20 +100,18 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        // Promotes "locked" → "completed" and removes acquiredAt
-        // so the TTL index never auto-deletes the completion marker.
         private async Task MarkAsCompletedAsync(CancellationToken cancellationToken)
         {
             var collection = MongoDbClientFactory.GetCollection<BsonDocument>(LockCollection);
 
             await collection.UpdateOneAsync(
                 Builders<BsonDocument>.Filter.And(
-                    Builders<BsonDocument>.Filter.Eq("_id",    LockId),
-                    Builders<BsonDocument>.Filter.Eq("status", StatusLocked)
+                    Builders<BsonDocument>.Filter.Eq("_id",       LockId),
+                    Builders<BsonDocument>.Filter.Eq(StatusField, StatusLocked)
                 ),
                 Builders<BsonDocument>.Update
-                    .Set("status",      StatusDone)
-                    .Set("completedAt", DateTime.UtcNow)
+                    .Set(StatusField,    StatusDone)
+                    .Set("completedAt",  DateTime.UtcNow)
                     .Unset("acquiredAt"),
                 cancellationToken: cancellationToken
             );
@@ -135,7 +119,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             Logger.LogInformation("NonAurnNetworksSeedHostedService: Completion marker persisted.");
         }
 
-        // Called only on failure — removes the "locked" doc so the next deployment retries.
         private async Task RemoveLockAsync(CancellationToken cancellationToken)
         {
             try
@@ -143,8 +126,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var collection = MongoDbClientFactory.GetCollection<BsonDocument>(LockCollection);
                 await collection.DeleteOneAsync(
                     Builders<BsonDocument>.Filter.And(
-                        Builders<BsonDocument>.Filter.Eq("_id",    LockId),
-                        Builders<BsonDocument>.Filter.Eq("status", StatusLocked)
+                        Builders<BsonDocument>.Filter.Eq("_id",       LockId),
+                        Builders<BsonDocument>.Filter.Eq(StatusField, StatusLocked)
                     ),
                     cancellationToken
                 );

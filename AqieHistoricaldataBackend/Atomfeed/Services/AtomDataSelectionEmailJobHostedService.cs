@@ -54,9 +54,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                     try
                     {
-                        _logger.LogInformation("Email job started at: {time}", DateTime.UtcNow);
+                        _logger.LogInformation("Email job started at: {Time}", DateTime.UtcNow);
                         await _emailJobService.ProcessPendingEmailJobsAsync(stoppingToken);
-                        _logger.LogInformation("Email job completed at: {time}", DateTime.UtcNow);
+                        _logger.LogInformation("Email job completed at: {Time}", DateTime.UtcNow);
                     }
                     finally
                     {
@@ -76,7 +76,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 // Wait for interval after job completes
                 try
                 {
-                    _logger.LogInformation("Waiting {minutes} minutes before next job...", _interval.TotalMinutes);
+                    _logger.LogInformation("Waiting {Minutes} minutes before next job...", _interval.TotalMinutes);
                     await Task.Delay(_interval, stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

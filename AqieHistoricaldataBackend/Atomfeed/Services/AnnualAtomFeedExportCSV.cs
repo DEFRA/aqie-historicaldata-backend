@@ -2,7 +2,7 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AnnualAtomFeedExportCsv(ILogger<HourlyAtomFeedExportCsv> logger) : IAnnualAtomFeedExportCsv
+    public class AnnualAtomFeedExportCsv(ILogger<AnnualAtomFeedExportCsv> logger) : IAnnualAtomFeedExportCsv
     {
         public async Task<byte[]> annualatomfeedexport_csv(List<FinalData> Final_list, QueryStringData data)
         {
