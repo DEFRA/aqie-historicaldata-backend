@@ -246,6 +246,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var connectionId = new ConnectionId(
                 new ServerId(new ClusterId(), new DnsEndPoint("localhost", 27017)));
 
+            var command = new BsonDocument("insert", "aqie_atom_seed_locks");
+
             var result = new BsonDocument
             {
                 ["ok"]       = 0,
@@ -254,7 +256,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 ["errmsg"]   = "E11000 duplicate key error"
             };
 
-            return new MongoCommandException(connectionId, "E11000 duplicate key error", result);
+            return new MongoCommandException(connectionId, "E11000 duplicate key error", command, result);
         }
     }
 }
