@@ -38,4 +38,6 @@ jobs:
     needs: build
     permissions:
       pull-requests: write
+      contents: read
+      id-token: write
     secrets: inherit
