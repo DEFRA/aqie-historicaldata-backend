@@ -40,5 +40,4 @@ jobs:
       pull-requests: write
       contents: read
       id-token: write
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    secrets: inherit
