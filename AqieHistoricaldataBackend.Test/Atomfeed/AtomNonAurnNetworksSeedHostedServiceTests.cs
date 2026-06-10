@@ -40,7 +40,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             _indexMock
                 .Setup(i => i.CreateOneAsync(
                     It.IsAny<CreateIndexModel<BsonDocument>>(),
-                    null,
+                    It.IsAny<CreateOneIndexOptions>(),       // ← was: null
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync("ttl_lock");
 
@@ -148,9 +148,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         // ── DuplicateKey — another instance is actively seeding ───────────────────
-        // The new locking strategy uses FindOneAndUpdateAsync + upsert.
-        // When another instance holds the "locked" doc, the upsert throws
-        // MongoCommandException with CodeName "DuplicateKey".
 
         [Fact]
         public async Task StartAsync_Skips_WhenAnotherInstanceHoldsLock()
@@ -197,7 +194,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             _indexMock
                 .Setup(i => i.CreateOneAsync(
                     It.IsAny<CreateIndexModel<BsonDocument>>(),
-                    null,
+                    It.IsAny<CreateOneIndexOptions>(),       // ← was: null
                     It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new InvalidOperationException("index creation failed"));
 
@@ -244,14 +241,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new DeleteResult.Acknowledged(1));
 
-        /// <summary>
-        /// Builds a <see cref="MongoCommandException"/> whose <see cref="MongoCommandException.CodeName"/>
-        /// is "DuplicateKey" — matching the catch filter in <c>TryAcquireLockAsync</c>.
-        /// </summary>
         private static MongoCommandException CreateDuplicateKeyCommandException()
         {
             var connectionId = new ConnectionId(
                 new ServerId(new ClusterId(), new DnsEndPoint("localhost", 27017)));
+
+            var command = new BsonDocument("insert", "aqie_atom_seed_locks");
 
             var result = new BsonDocument
             {
@@ -261,7 +256,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 ["errmsg"]   = "E11000 duplicate key error"
             };
 
-            return new MongoCommandException(connectionId, "E11000 duplicate key error", result);
+            return new MongoCommandException(connectionId, "E11000 duplicate key error", command, result);
         }
     }
 }
