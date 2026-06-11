@@ -21,8 +21,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         private readonly Mock<IMongoCollection<BsonDocument>> _stationCollectionMock;
         private readonly Mock<IMongoIndexManager<BsonDocument>> _pollutantIndexMock;
         private readonly Mock<IMongoIndexManager<BsonDocument>> _stationIndexMock;
-        private readonly Mock<IMongoDatabase> _pollutantDatabaseMock;  // added
-        private readonly Mock<IMongoDatabase> _stationDatabaseMock;    // added
+        private readonly Mock<IMongoDatabase> _pollutantDatabaseMock;
+        private readonly Mock<IMongoDatabase> _stationDatabaseMock;
         private readonly AtomDataSelectionNonAurnNetworks _sut;
 
         private const string BucketName = "test-bucket";
@@ -42,23 +42,19 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             _stationCollectionMock = new Mock<IMongoCollection<BsonDocument>>();
             _pollutantIndexMock = new Mock<IMongoIndexManager<BsonDocument>>();
             _stationIndexMock = new Mock<IMongoIndexManager<BsonDocument>>();
-            _pollutantDatabaseMock = new Mock<IMongoDatabase>();  // added
-            _stationDatabaseMock = new Mock<IMongoDatabase>();    // added
+            _pollutantDatabaseMock = new Mock<IMongoDatabase>();
+            _stationDatabaseMock = new Mock<IMongoDatabase>();
 
             // Wire up Database property so DropCollectionAsync doesn't throw
             _pollutantCollectionMock.Setup(c => c.Database).Returns(_pollutantDatabaseMock.Object);
             _stationCollectionMock.Setup(c => c.Database).Returns(_stationDatabaseMock.Object);
 
             _pollutantDatabaseMock
-                .Setup(d => d.DropCollectionAsync(
-                    It.IsAny<string>(),
-                    It.IsAny<CancellationToken>()))
+                .Setup(d => d.DropCollectionAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
             _stationDatabaseMock
-                .Setup(d => d.DropCollectionAsync(
-                    It.IsAny<string>(),
-                    It.IsAny<CancellationToken>()))
+                .Setup(d => d.DropCollectionAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
 
             _pollutantCollectionMock.Setup(c => c.Indexes).Returns(_pollutantIndexMock.Object);
@@ -149,37 +145,67 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             return ms;
         }
 
-        private void SetupS3ForPollutant(MemoryStream stream) =>
+        /// <summary>Routes S3 setup to the correct key based on which public method is under test.</summary>
+        private void SetupS3(bool isPollutant, MemoryStream stream)
+        {
+            string key = isPollutant ? PollutantMasterKey : StationMasterKey;
             _s3Mock
-                .Setup(s => s.GetObjectAsync(BucketName, PollutantMasterKey, It.IsAny<CancellationToken>()))
+                .Setup(s => s.GetObjectAsync(BucketName, key, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new GetObjectResponse { ResponseStream = stream });
+        }
 
-        private void SetupS3ForStation(MemoryStream stream) =>
-            _s3Mock
-                .Setup(s => s.GetObjectAsync(BucketName, StationMasterKey, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new GetObjectResponse { ResponseStream = stream });
+        /// <summary>Calls the appropriate public method under test.</summary>
+        private Task CallSutMethod(bool isPollutant) =>
+            isPollutant
+                ? _sut.ExceltoMongoDB("any")
+                : _sut.ExceltoMongoDB_Station_detials("any");
 
-        // ── GetAtomNonAurnNetworks – branching ────────────────────────────────────
+        private Mock<IMongoCollection<BsonDocument>> GetCollectionMock(bool isPollutant) =>
+            isPollutant ? _pollutantCollectionMock : _stationCollectionMock;
+
+        private Mock<IMongoIndexManager<BsonDocument>> GetIndexMock(bool isPollutant) =>
+            isPollutant ? _pollutantIndexMock : _stationIndexMock;
+
+        private Mock<IMongoDatabase> GetDatabaseMock(bool isPollutant) =>
+            isPollutant ? _pollutantDatabaseMock : _stationDatabaseMock;
+
+        private static string[] GetUniqueKeys(bool isPollutant) =>
+            isPollutant ? PollutantUniqueKeys : StationUniqueKeys;
+
+        private static string GetCollectionName(bool isPollutant) =>
+            isPollutant
+                ? "aqie_atom_non_aurn_networks_pollutant_master"
+                : "aqie_atom_non_aurn_networks_station_details";
+
+        private static string[][] GetSampleRows(bool isPollutant) =>
+            isPollutant
+                ? [["1", "NO2", "high"]]
+                : [["SITE001", "Urban", "NO2"]];
+
+        // ── GetAtomNonAurnNetworks – routing ──────────────────────────────────────
 
         [Fact]
         public async Task GetAtomNonAurnNetworks_ReturnsSuccess_AndCallsPollutantPath_WhenSiteNameIsPollutant()
         {
             // Arrange
-            SetupS3ForPollutant(CreateExcelStream(PollutantUniqueKeys));
+            SetupS3(isPollutant: true, CreateExcelStream(PollutantUniqueKeys));
             var data = new QueryStringData { SiteName = "Pollutant", pollutantName = "any" };
 
             // Act
             var result = await _sut.GetAtomNonAurnNetworks(data);
 
-            // Assert – always returns "Success"; inner tasks are fire-and-forget
+            // Assert
             Assert.Equal("Success", (string)result);
+            _mongoFactoryMock.Verify(
+                f => f.GetCollection<BsonDocument>("aqie_atom_non_aurn_networks_pollutant_master"),
+                Times.AtLeastOnce);
         }
 
         [Fact]
         public async Task GetAtomNonAurnNetworks_ReturnsSuccess_AndCallsStationPath_WhenSiteNameIsNotPollutant()
         {
             // Arrange
-            SetupS3ForStation(CreateExcelStream(StationUniqueKeys));
+            SetupS3(isPollutant: false, CreateExcelStream(StationUniqueKeys));
             var data = new QueryStringData { SiteName = "Station", pollutantName = "any" };
 
             // Act
@@ -187,6 +213,9 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             // Assert
             Assert.Equal("Success", (string)result);
+            _mongoFactoryMock.Verify(
+                f => f.GetCollection<BsonDocument>("aqie_atom_non_aurn_networks_station_details"),
+                Times.AtLeastOnce);
         }
 
         [Fact]
@@ -204,7 +233,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Assert.Equal("Failure", (string)result);
         }
 
-        // ── ExceltoMongoDB – environment-variable guards ──────────────────────────
+        // ── Environment-variable guards (path-specific env vars kept as Facts) ────
 
         [Fact]
         public async Task ExceltoMongoDB_Throws_WhenS3BucketNameMissing()
@@ -225,179 +254,6 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 () => _sut.ExceltoMongoDB("any"));
         }
 
-        // ── ExceltoMongoDB – header-only worksheet ────────────────────────────────
-
-        [Fact]
-        public async Task ExceltoMongoDB_DoesNotUpsert_WhenWorksheetHasOnlyHeaderRow()
-        {
-            // Arrange – header row only; Skip(1) produces no iterations
-            SetupS3ForPollutant(CreateExcelStream(PollutantUniqueKeys));
-
-            // Act
-            await _sut.ExceltoMongoDB("any");
-
-            // Assert
-            _pollutantCollectionMock.Verify(
-                c => c.ReplaceOneAsync(
-                    It.IsAny<FilterDefinition<BsonDocument>>(),
-                    It.IsAny<BsonDocument>(),
-                    It.IsAny<ReplaceOptions>(),
-                    It.IsAny<CancellationToken>()),
-                Times.Never);
-        }
-
-        // ── ExceltoMongoDB – valid rows ───────────────────────────────────────────
-
-        [Fact]
-        public async Task ExceltoMongoDB_UpsertsDocument_WhenAllKeyFieldsPresent()
-        {
-            // Arrange
-            var rows = new[] { new[] { "1", "NO2", "high" } };
-            SetupS3ForPollutant(CreateExcelStream(PollutantUniqueKeys, rows));
-
-            // Act
-            await _sut.ExceltoMongoDB("any");
-
-            // Assert – exactly one upsert
-            _pollutantCollectionMock.Verify(
-                c => c.ReplaceOneAsync(
-                    It.IsAny<FilterDefinition<BsonDocument>>(),
-                    It.IsAny<BsonDocument>(),
-                    It.Is<ReplaceOptions>(o => o.IsUpsert),
-                    It.IsAny<CancellationToken>()),
-                Times.Once);
-        }
-
-        [Fact]
-        public async Task ExceltoMongoDB_UpsertsMultipleDocuments_WhenMultipleValidRowsPresent()
-        {
-            // Arrange
-            var rows = new[]
-            {
-                new[] { "1", "NO2",  "high"   },
-                new[] { "2", "PM10", "medium" },
-                new[] { "3", "SO2",  "low"    }
-            };
-            SetupS3ForPollutant(CreateExcelStream(PollutantUniqueKeys, rows));
-
-            // Act
-            await _sut.ExceltoMongoDB("any");
-
-            // Assert
-            _pollutantCollectionMock.Verify(
-                c => c.ReplaceOneAsync(
-                    It.IsAny<FilterDefinition<BsonDocument>>(),
-                    It.IsAny<BsonDocument>(),
-                    It.IsAny<ReplaceOptions>(),
-                    It.IsAny<CancellationToken>()),
-                Times.Exactly(3));
-        }
-
-        // ── ExceltoMongoDB – missing key fields ───────────────────────────────────
-
-        [Fact]
-        public async Task ExceltoMongoDB_SkipsRow_WhenKeyFieldIsMissing()
-        {
-            // Arrange – headers don't include "pollutant_value", row is skipped
-            var headers = new[] { "pollutantID", "pollutantName", "extra_column" };
-            var rows = new[] { new[] { "1", "NO2", "irrelevant" } };
-            SetupS3ForPollutant(CreateExcelStream(headers, rows));
-
-            // Act
-            await _sut.ExceltoMongoDB("any");
-
-            // Assert
-            _pollutantCollectionMock.Verify(
-                c => c.ReplaceOneAsync(
-                    It.IsAny<FilterDefinition<BsonDocument>>(),
-                    It.IsAny<BsonDocument>(),
-                    It.IsAny<ReplaceOptions>(),
-                    It.IsAny<CancellationToken>()),
-                Times.Never);
-        }
-
-        [Fact]
-        public async Task ExceltoMongoDB_SkipsInvalidRows_AndUpsertsValidOnes()
-        {
-            // Arrange – row is missing pollutantName + pollutant_value
-            var headers = new[] { "pollutantID", "extra1", "extra2" };
-            var rows = new[] { new[] { "only_id", "val1", "val2" } };
-            SetupS3ForPollutant(CreateExcelStream(headers, rows));
-
-            // Act
-            await _sut.ExceltoMongoDB("any");
-
-            // Assert – skipped row results in zero upserts
-            _pollutantCollectionMock.Verify(
-                c => c.ReplaceOneAsync(
-                    It.IsAny<FilterDefinition<BsonDocument>>(),
-                    It.IsAny<BsonDocument>(),
-                    It.IsAny<ReplaceOptions>(),
-                    It.IsAny<CancellationToken>()),
-                Times.Never);
-        }
-
-        // ── ExceltoMongoDB – exception propagation ────────────────────────────────
-
-        [Fact]
-        public async Task ExceltoMongoDB_RethrowsMongoException_FromReplaceOneAsync()
-        {
-            // Arrange
-            var rows = new[] { new[] { "1", "NO2", "high" } };
-            SetupS3ForPollutant(CreateExcelStream(PollutantUniqueKeys, rows));
-
-            _pollutantCollectionMock
-                .Setup(c => c.ReplaceOneAsync(
-                    It.IsAny<FilterDefinition<BsonDocument>>(),
-                    It.IsAny<BsonDocument>(),
-                    It.IsAny<ReplaceOptions>(),
-                    It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new MongoException("Mongo failure"));
-
-            // Act & Assert
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB("any"));
-            Assert.IsType<MongoException>(ex.InnerException);
-            Assert.Equal("Mongo failure", ex.InnerException!.Message);
-        }
-
-        [Fact]
-        public async Task ExceltoMongoDB_RethrowsException_WhenS3Throws()
-        {
-            // Arrange
-            _s3Mock
-                .Setup(s => s.GetObjectAsync(BucketName, PollutantMasterKey, It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new Exception("S3 unavailable"));
-
-            // Act & Assert
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB("any"));
-            Assert.NotNull(ex.InnerException);
-            Assert.Equal("S3 unavailable", ex.InnerException!.Message);
-        }
-
-        [Fact]
-        public async Task ExceltoMongoDB_RethrowsMongoException_FromCreateIndexAsync()
-        {
-            // Arrange
-            SetupS3ForPollutant(CreateExcelStream(PollutantUniqueKeys));
-
-            _pollutantIndexMock
-                .Setup(i => i.CreateOneAsync(
-                    It.IsAny<CreateIndexModel<BsonDocument>>(),
-                    null,
-                    It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new MongoException("Index creation failed"));
-
-            // Act & Assert
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB("any"));
-            Assert.IsType<MongoException>(ex.InnerException);
-            Assert.Equal("Index creation failed", ex.InnerException!.Message);
-        }
-
-        // ── ExceltoMongoDB_Station_detials – environment-variable guards ──────────
-
         [Fact]
         public async Task ExceltoMongoDB_StationDetails_Throws_WhenS3BucketNameMissing()
         {
@@ -417,19 +273,21 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 () => _sut.ExceltoMongoDB_Station_detials("any"));
         }
 
-        // ── ExceltoMongoDB_Station_detials – header-only worksheet ────────────────
+        // ── Shared LoadExcelToMongoDbAsync behaviour (Theory covers both paths) ───
 
-        [Fact]
-        public async Task ExceltoMongoDB_StationDetails_DoesNotUpsert_WhenWorksheetHasOnlyHeaderRow()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task LoadExcel_DoesNotUpsert_WhenWorksheetHasOnlyHeaderRow(bool isPollutant)
         {
-            // Arrange
-            SetupS3ForStation(CreateExcelStream(StationUniqueKeys));
+            // Arrange – header row only; Skip(1) produces no iterations
+            SetupS3(isPollutant, CreateExcelStream(GetUniqueKeys(isPollutant)));
 
             // Act
-            await _sut.ExceltoMongoDB_Station_detials("any");
+            await CallSutMethod(isPollutant);
 
             // Assert
-            _stationCollectionMock.Verify(
+            GetCollectionMock(isPollutant).Verify(
                 c => c.ReplaceOneAsync(
                     It.IsAny<FilterDefinition<BsonDocument>>(),
                     It.IsAny<BsonDocument>(),
@@ -438,20 +296,19 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 Times.Never);
         }
 
-        // ── ExceltoMongoDB_Station_detials – valid rows ───────────────────────────
-
-        [Fact]
-        public async Task ExceltoMongoDB_StationDetails_UpsertsDocument_WhenAllKeyFieldsPresent()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task LoadExcel_UpsertsDocument_WhenAllKeyFieldsPresent(bool isPollutant)
         {
             // Arrange
-            var rows = new[] { new[] { "SITE001", "Urban", "NO2" } };
-            SetupS3ForStation(CreateExcelStream(StationUniqueKeys, rows));
+            SetupS3(isPollutant, CreateExcelStream(GetUniqueKeys(isPollutant), GetSampleRows(isPollutant)));
 
             // Act
-            await _sut.ExceltoMongoDB_Station_detials("any");
+            await CallSutMethod(isPollutant);
 
-            // Assert
-            _stationCollectionMock.Verify(
+            // Assert – exactly one upsert
+            GetCollectionMock(isPollutant).Verify(
                 c => c.ReplaceOneAsync(
                     It.IsAny<FilterDefinition<BsonDocument>>(),
                     It.IsAny<BsonDocument>(),
@@ -460,23 +317,23 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 Times.Once);
         }
 
-        [Fact]
-        public async Task ExceltoMongoDB_StationDetails_UpsertsMultipleDocuments_WhenMultipleValidRows()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task LoadExcel_UpsertsMultipleDocuments_WhenMultipleValidRowsPresent(bool isPollutant)
         {
             // Arrange
-            var rows = new[]
-            {
-                new[] { "SITE001", "Urban",    "NO2"  },
-                new[] { "SITE002", "Rural",    "PM10" },
-                new[] { "SITE003", "Suburban", "SO2"  }
-            };
-            SetupS3ForStation(CreateExcelStream(StationUniqueKeys, rows));
+            string[][] rows = isPollutant
+                ? [["1", "NO2", "high"], ["2", "PM10", "medium"], ["3", "SO2", "low"]]
+                : [["SITE001", "Urban", "NO2"], ["SITE002", "Rural", "PM10"], ["SITE003", "Suburban", "SO2"]];
+
+            SetupS3(isPollutant, CreateExcelStream(GetUniqueKeys(isPollutant), rows));
 
             // Act
-            await _sut.ExceltoMongoDB_Station_detials("any");
+            await CallSutMethod(isPollutant);
 
             // Assert
-            _stationCollectionMock.Verify(
+            GetCollectionMock(isPollutant).Verify(
                 c => c.ReplaceOneAsync(
                     It.IsAny<FilterDefinition<BsonDocument>>(),
                     It.IsAny<BsonDocument>(),
@@ -485,21 +342,23 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 Times.Exactly(3));
         }
 
-        // ── ExceltoMongoDB_Station_detials – missing key fields ───────────────────
-
-        [Fact]
-        public async Task ExceltoMongoDB_StationDetails_SkipsRow_WhenKeyFieldIsMissing()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task LoadExcel_SkipsRow_WhenKeyFieldIsMissing(bool isPollutant)
         {
-            // Arrange – headers omit "Pollutant Name"
-            var headers = new[] { "SiteID", "Network Type", "OtherField" };
-            var rows = new[] { new[] { "SITE001", "Urban", "irrelevant" } };
-            SetupS3ForStation(CreateExcelStream(headers, rows));
+            // Headers deliberately omit one unique key so the row is skipped
+            string[] incompleteHeaders = isPollutant
+                ? ["pollutantID", "pollutantName", "extra_column"]   // missing: pollutant_value
+                : ["SiteID", "Network Type", "OtherField"];           // missing: Pollutant Name
+
+            SetupS3(isPollutant, CreateExcelStream(incompleteHeaders, [["val1", "val2", "val3"]]));
 
             // Act
-            await _sut.ExceltoMongoDB_Station_detials("any");
+            await CallSutMethod(isPollutant);
 
             // Assert
-            _stationCollectionMock.Verify(
+            GetCollectionMock(isPollutant).Verify(
                 c => c.ReplaceOneAsync(
                     It.IsAny<FilterDefinition<BsonDocument>>(),
                     It.IsAny<BsonDocument>(),
@@ -508,16 +367,60 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 Times.Never);
         }
 
-        // ── ExceltoMongoDB_Station_detials – exception propagation ────────────────
-
-        [Fact]
-        public async Task ExceltoMongoDB_StationDetails_RethrowsMongoException_FromReplaceOneAsync()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task LoadExcel_DropsAndRecreatesCollection_BeforeUpserting(bool isPollutant)
         {
             // Arrange
-            var rows = new[] { new[] { "SITE001", "Urban", "NO2" } };
-            SetupS3ForStation(CreateExcelStream(StationUniqueKeys, rows));
+            SetupS3(isPollutant, CreateExcelStream(GetUniqueKeys(isPollutant)));
+            string collectionName = GetCollectionName(isPollutant);
 
-            _stationCollectionMock
+            // Act
+            await CallSutMethod(isPollutant);
+
+            // Assert
+            // Collection is fetched twice: once before drop, once after recreate
+            _mongoFactoryMock.Verify(
+                f => f.GetCollection<BsonDocument>(collectionName),
+                Times.Exactly(2));
+
+            GetDatabaseMock(isPollutant).Verify(
+                d => d.DropCollectionAsync(collectionName, It.IsAny<CancellationToken>()),
+                Times.Once);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task LoadExcel_CreatesUniqueIndex_OnExpectedKeyFields(bool isPollutant)
+        {
+            // Arrange
+            SetupS3(isPollutant, CreateExcelStream(GetUniqueKeys(isPollutant)));
+
+            // Act
+            await CallSutMethod(isPollutant);
+
+            // Assert
+            GetIndexMock(isPollutant).Verify(
+                i => i.CreateOneAsync(
+                    It.Is<CreateIndexModel<BsonDocument>>(m => m.Options.Unique == true),
+                    null,
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
+        }
+
+        // ── Exception propagation (Theory covers both paths) ──────────────────────
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task LoadExcel_RethrowsMongoException_FromReplaceOneAsync(bool isPollutant)
+        {
+            // Arrange
+            SetupS3(isPollutant, CreateExcelStream(GetUniqueKeys(isPollutant), GetSampleRows(isPollutant)));
+
+            GetCollectionMock(isPollutant)
                 .Setup(c => c.ReplaceOneAsync(
                     It.IsAny<FilterDefinition<BsonDocument>>(),
                     It.IsAny<BsonDocument>(),
@@ -527,33 +430,40 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             // Act & Assert
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB_Station_detials("any"));
+                () => CallSutMethod(isPollutant));
+
             Assert.IsType<MongoException>(ex.InnerException);
             Assert.Equal("Mongo failure", ex.InnerException!.Message);
         }
 
-        [Fact]
-        public async Task ExceltoMongoDB_StationDetails_RethrowsException_WhenS3Throws()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task LoadExcel_RethrowsException_WhenS3Throws(bool isPollutant)
         {
             // Arrange
+            string s3Key = isPollutant ? PollutantMasterKey : StationMasterKey;
             _s3Mock
-                .Setup(s => s.GetObjectAsync(BucketName, StationMasterKey, It.IsAny<CancellationToken>()))
+                .Setup(s => s.GetObjectAsync(BucketName, s3Key, It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new Exception("S3 unavailable"));
 
             // Act & Assert
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB_Station_detials("any"));
+                () => CallSutMethod(isPollutant));
+
             Assert.NotNull(ex.InnerException);
             Assert.Equal("S3 unavailable", ex.InnerException!.Message);
         }
 
-        [Fact]
-        public async Task ExceltoMongoDB_StationDetails_RethrowsMongoException_FromCreateIndexAsync()
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task LoadExcel_RethrowsMongoException_FromCreateIndexAsync(bool isPollutant)
         {
             // Arrange
-            SetupS3ForStation(CreateExcelStream(StationUniqueKeys));
+            SetupS3(isPollutant, CreateExcelStream(GetUniqueKeys(isPollutant)));
 
-            _stationIndexMock
+            GetIndexMock(isPollutant)
                 .Setup(i => i.CreateOneAsync(
                     It.IsAny<CreateIndexModel<BsonDocument>>(),
                     null,
@@ -562,7 +472,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             // Act & Assert
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => _sut.ExceltoMongoDB_Station_detials("any"));
+                () => CallSutMethod(isPollutant));
+
             Assert.IsType<MongoException>(ex.InnerException);
             Assert.Equal("Index creation failed", ex.InnerException!.Message);
         }
