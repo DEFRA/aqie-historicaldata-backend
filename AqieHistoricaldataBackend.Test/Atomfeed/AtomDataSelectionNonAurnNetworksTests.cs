@@ -477,5 +477,25 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Assert.IsType<MongoException>(ex.InnerException);
             Assert.Equal("Index creation failed", ex.InnerException!.Message);
         }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task LoadExcel_RethrowsFileNotFoundException_WhenS3ThrowsFileNotFound(bool isPollutant)
+        {
+            // Arrange – FileNotFoundException hits the dedicated catch block, not the generic one
+            string s3Key = isPollutant ? PollutantMasterKey : StationMasterKey;
+            _s3Mock
+                .Setup(s => s.GetObjectAsync(BucketName, s3Key, It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new FileNotFoundException("File not found in S3"));
+
+            // Act & Assert
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => CallSutMethod(isPollutant));
+
+            Assert.IsType<FileNotFoundException>(ex.InnerException);
+            Assert.Contains("Failed to load", ex.Message);
+            Assert.Contains("data from S3", ex.Message);
+        }
     }
 }
