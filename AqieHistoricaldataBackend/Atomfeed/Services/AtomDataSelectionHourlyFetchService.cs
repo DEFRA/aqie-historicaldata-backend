@@ -25,7 +25,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 var siteYearPairs = filteredstationpollutant
                                     .SelectMany(siteinfo => years.Select(year => new { siteinfo, year }));
-                await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 5 }, async (pair, ct) =>
+                await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 3 }, async (pair, ct) =>
                 {
                     try
                     {
@@ -139,7 +139,17 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 new PollutantDetails { PollutantName = "Particulate sulphate", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/47" },
                 new PollutantDetails { PollutantName = "Gaseous hydrochloric acid", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/39" },
                 new PollutantDetails { PollutantName = "Gaseous nitric acid", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/50" },
-                new PollutantDetails { PollutantName = "Gaseous nitrous acid", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/999005" }
+                new PollutantDetails { PollutantName = "Gaseous nitrous acid", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/999005" },
+                new PollutantDetails { PollutantName = "Ammonium in PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1045" },
+                new PollutantDetails { PollutantName = "Calcium in PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1629" },
+                new PollutantDetails { PollutantName = "Chloride in PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1631" },
+                new PollutantDetails { PollutantName = "Gaseous ammonia", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/35" },
+                new PollutantDetails { PollutantName = "Magnesium in PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1659" },
+                new PollutantDetails { PollutantName = "Nitrate in PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1046" },
+                new PollutantDetails { PollutantName = "Potassium in PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1657" },
+                new PollutantDetails { PollutantName = "Sodium in PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1668" },
+                new PollutantDetails { PollutantName = "Sulphate in PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1047" }
+
             };
             // Split and normalize the filter string
             var filterList = (filter ?? string.Empty)

@@ -82,7 +82,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 using var workbook = new XLWorkbook(memoryStream);
                 var worksheet = workbook.Worksheet(1);
-                var allRows = worksheet.RangeUsed().RowsUsed().ToList();
+                var rangeUsed = worksheet.RangeUsed();
+                if (rangeUsed == null)
+                {
+                    Logger.LogWarning("{LogContext} - No data found in worksheet", logContext);
+                    return;
+                }
+
+                var allRows = rangeUsed.RowsUsed().ToList();
 
                 if (allRows.Count == 0) return;
 
