@@ -497,5 +497,38 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Assert.Contains("Failed to load", ex.Message);
             Assert.Contains("data from S3", ex.Message);
         }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public async Task LoadExcel_ReturnsEarly_WhenWorksheetHasNoUsedRange(bool isPollutant)
+        {
+            // Arrange – completely empty worksheet so RangeUsed() returns null
+            var ms = new MemoryStream();
+            using (var workbook = new XLWorkbook())
+            {
+                workbook.AddWorksheet("Sheet1"); // no data written → RangeUsed() == null
+                workbook.SaveAs(ms);
+            }
+            ms.Position = 0;
+
+            SetupS3(isPollutant, ms);
+
+            // Act
+            await CallSutMethod(isPollutant);
+
+            // Assert – method returns before touching MongoDB
+            _mongoFactoryMock.Verify(
+                f => f.GetCollection<BsonDocument>(GetCollectionName(isPollutant)),
+                Times.Never);
+
+            GetCollectionMock(isPollutant).Verify(
+                c => c.ReplaceOneAsync(
+                    It.IsAny<FilterDefinition<BsonDocument>>(),
+                    It.IsAny<BsonDocument>(),
+                    It.IsAny<ReplaceOptions>(),
+                    It.IsAny<CancellationToken>()),
+                Times.Never);
+        }
     }
 }
