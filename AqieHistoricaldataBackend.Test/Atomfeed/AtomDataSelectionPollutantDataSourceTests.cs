@@ -19,45 +19,26 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         private readonly Mock<ILogger<HistoryexceedenceService>> _loggerMock = new();
         private readonly Mock<IMongoDbClientFactory> _mongoFactoryMock = new();
         private readonly Mock<IMongoCollection<StationDetailDocument>> _collectionMock = new();
-        private readonly Mock<IAsyncCursor<StationDetailDocument>> _cursorMock = new();
 
-        private AtomDataSelectionPollutantDataSource CreateSut()
+        // ------------------------------------------------------------------
+        // Builder: documents with explicit pollutantID per entry
+        // ------------------------------------------------------------------
+        private AtomDataSelectionPollutantDataSource CreateSutWithDocuments(
+            List<StationDetailDocument> documents)
         {
-            _mongoFactoryMock
-                .Setup(f => f.GetCollection<StationDetailDocument>(
-                    "aqie_atom_non_aurn_networks_station_details"))
-                .Returns(_collectionMock.Object);
-
-            return new AtomDataSelectionPollutantDataSource(
-                _loggerMock.Object,
-                _mongoFactoryMock.Object);
-        }
-
-        private AtomDataSelectionPollutantDataSource CreateSutWithProjections(
-            List<(string? NetworkType, string? NetworkId)> projections)
-        {
-            var docs = projections
-                .Select(p => new StationDetailDocument
-                {
-                    NetworkType = p.NetworkType,
-                    NetworkID   = p.NetworkId,
-                    pollutantID = "1"
-                })
-                .ToList();
-
-            var projCursorMock = new Mock<IAsyncCursor<StationDetailDocument>>();
-            projCursorMock
+            var cursorMock = new Mock<IAsyncCursor<StationDetailDocument>>();
+            cursorMock
                 .SetupSequence(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(true)
                 .ReturnsAsync(false);
-            projCursorMock.Setup(c => c.Current).Returns(docs);
+            cursorMock.Setup(c => c.Current).Returns(documents);
 
             _collectionMock
                 .Setup(c => c.FindAsync(
                     It.IsAny<FilterDefinition<StationDetailDocument>>(),
                     It.IsAny<FindOptions<StationDetailDocument, StationDetailDocument>>(),
                     It.IsAny<CancellationToken>()))
-                .ReturnsAsync(projCursorMock.Object);
+                .ReturnsAsync(cursorMock.Object);
 
             _mongoFactoryMock
                 .Setup(f => f.GetCollection<StationDetailDocument>(
@@ -68,6 +49,19 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 _loggerMock.Object,
                 _mongoFactoryMock.Object);
         }
+
+        // Convenience overload for tests that only care about NetworkType / NetworkID
+        // and do not need specific pollutantID values (defaults to "1")
+        private AtomDataSelectionPollutantDataSource CreateSutWithProjections(
+            List<(string? NetworkType, string? NetworkId)> projections) =>
+            CreateSutWithDocuments(projections
+                .Select(p => new StationDetailDocument
+                {
+                    NetworkType = p.NetworkType,
+                    NetworkID   = p.NetworkId,
+                    pollutantID = "1"
+                })
+                .ToList());
 
         /// <summary>
         /// Serializes the SUT result through JSON to avoid cross-assembly
@@ -101,13 +95,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         // =====================================================================
-        // 2. pollutantId is empty string → empty list
+        // 2. pollutantId is whitespace-only → empty list
         // =====================================================================
         [Fact]
-        public async Task GetAtomPollutantDataSource_EmptyPollutantId_ReturnsEmptyList()
+        public async Task GetAtomPollutantDataSource_WhitespacePollutantId_ReturnsEmptyList()
         {
             var sut  = CreateSutWithProjections([]);
-            var data = new QueryStringData { pollutantId = "   ,  , " };
+            var data = new QueryStringData { pollutantId = " , , " };
 
             var result = await InvokeAsync(sut, data);
 
@@ -130,7 +124,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         // =====================================================================
-        // 3b. AURN pollutant only + no DB results → OtherDataFromDefra absent
+        // 3b. AURN pollutant only → OtherDataFromDefra absent
         // =====================================================================
         [Fact]
         public async Task GetAtomPollutantDataSource_AurnPollutantOnly_NoDbResults_DoesNotReturnOtherDataFromDefra()
@@ -140,26 +134,44 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             var result = await InvokeAsync(sut, data);
 
-            Assert.DoesNotContain(result, r => r.GetProperty("category").GetString() == "Other data from Defra");
+            Assert.DoesNotContain(result,
+                r => r.GetProperty("category").GetString() == "Other data from Defra");
         }
 
         // =====================================================================
-        // 4. AURN category networks list contains AurnNetworkName
+        // 4. AURN network is now an OBJECT with "name" and "pollutantID" fields
+        //    (Breaking change from the previous string-array shape)
         // =====================================================================
         [Fact]
-        public async Task GetAtomPollutantDataSource_AurnPollutant_AurnCategoryHasNetworkName()
+        public async Task GetAtomPollutantDataSource_AurnPollutant_NetworkIsObjectWithNameAndPollutantId()
         {
             var sut  = CreateSutWithProjections([]);
             var data = new QueryStringData { pollutantId = "44" };
 
             var result = await InvokeAsync(sut, data);
 
-            var aurnNetworks = result[0].GetProperty("networks")
-                .EnumerateArray()
-                .Select(e => e.GetString())
-                .ToList();
+            var network = result[0].GetProperty("networks").EnumerateArray().Single();
 
-            Assert.Contains("Automatic Urban and Rural Network (AURN)", aurnNetworks);
+            Assert.Equal("Automatic Urban and Rural Network (AURN)", network.GetProperty("name").GetString());
+            Assert.Equal("44", network.GetProperty("pollutantID").GetString());
+        }
+
+        // =====================================================================
+        // 4b. Multiple AURN pollutants → pollutantID contains all requested IDs
+        // =====================================================================
+        [Fact]
+        public async Task GetAtomPollutantDataSource_MultipleAurnPollutants_PollutantIdContainsAll()
+        {
+            var sut  = CreateSutWithProjections([]);
+            var data = new QueryStringData { pollutantId = "36,44" };
+
+            var result = await InvokeAsync(sut, data);
+
+            var network  = result[0].GetProperty("networks").EnumerateArray().Single();
+            var parts    = network.GetProperty("pollutantID").GetString()!.Split(',');
+
+            Assert.Contains("36", parts);
+            Assert.Contains("44", parts);
         }
 
         // =====================================================================
@@ -178,6 +190,78 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         // =====================================================================
+        // 5b. Non-AURN network includes "name", "id", and "pollutantID"
+        // =====================================================================
+        [Fact]
+        public async Task GetAtomPollutantDataSource_NonAurnNetwork_HasNameIdAndPollutantId()
+        {
+            var sut = CreateSutWithDocuments(
+            [
+                new StationDetailDocument
+                {
+                    NetworkType = "UKEAP - Rural NO2 Network",
+                    NetworkID   = "1",
+                    pollutantID = "44"
+                }
+            ]);
+            var data = new QueryStringData { pollutantId = "129" };
+
+            var result  = await InvokeAsync(sut, data);
+            var network = result[0].GetProperty("networks").EnumerateArray().Single();
+
+            Assert.Equal("UKEAP - Rural NO2 Network", network.GetProperty("name").GetString());
+            Assert.Equal(1,                            network.GetProperty("id").GetInt32());
+            Assert.Equal("44",                         network.GetProperty("pollutantID").GetString());
+        }
+
+        // =====================================================================
+        // 5c. Multiple documents for the same network → pollutantIDs are aggregated
+        // =====================================================================
+        [Fact]
+        public async Task GetAtomPollutantDataSource_MultipleDocsForSameNetwork_PollutantIdsAreAggregated()
+        {
+            var sut = CreateSutWithDocuments(
+            [
+                new StationDetailDocument { NetworkType = "UKEAP - Precip-Net", NetworkID = "3", pollutantID = "129" },
+                new StationDetailDocument { NetworkType = "UKEAP - Precip-Net", NetworkID = "3", pollutantID = "130" },
+                new StationDetailDocument { NetworkType = "UKEAP - Precip-Net", NetworkID = "3", pollutantID = "131" }
+            ]);
+            var data = new QueryStringData { pollutantId = "129,130,131" };
+
+            var result   = await InvokeAsync(sut, data);
+            var networks = result[0].GetProperty("networks").EnumerateArray().ToList();
+
+            Assert.Single(networks);
+
+            var parts = networks[0].GetProperty("pollutantID").GetString()!.Split(',');
+            Assert.Contains("129", parts);
+            Assert.Contains("130", parts);
+            Assert.Contains("131", parts);
+        }
+
+        // =====================================================================
+        // 5d. Duplicate pollutantID values for the same network → de-duplicated
+        // =====================================================================
+        [Fact]
+        public async Task GetAtomPollutantDataSource_DuplicatePollutantIdsForNetwork_AreDeduped()
+        {
+            var sut = CreateSutWithDocuments(
+            [
+                new StationDetailDocument { NetworkType = "UKEAP - Precip-Net", NetworkID = "3", pollutantID = "129" },
+                new StationDetailDocument { NetworkType = "UKEAP - Precip-Net", NetworkID = "3", pollutantID = "129" }
+            ]);
+            var data = new QueryStringData { pollutantId = "129" };
+
+            var result = await InvokeAsync(sut, data);
+            var parts  = result[0].GetProperty("networks").EnumerateArray()
+                                  .Single()
+                                  .GetProperty("pollutantID").GetString()!
+                                  .Split(',');
+
+            Assert.Single(parts.Where(p => p == "129"));
+        }
+
+        // =====================================================================
         // 6. Non-numeric NetworkId → id defaults to -2
         // =====================================================================
         [Fact]
@@ -186,9 +270,9 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var sut  = CreateSutWithProjections([("LAQN", "NOT_A_NUMBER")]);
             var data = new QueryStringData { pollutantId = "1" };
 
-            var result = await InvokeAsync(sut, data);
-
+            var result  = await InvokeAsync(sut, data);
             var network = result[0].GetProperty("networks").EnumerateArray().First();
+
             Assert.Equal(-2, network.GetProperty("id").GetInt32());
         }
 
@@ -209,17 +293,17 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         // =====================================================================
-        // 8. Duplicate NetworkType rows → DistinctBy keeps only one
+        // 8. Duplicate NetworkType + NetworkID rows → grouped into one network
         // =====================================================================
         [Fact]
-        public async Task GetAtomPollutantDataSource_DuplicateNetworkType_DistinctByReducesToOne()
+        public async Task GetAtomPollutantDataSource_DuplicateNetworkTypeAndId_GroupedIntoOneNetwork()
         {
             var sut  = CreateSutWithProjections([("LAQN", "5"), ("LAQN", "5")]);
             var data = new QueryStringData { pollutantId = "1" };
 
-            var result = await InvokeAsync(sut, data);
-
+            var result   = await InvokeAsync(sut, data);
             var networks = result[0].GetProperty("networks").EnumerateArray().ToList();
+
             Assert.Single(networks);
         }
 
@@ -232,20 +316,23 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var sut  = CreateSutWithProjections([(null, null), ("LAQN", "3")]);
             var data = new QueryStringData { pollutantId = "1" };
 
-            var result = await InvokeAsync(sut, data);
-
+            var result   = await InvokeAsync(sut, data);
             var networks = result[0].GetProperty("networks").EnumerateArray().ToList();
+
             Assert.Single(networks);
         }
 
         // =====================================================================
-        // 10. All null NetworkTypes + non-AURN pollutant → empty list
+        // 10. Null pollutantID on document → document is excluded
         // =====================================================================
         [Fact]
-        public async Task GetAtomPollutantDataSource_AllNullNetworkTypes_NonAurnPollutant_ReturnsEmptyList()
+        public async Task GetAtomPollutantDataSource_NullPollutantIdOnDocument_IsFilteredOut()
         {
-            var sut  = CreateSutWithProjections([(null, null)]);
-            var data = new QueryStringData { pollutantId = "1" };
+            var sut = CreateSutWithDocuments(
+            [
+                new StationDetailDocument { NetworkType = "UKEAP - Rural NO2 Network", NetworkID = "1", pollutantID = null }
+            ]);
+            var data = new QueryStringData { pollutantId = "129" };
 
             var result = await InvokeAsync(sut, data);
 
@@ -253,13 +340,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         // =====================================================================
-        // 11. Whitespace-only pollutantId → empty list
+        // 11. All null NetworkTypes + non-AURN pollutant → empty list
         // =====================================================================
         [Fact]
-        public async Task GetAtomPollutantDataSource_WhitespacePollutantId_ReturnsEmptyList()
+        public async Task GetAtomPollutantDataSource_AllNullNetworkTypes_NonAurnPollutant_ReturnsEmptyList()
         {
-            var sut  = CreateSutWithProjections([]);
-            var data = new QueryStringData { pollutantId = " , , " };
+            var sut  = CreateSutWithProjections([(null, null)]);
+            var data = new QueryStringData { pollutantId = "1" };
 
             var result = await InvokeAsync(sut, data);
 
@@ -279,7 +366,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             var result = await InvokeAsync(sut, data);
 
-            Assert.Contains(result, r => r.GetProperty("category").GetString() == "Near real-time data from Defra");
+            Assert.Contains(result,
+                r => r.GetProperty("category").GetString() == "Near real-time data from Defra");
         }
 
         // =====================================================================
@@ -294,8 +382,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .Throws(new InvalidOperationException("DB unavailable"));
 
             var sut    = new AtomDataSelectionPollutantDataSource(_loggerMock.Object, _mongoFactoryMock.Object);
-            var data   = new QueryStringData { pollutantId = "36" };
-            var result = await sut.GetAtomPollutantDataSource(data);
+            var result = await sut.GetAtomPollutantDataSource(new QueryStringData { pollutantId = "36" });
 
             Assert.Equal("Failure", (string)result);
         }
@@ -311,9 +398,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     "aqie_atom_non_aurn_networks_station_details"))
                 .Throws(new InvalidOperationException("DB unavailable"));
 
-            var sut  = new AtomDataSelectionPollutantDataSource(_loggerMock.Object, _mongoFactoryMock.Object);
-            var data = new QueryStringData { pollutantId = "1" };
-            await sut.GetAtomPollutantDataSource(data);
+            var sut = new AtomDataSelectionPollutantDataSource(_loggerMock.Object, _mongoFactoryMock.Object);
+            await sut.GetAtomPollutantDataSource(new QueryStringData { pollutantId = "1" });
 
             _loggerMock.Verify(
                 l => l.Log(
