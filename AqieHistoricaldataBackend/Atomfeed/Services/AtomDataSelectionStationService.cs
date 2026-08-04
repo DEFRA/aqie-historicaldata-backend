@@ -570,33 +570,33 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var documents = await siteCollection.Find(combinedFilter).ToListAsync();
 
             var filteredSites = documents
-                        .GroupBy(d => d.SiteID)
-                        .Select(g =>
-                        {
-                            var first = g.First();
-                            var (areaType, siteType) = SplitEnvironmentType(first.EnvironmentType);
-                            return new SiteInfo
-                            {
-                                LocalSiteId = first.SiteID,
-                                SiteName = first.SiteName,
-                                AreaType = areaType,
-                                SiteType = siteType,
-                                Latitude = first.Latitude,
-                                Longitude = first.Longitude,
-                                NetworkType = first.NetworkType,
-                                ZoneRegion = first.Region,
-                                Pollutants = g
-                                    .Where(d => d.PollutantName != null)
-                                    .Select(d => new PollutantInfo
+                                .GroupBy(d => new { d.SiteID, d.NetworkID })  
+                                .Select(g =>
+                                {
+                                    var first = g.First();
+                                    var (areaType, siteType) = SplitEnvironmentType(first.EnvironmentType);
+                                    return new SiteInfo
                                     {
-                                        Name = d.PollutantName,
-                                        StartDate = d.StartDate,
-                                        EndDate = d.EndDate
-                                    })
-                                    .ToList()
-                            };
-                        })
-                        .ToList();
+                                        LocalSiteId = first.SiteID,
+                                        SiteName = first.SiteName,
+                                        AreaType = areaType,
+                                        SiteType = siteType,
+                                        Latitude = first.Latitude,
+                                        Longitude = first.Longitude,
+                                        NetworkType = first.NetworkType,
+                                        ZoneRegion = first.Region,
+                                        Pollutants = g
+                                            .Where(d => d.PollutantName != null)
+                                            .Select(d => new PollutantInfo
+                                            {
+                                                Name = d.PollutantName,
+                                                StartDate = d.StartDate,
+                                                EndDate = d.EndDate
+                                            })
+                                            .ToList()
+                                    };
+                                })
+                                .ToList();
             return filteredSites;
         }
     }

@@ -163,8 +163,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 new PollutantDetails { PollutantName = "Conductivity", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/412" },
                 new PollutantDetails { PollutantName = "pH in precipitation", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/753" },
                 new PollutantDetails { PollutantName = "Rainfall", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/2076" },
-                new PollutantDetails { PollutantName = "Fluoride", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/999006" }
-
+                new PollutantDetails { PollutantName = "Fluoride", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/999006" },
+                new PollutantDetails { PollutantName = "1,3-butadiene", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/24" },
+                new PollutantDetails { PollutantName = "Benzene", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/20" },
+                new PollutantDetails { PollutantName = "Gaseous ammonia (passive)", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/35" },
+                new PollutantDetails { PollutantName = "Gaseous ammonia (active)", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/35" },
+                new PollutantDetails { PollutantName = "Gaseous ammonia (diffusion tube)", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/35" },
+                new PollutantDetails { PollutantName = "Particulate ammonium", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/45" }
             };
             // Split and normalize the filter string
             var filterList = (filter ?? string.Empty)
