@@ -547,7 +547,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
 
         public async Task<List<SiteInfo>> GetSiteInfoAsync(string pollutantName, string networkId)
-        {
+            {
             var siteCollection = MongoDbClientFactory.GetCollection<StationDetailDocument>("aqie_atom_non_aurn_networks_station_details");
 
             var pollutantIds = pollutantName
