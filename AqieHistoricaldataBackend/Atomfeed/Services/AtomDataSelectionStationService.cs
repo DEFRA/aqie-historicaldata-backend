@@ -380,7 +380,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 Logger.LogError("GetRicardoToken Auth failed - no token returned");
                 return "Failure";
             }
-
             return token;
         }
 
