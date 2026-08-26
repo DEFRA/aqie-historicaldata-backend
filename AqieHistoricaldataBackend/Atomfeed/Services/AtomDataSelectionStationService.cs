@@ -380,6 +380,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 Logger.LogError("GetRicardoToken Auth failed - no token returned");
                 return "Failure";
             }
+
             return token;
         }
 
@@ -391,7 +392,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var pollutantMap = new Dictionary<string, List<string>>
             {
                 { "Ozone", new List<string> { "Ozone" } },
-                { "Fine particulate matter", new List<string>
+                { "Fine particulate matter (PM2.5)", new List<string>
                     {
                         "PM<sub>2.5</sub> (Hourly measured)",
                         "Volatile PM<sub>2.5</sub> (Hourly measured)",
@@ -399,7 +400,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         "PM<sub>2.5</sub> particulate matter (Hourly measured)"
                     }
                 },
-                { "Particulate matter", new List<string>
+                { "Particulate matter (PM10)", new List<string>
                     {
                         "PM<sub>10</sub> (Hourly measured)",
                         "Volatile PM<sub>10</sub> (Hourly measured)",
