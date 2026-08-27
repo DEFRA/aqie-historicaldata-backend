@@ -229,7 +229,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             new PollutantDetails
             {
                 PollutantName = "Nitrogen dioxide",
-                PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/8"
+                PollutantMasterUrl = "8"
             }
         ];
 

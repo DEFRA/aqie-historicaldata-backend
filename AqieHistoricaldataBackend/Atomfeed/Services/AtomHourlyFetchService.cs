@@ -21,11 +21,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         {
             var allPollutants = new List<PollutantDetails>
             {
-                new PollutantDetails { PollutantName = "Nitrogen dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/8" },
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" },
-                new PollutantDetails { PollutantName = "PM2.5", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/6001" },
-                new PollutantDetails { PollutantName = "Ozone", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/7" },
-                new PollutantDetails { PollutantName = "Sulphur dioxide", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/1" }
+                new PollutantDetails { PollutantName = "Nitrogen dioxide", PollutantMasterUrl = "8" },
+                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" },
+                new PollutantDetails { PollutantName = "PM2.5", PollutantMasterUrl = "6001" },
+                new PollutantDetails { PollutantName = "Ozone", PollutantMasterUrl = "7" },
+                new PollutantDetails { PollutantName = "Sulphur dioxide", PollutantMasterUrl = "1" }
             };
 
             var filtered = allPollutants.Where(p => p.PollutantName == filter);
@@ -91,9 +91,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     var feature = features[i];
                     var href = feature["om:OM_Observation"]?["om:observedProperty"]?["@xlink:href"]?.ToString();
-                    string? cleanedUrl = href?.Replace("http://", "");
+                    string? cleanedUrl = href is not null
+                                        ? href[(href.LastIndexOf('/') + 1)..]
+                                        : null;
                     if (string.IsNullOrEmpty(href)) continue;
-
                     var match = pollutants.FirstOrDefault(p => p.PollutantMasterUrl == cleanedUrl);
                     if (match != null)
                     {
