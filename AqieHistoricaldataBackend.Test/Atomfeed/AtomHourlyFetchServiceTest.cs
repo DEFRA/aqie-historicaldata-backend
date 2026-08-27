@@ -80,6 +80,20 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Assert.Equal(5, result.Count);
         }
 
+        [Theory]
+        [InlineData("Nitrogen dioxide", "8")]
+        [InlineData("PM10", "5")]
+        [InlineData("PM2.5", "6001")]
+        [InlineData("Ozone", "7")]
+        [InlineData("Sulphur dioxide", "1")]
+        public void GetPollutantsToDisplay_CorrectPollutantMasterUrl_ForEachPollutant(string pollutantName, string expectedUrl)
+        {
+            var result = InvokeGetPollutantsToDisplay(pollutantName);
+
+            Assert.Single(result);
+            Assert.Equal(expectedUrl, result[0].PollutantMasterUrl);
+        }
+
         #endregion
 
         #region FetchAtomFeedAsync
@@ -294,7 +308,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var pollutants = new List<PollutantDetails>
             {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" }
+                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
             };
 
             var feature = new JObject
@@ -317,7 +331,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             // The loop starts at i = 1, so index 0 is always skipped
             var pollutants = new List<PollutantDetails>
             {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" }
+                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
             };
 
             var featureAtIndex0 = BuildFeatureObject(
@@ -336,7 +350,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var pollutants = new List<PollutantDetails>
             {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" }
+                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
             };
 
             var result = InvokeProcessAtomData(new JArray(), pollutants);
@@ -349,7 +363,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var pollutants = new List<PollutantDetails>
             {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" }
+                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
             };
 
             var feature = BuildFeatureObject(
@@ -367,7 +381,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var pollutants = new List<PollutantDetails>
             {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" }
+                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
             };
 
             var feature = new JObject
@@ -396,7 +410,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var pollutants = new List<PollutantDetails>
             {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" }
+                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
             };
 
             var feature = BuildFeatureObject(
@@ -416,8 +430,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var pollutants = new List<PollutantDetails>
             {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" },
-                new PollutantDetails { PollutantName = "Ozone", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/7" }
+                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" },
+                new PollutantDetails { PollutantName = "Ozone", PollutantMasterUrl = "7" }
             };
 
             var feature1 = BuildFeatureObject(
@@ -439,7 +453,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var pollutants = new List<PollutantDetails>
             {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" }
+                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
             };
 
             // A malformed feature that causes an exception followed by a valid one
@@ -461,7 +475,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             var pollutants = new List<PollutantDetails>
             {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "dd.eionet.europa.eu/vocabulary/aq/pollutant/5" }
+                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
             };
 
             var feature = new JObject
