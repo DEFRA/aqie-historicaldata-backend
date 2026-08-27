@@ -123,8 +123,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var allPollutants = new List<PollutantDetails>
             {
                 new PollutantDetails { PollutantName = "Nitrogen dioxide", PollutantMasterUrl = "8" },
-                new PollutantDetails { PollutantName = "Particulate matter", PollutantMasterUrl = "5" },
-                new PollutantDetails { PollutantName = "Fine particulate matter", PollutantMasterUrl = "6001" },
+                new PollutantDetails { PollutantName = "Particulate matter (PM10)", PollutantMasterUrl = "5" },
+                new PollutantDetails { PollutantName = "Fine particulate matter (PM2.5)", PollutantMasterUrl = "6001" },
                 new PollutantDetails { PollutantName = "Ozone", PollutantMasterUrl = "7" },
                 new PollutantDetails { PollutantName = "Sulphur dioxide", PollutantMasterUrl = "1" },
                 new PollutantDetails { PollutantName = "Nitrogen oxides as nitrogen dioxide", PollutantMasterUrl = "9" },
