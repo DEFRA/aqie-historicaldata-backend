@@ -95,11 +95,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     return new JArray();
                 }
                 var stream = await response.Content.ReadAsStreamAsync();
-                var xml = new XmlDocument();
-                xml.Load(stream);
-                var json = Newtonsoft.Json.JsonConvert.SerializeXmlNode(xml);
-                var featureCollection = JObject.Parse(json)["gml:FeatureCollection"];
-                return featureCollection?["gml:featureMember"] as JArray ?? new JArray();
+                return AtomFeedHelper.ParseXmlStreamToFeatureArray(stream);
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
@@ -238,9 +234,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     var feature = features[i];
                     var href = feature["om:OM_Observation"]?["om:observedProperty"]?["@xlink:href"]?.ToString();
-                    string? cleanedUrl = href is not null
-                                        ? href[(href.LastIndexOf('/') + 1)..]
-                                        : null;
+                    string? cleanedUrl = AtomFeedHelper.ExtractPollutantId(href);
                     if (string.IsNullOrEmpty(href)) continue;
                     var match = pollutants.FirstOrDefault(p => p.PollutantMasterUrl == cleanedUrl);
                     if (match != null)
@@ -259,24 +253,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
             return finalList;
         }
-        private static List<FinalData> ExtractFinalData(string values, string pollutantName, SiteInfo siteinfo)
-        {
-            return values.Replace("\r\n", "").Trim().Split("@@")
-                .Select(item => item.Split(','))
-                .Where(parts => parts.Length >= 5)
-                .Select(parts => new FinalData
-                {
-                    StartTime = parts[0],
-                    EndTime = parts[1],
-                    Verification = parts[2],
-                    Validity = parts[3],
-                    Value = parts[4],
-                    PollutantName = pollutantName,
-                    SiteName = siteinfo.SiteName,
-                    SiteType = siteinfo.AreaType + siteinfo.SiteType,
-                    Region = siteinfo.ZoneRegion,
-                    Country = siteinfo.Country
-                }).ToList();
-        }
+        private static List<FinalData> ExtractFinalData(string values, string pollutantName, SiteInfo siteInfo)
+            => AtomFeedHelper.ToFinalData(AtomFeedHelper.SplitSweValues(values), pollutantName, siteInfo);
     }
 }
