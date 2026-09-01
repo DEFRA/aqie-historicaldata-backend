@@ -118,12 +118,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 DownloadPollutantType = "Annual",
                 Year = "2021"
             };
-            _annualMock.Setup(x => x.annualatomfeedexport_csv(finalList, data))
+            _annualMock.Setup(x => x.annualatomfeedexport_csv(It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>()))
                        .ReturnsAsync(SampleCsvBytes);
 
             var result = await CreateService().WriteCsvToAwsS3BucketAsync(finalList, data, "Annual");
 
-            _annualMock.Verify(x => x.annualatomfeedexport_csv(finalList, data), Times.Once);
+            _annualMock.Verify(x => x.annualatomfeedexport_csv(It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>()), Times.Once);
             Assert.Equal(PresignedUrl, result);
         }
 
