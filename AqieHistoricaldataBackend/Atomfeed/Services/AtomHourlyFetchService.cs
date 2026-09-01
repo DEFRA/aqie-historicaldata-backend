@@ -64,10 +64,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
 
                 var stream = await response.Content.ReadAsStreamAsync();
-                var xml = new XmlDocument();
-                xml.Load(stream);
-                var json = Newtonsoft.Json.JsonConvert.SerializeXmlNode(xml);
-                return JObject.Parse(json)["gml:FeatureCollection"]?["gml:featureMember"] as JArray ?? new JArray();
+                return AtomFeedHelper.ParseXmlStreamToFeatureArray(stream);
             }
             catch (HttpRequestException ex)
             {
@@ -91,9 +88,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 {
                     var feature = features[i];
                     var href = feature["om:OM_Observation"]?["om:observedProperty"]?["@xlink:href"]?.ToString();
-                    string? cleanedUrl = href is not null
-                                        ? href[(href.LastIndexOf('/') + 1)..]
-                                        : null;
+                    string? cleanedUrl = AtomFeedHelper.ExtractPollutantId(href);
                     if (string.IsNullOrEmpty(href)) continue;
                     var match = pollutants.FirstOrDefault(p => p.PollutantMasterUrl == cleanedUrl);
                     if (match != null)
@@ -115,19 +110,6 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
 
         private static List<FinalData> ExtractFinalData(string values, string pollutantName)
-        {
-            return values.Replace("\r\n", "").Trim().Split("@@")
-                .Select(item => item.Split(','))
-                .Where(parts => parts.Length >= 5)
-                .Select(parts => new FinalData
-                {
-                    StartTime = parts[0],
-                    EndTime = parts[1],
-                    Verification = parts[2],
-                    Validity = parts[3],
-                    Value = parts[4],
-                    PollutantName = pollutantName
-                }).ToList();
-        }
+            => AtomFeedHelper.ToFinalData(AtomFeedHelper.SplitSweValues(values), pollutantName);
     }
 }
