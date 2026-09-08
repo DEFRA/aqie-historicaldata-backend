@@ -73,6 +73,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     IAwss3BucketService AWSS3BucketService, IAuthService AuthService,
     IMongoDbClientFactory MongoDbClientFactory) : IAtomDataSelectionStationService
     {
+        private const string FailureResult = "Failure";
         // MongoDB collection for job documents
         private IMongoCollection<JobDocument>? _jobCollection;
 
@@ -97,7 +98,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 if (string.IsNullOrEmpty(pollutantName) || string.IsNullOrEmpty(year))
                 {
                     Logger.LogWarning("GetAtomDataSelectionStation called with null or empty pollutantName or year.");
-                    return "Failure";
+                    return FailureResult;
                 }
                 List<SiteInfo> filteredSites = new List<SiteInfo>();
 
@@ -147,12 +148,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     return await HandleHourlyDataSelection(stationData, pollutantName, year, queryStringData, dataselectordownloadtype ?? string.Empty);
                 }
 
-                return "Failure";
+                return FailureResult;
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Error in GetAtomDataSelectionStation");
-                return "Failure";
+                return FailureResult;
             }
         }
 
