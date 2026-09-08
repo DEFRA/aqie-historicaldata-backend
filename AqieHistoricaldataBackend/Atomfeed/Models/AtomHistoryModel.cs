@@ -51,6 +51,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? Latitude { get; set; }
             public string? Longitude { get; set; }
             public string? Year { get; set; }
+            public string? Days { get; set; }
             public string? DownloadPollutant { get; set; }
             public string? DownloadPollutantType { get; set; }
 

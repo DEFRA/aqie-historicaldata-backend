@@ -118,6 +118,26 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             "  <gml:featureMember><om:OM_Observation/></gml:featureMember>" +
             "</gml:FeatureCollection>";
 
+        /// <summary>Two rows with StartTime values 14 days apart within a single feature.
+        /// Used to verify the Days == "7days" branch (AtomDataSelectionFilterLast7Days.ByStartTime)
+        /// keeps only rows within 7 days of the most recent StartTime and drops the older one.</summary>
+        private const string XmlSpanningMoreThan7Days =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+            "<gml:FeatureCollection xmlns:gml=\"http://www.opengis.net/gml/3.2\"" +
+            "                       xmlns:om=\"http://www.opengis.net/om/2.0\"" +
+            "                       xmlns:swe=\"http://www.opengis.net/swe/2.0\"" +
+            "                       xmlns:xlink=\"http://www.w3.org/1999/xlink\">" +
+            "  <gml:featureMember><om:OM_Observation/></gml:featureMember>" +
+            "  <gml:featureMember>" +
+            "    <om:OM_Observation>" +
+            "      <om:observedProperty xlink:href=\"http://dd.eionet.europa.eu/vocabulary/aq/pollutant/8\"/>" +
+            "      <om:result><swe:DataArray>" +
+            "        <swe:values>2024-01-01T00:00,2024-01-08T00:00,1,1,50@@2024-01-15T00:00,2024-01-22T00:00,1,1,60</swe:values>" +
+            "      </swe:DataArray></om:result>" +
+            "    </om:OM_Observation>" +
+            "  </gml:featureMember>" +
+            "</gml:FeatureCollection>";
+
         // ── Shared test data ──────────────────────────────────────────────────────────
 
         private static readonly SiteInfo DefaultSite = new()
@@ -376,9 +396,65 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             result.Should().BeEmpty();
         }
 
-        // ═══════════════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════
+        // GetAtomDataSelectionHourlyFetchService – Days == "7days" filter branch
+        // ═══════════════════════════════════════════════════════════════════════
+
+        [Fact]
+        public async Task GetAtomData_FiltersToLast7Days_WhenDaysIs7Days()
+        {
+            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(XmlSpanningMoreThan7Days, Encoding.UTF8, "application/xml")
+            });
+
+            var data = new QueryStringData { dataSource = "AURN", Days = "7days" };
+
+            var result = await _service.GetAtomDataSelectionHourlyFetchService(
+                [DefaultSite], "Nitrogen dioxide", "2024", data);
+
+            // Only the row anchored on the most recent StartTime (2024-01-15) falls
+            // within the 7-day window; the row starting 2024-01-01 is excluded.
+            result.Should().HaveCount(1);
+            result.Single().StartTime.Should().Be("2024-01-15T00:00");
+        }
+
+        [Fact]
+        public async Task GetAtomData_ReturnsAllResults_WhenDaysIsNot7Days()
+        {
+            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(XmlSpanningMoreThan7Days, Encoding.UTF8, "application/xml")
+            });
+
+            var data = new QueryStringData { dataSource = "AURN", Days = null };
+
+            var result = await _service.GetAtomDataSelectionHourlyFetchService(
+                [DefaultSite], "Nitrogen dioxide", "2024", data);
+
+            // No 7-day filter applied → both rows are returned.
+            result.Should().HaveCount(2);
+        }
+
+        [Fact]
+        public async Task GetAtomData_ReturnsAllResults_WhenDaysIsEmptyString()
+        {
+            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(XmlSpanningMoreThan7Days, Encoding.UTF8, "application/xml")
+            });
+
+            var data = new QueryStringData { dataSource = "AURN", Days = "" };
+
+            var result = await _service.GetAtomDataSelectionHourlyFetchService(
+                [DefaultSite], "Nitrogen dioxide", "2024", data);
+
+            result.Should().HaveCount(2);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // GetAtomDataSelectionHourlyFetchService – outer catch block
-        // ═══════════════════════════════════════════════════════════════════════════════
+        // ═══════════════════════════════════════════════════════════════════════
 
         [Fact]
         public async Task GetAtomData_OuterCatch_ReturnsEmpty_WhenFilteryearIsNull()

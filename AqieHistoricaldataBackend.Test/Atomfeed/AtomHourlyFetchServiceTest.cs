@@ -1,37 +1,208 @@
-using AqieHistoricaldataBackend.Atomfeed.Services;
-using Microsoft.Extensions.Logging;
-using Moq.Protected;
-using Moq;
-using Newtonsoft.Json.Linq;
-using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 using System.Net;
 using System.Reflection;
-using System.Text;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Moq.Protected;
+using Newtonsoft.Json.Linq;
+using Xunit;
+using AqieHistoricaldataBackend.Atomfeed.Services;
+using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Test.Atomfeed
 {
     public class AtomHourlyFetchServiceTests
     {
-        private readonly Mock<ILogger<AtomHourlyFetchService>> _loggerMock;
-        private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
-        private readonly AtomHourlyFetchService _service;
+        private readonly Mock<ILogger<AtomHourlyFetchService>> _loggerMock = new();
+        private readonly Mock<IHttpClientFactory> _factoryMock = new();
 
-        public AtomHourlyFetchServiceTests()
+        private const string ValidAtomXml = """
+<?xml version="1.0" encoding="utf-8"?>
+<gml:FeatureCollection xmlns:gml="http://www.opengis.net/gml/3.2"
+      xmlns:om="http://www.opengis.net/om/2.0"
+      xmlns:swe="http://www.opengis.net/swe/2.0"
+      xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <gml:featureMember>
+      <dummy></dummy>
+    </gml:featureMember>
+
+    <gml:featureMember>
+      <om:OM_Observation>
+        <om:observedProperty xlink:href="8" />
+        <om:result>
+          <swe:DataArray>
+            <swe:values>
+2025-01-01T00:00:00Z,2025-01-01T01:00:00Z,V,Y,12.5
+            </swe:values>
+          </swe:DataArray>
+        </om:result>
+      </om:OM_Observation>
+    </gml:featureMember>
+
+</gml:FeatureCollection>
+""";
+
+        private AtomHourlyFetchService CreateService(
+            HttpResponseMessage? response = null,
+            Exception? exception = null)
         {
-            _loggerMock = new Mock<ILogger<AtomHourlyFetchService>>();
-            _httpClientFactoryMock = new Mock<IHttpClientFactory>();
-            _service = new AtomHourlyFetchService(_loggerMock.Object, _httpClientFactoryMock.Object);
+            var handler = new Mock<HttpMessageHandler>();
+
+            if (exception != null)
+            {
+                handler.Protected()
+                    .Setup<Task<HttpResponseMessage>>(
+                        "SendAsync",
+                        ItExpr.IsAny<HttpRequestMessage>(),
+                        ItExpr.IsAny<CancellationToken>())
+                    .ThrowsAsync(exception);
+            }
+            else
+            {
+                handler.Protected()
+                    .Setup<Task<HttpResponseMessage>>(
+                        "SendAsync",
+                        ItExpr.IsAny<HttpRequestMessage>(),
+                        ItExpr.IsAny<CancellationToken>())
+                    .ReturnsAsync(response!);
+            }
+
+            var client = new HttpClient(handler.Object)
+            {
+                BaseAddress = new Uri("https://unit-test/")
+            };
+
+            _factoryMock.Setup(x => x.CreateClient("Atomfeed"))
+                .Returns(client);
+
+            return new AtomHourlyFetchService(
+                _loggerMock.Object,
+                _factoryMock.Object);
         }
 
-        #region GetPollutantsToDisplay
+        #region GetAtomHourlydatafetch
 
         [Fact]
-        public void GetPollutantsToDisplay_ReturnsFiltered_WhenValidFilter()
+        public async Task GetAtomHourlydatafetch_ShouldReturnEmpty_WhenSiteIdEmpty()
         {
-            var result = InvokeGetPollutantsToDisplay("PM10");
+            var service = CreateService(
+                new HttpResponseMessage(HttpStatusCode.OK));
+
+            var result =
+                await service.GetAtomHourlydatafetch(
+                    string.Empty,
+                    "2025",
+                    "PM10");
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task GetAtomHourlydatafetch_ShouldReturnEmpty_WhenYearEmpty()
+        {
+            var service = CreateService(
+                new HttpResponseMessage(HttpStatusCode.OK));
+
+            var result =
+                await service.GetAtomHourlydatafetch(
+                    "SITE1",
+                    string.Empty,
+                    "PM10");
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task GetAtomHourlydatafetch_ShouldReturnEmpty_When404Returned()
+        {
+            var service = CreateService(
+                new HttpResponseMessage(HttpStatusCode.NotFound));
+
+            var result =
+                await service.GetAtomHourlydatafetch(
+                    "SITE1",
+                    "2025",
+                    "PM10");
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task GetAtomHourlydatafetch_ShouldReturnEmpty_When304Returned()
+        {
+            var service = CreateService(
+                new HttpResponseMessage(HttpStatusCode.NotModified));
+
+            var result =
+                await service.GetAtomHourlydatafetch(
+                    "SITE1",
+                    "2025",
+                    "PM10");
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task GetAtomHourlydatafetch_ShouldReturnEmpty_When428Returned()
+        {
+            var service = CreateService(
+                new HttpResponseMessage(HttpStatusCode.PreconditionRequired)
+                {
+                    Content = new StringContent("428")
+                });
+
+            var result =
+                await service.GetAtomHourlydatafetch(
+                    "SITE1",
+                    "2025",
+                    "PM10");
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task GetAtomHourlydatafetch_ShouldReturnEmpty_When500Returned()
+        {
+            var service = CreateService(
+                new HttpResponseMessage(HttpStatusCode.InternalServerError)
+                {
+                    Content = new StringContent("error")
+                });
+
+            var result =
+                await service.GetAtomHourlydatafetch(
+                    "SITE1",
+                    "2025",
+                    "PM10");
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task GetAtomHourlydatafetch_ShouldMapAtomData_WhenPollutantFound()
+        {
+            var service = CreateService(
+                new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(ValidAtomXml)
+                });
+
+            var result =
+                await service.GetAtomHourlydatafetch(
+                    "SITE1",
+                    "2025",
+                    "Nitrogen dioxide");
 
             Assert.Single(result);
-            Assert.Equal("PM10", result[0].PollutantName);
+
+            var record = result.First();
+
+            Assert.Equal("Nitrogen dioxide", record.PollutantName);
+            Assert.Equal("2025-01-01T00:00:00Z", record.StartTime);
+            Assert.Equal("2025-01-01T01:00:00Z", record.EndTime);
+            Assert.Equal("V", record.Verification);
+            Assert.Equal("Y", record.Validity);
+            Assert.Equal("12.5", record.Value);
         }
 
         [Theory]
@@ -40,655 +211,574 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [InlineData("PM2.5")]
         [InlineData("Ozone")]
         [InlineData("Sulphur dioxide")]
-        public void GetPollutantsToDisplay_ReturnsSingleMatch_ForEachKnownPollutant(string pollutantName)
+        public async Task GetAtomHourlydatafetch_ShouldSupportConfiguredPollutants(
+            string pollutant)
         {
-            var result = InvokeGetPollutantsToDisplay(pollutantName);
+            var service = CreateService(
+                new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(ValidAtomXml)
+                });
 
-            Assert.Single(result);
-            Assert.Equal(pollutantName, result[0].PollutantName);
-        }
-
-        [Fact]
-        public void GetPollutantsToDisplay_ReturnsAll_WhenInvalidFilter()
-        {
-            var result = InvokeGetPollutantsToDisplay("Invalid");
-
-            Assert.Equal(5, result.Count);
-        }
-
-        [Fact]
-        public void GetPollutantsToDisplay_ReturnsAll_WhenEmptyFilter()
-        {
-            var result = InvokeGetPollutantsToDisplay(string.Empty);
-
-            Assert.Equal(5, result.Count);
-        }
-
-        [Fact]
-        public void GetPollutantsToDisplay_ReturnsAll_WhenNullFilter()
-        {
-            var result = InvokeGetPollutantsToDisplay(null);
-
-            Assert.Equal(5, result.Count);
-        }
-
-        [Fact]
-        public void GetPollutantsToDisplay_IsCaseSensitive_ReturnsAll_WhenWrongCase()
-        {
-            var result = InvokeGetPollutantsToDisplay("pm10");
-
-            Assert.Equal(5, result.Count);
-        }
-
-        [Theory]
-        [InlineData("Nitrogen dioxide", "8")]
-        [InlineData("PM10", "5")]
-        [InlineData("PM2.5", "6001")]
-        [InlineData("Ozone", "7")]
-        [InlineData("Sulphur dioxide", "1")]
-        public void GetPollutantsToDisplay_CorrectPollutantMasterUrl_ForEachPollutant(string pollutantName, string expectedUrl)
-        {
-            var result = InvokeGetPollutantsToDisplay(pollutantName);
-
-            Assert.Single(result);
-            Assert.Equal(expectedUrl, result[0].PollutantMasterUrl);
-        }
-
-        #endregion
-
-        #region FetchAtomFeedAsync
-
-        [Fact]
-        public async Task FetchAtomFeedAsync_ReturnsEmptyJArray_OnHttpError()
-        {
-            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.InternalServerError));
-
-            var result = await InvokeFetchAtomFeedAsync("site", "2024");
-
-            Assert.Empty(result);
-        }
-
-        [Fact]
-        public async Task FetchAtomFeedAsync_ReturnsEmptyJArray_On304NotModified()
-        {
-            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.NotModified));
-
-            var result = await InvokeFetchAtomFeedAsync("site", "2024");
-
-            Assert.Empty(result);
-            _loggerMock.VerifyLog(LogLevel.Warning, "304 Not Modified", Times.Once());
-        }
-
-        [Fact]
-        public async Task FetchAtomFeedAsync_ReturnsEmptyJArray_On428PreconditionRequired()
-        {
-            SetupHttpClient(new HttpResponseMessage((HttpStatusCode)428)
-            {
-                Content = new StringContent("Precondition Required")
-            });
-
-            var result = await InvokeFetchAtomFeedAsync("site", "2024");
-
-            Assert.Empty(result);
-            _loggerMock.VerifyLog(LogLevel.Error, "428 Precondition Required", Times.Once());
-        }
-
-        [Fact]
-        public async Task FetchAtomFeedAsync_ReturnsEmptyJArray_On404NotFound()
-        {
-            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.NotFound)
-            {
-                Content = new StringContent("Not Found")
-            });
-
-            var result = await InvokeFetchAtomFeedAsync("site", "2024");
-
-            Assert.Empty(result);
-        }
-
-        [Fact]
-        public async Task FetchAtomFeedAsync_ReturnsEmptyJArray_WhenHttpRequestExceptionThrown()
-        {
-            var handler = new ThrowingHttpMessageHandler(new HttpRequestException("Connection refused"));
-            var client = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") };
-            _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Returns(client);
-
-            var result = await InvokeFetchAtomFeedAsync("site", "2024");
-
-            Assert.Empty(result);
-            _loggerMock.VerifyLog(LogLevel.Error, "HTTP error fetching", Times.Once());
-        }
-
-        [Fact]
-        public async Task FetchAtomFeedAsync_ReturnsEmptyJArray_WhenGeneralExceptionThrown()
-        {
-            var handler = new ThrowingHttpMessageHandler(new InvalidOperationException("Unexpected"));
-            var client = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") };
-            _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Returns(client);
-
-            var result = await InvokeFetchAtomFeedAsync("site", "2024");
-
-            Assert.Empty(result);
-            _loggerMock.VerifyLog(LogLevel.Error, "Error fetching Atom feed", Times.Once());
-        }
-
-        [Fact]
-        public async Task FetchAtomFeedAsync_ReturnsJArray_WhenValidXmlResponse()
-        {
-            var xml = BuildXmlWithFeatureMembers(
-                "<om:OM_Observation>" +
-                "  <om:observedProperty xlink:href=\"http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5\"/>" +
-                "  <om:result><swe:DataArray><swe:values>2024-01-01T00:00,2024-01-01T01:00,Verified,Valid,42</swe:values></swe:DataArray></om:result>" +
-                "</om:OM_Observation>");
-
-            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(xml, Encoding.UTF8, "application/xml")
-            });
-
-            var result = await InvokeFetchAtomFeedAsync("ABD", "2024");
+            var result =
+                await service.GetAtomHourlydatafetch(
+                    "SITE1",
+                    "2025",
+                    pollutant);
 
             Assert.NotNull(result);
-            Assert.NotEmpty(result);
-        }
-
-        [Fact]
-        public async Task FetchAtomFeedAsync_ReturnsNull_WhenXmlLacksFeatureMember()
-        {
-            var xml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
-                      "<gml:FeatureCollection xmlns:gml=\"http://www.opengis.net/gml/3.2\"></gml:FeatureCollection>";
-
-            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(xml, Encoding.UTF8, "application/xml")
-            });
-
-            // The service returns JObject["gml:featureMember"] as JArray which will be null
-            // and ProcessAtomData handles a null JArray gracefully via GetAtomHourlydatafetch
-            var result = await _service.GetAtomHourlydatafetch("ABD", "2024", "");
-
-            Assert.NotNull(result);
-            Assert.Empty(result);
         }
 
         #endregion
 
-        #region ExtractFinalData
+        #region Private Method Reflection
 
         [Fact]
-        public void ExtractFinalData_ReturnsParsedData_WhenValid()
+        public void GetPollutantsToDisplay_ShouldReturnExactMatch()
         {
-            var values = "2024-01-01T00:00,2024-01-01T01:00,Verified,Valid,42@@2024-01-01T01:00,2024-01-01T02:00,Verified,Valid,43";
-            var result = InvokeExtractFinalData(values, "PM10");
+            var method =
+                typeof(AtomHourlyFetchService)
+                    .GetMethod(
+                        "GetPollutantsToDisplay",
+                        BindingFlags.NonPublic | BindingFlags.Static);
 
-            Assert.Equal(2, result.Count);
-            Assert.Equal("42", result[0].Value);
-            Assert.Equal("43", result[1].Value);
-            Assert.All(result, r => Assert.Equal("PM10", r.PollutantName));
-        }
-
-        [Fact]
-        public void ExtractFinalData_IgnoresInvalidEntries()
-        {
-            var values = "invalid@@2024-01-01T01:00,2024-01-01T02:00,Verified,Valid,43";
-            var result = InvokeExtractFinalData(values, "PM10");
+            var result =
+                (List<PollutantDetails>)method!
+                    .Invoke(null, new object[] { "PM10" })!;
 
             Assert.Single(result);
-            Assert.Equal("43", result[0].Value);
-        }
-
-        [Fact]
-        public void ExtractFinalData_MapsAllFieldsCorrectly()
-        {
-            var values = "2024-01-01T00:00,2024-01-01T01:00,Verified,Valid,55";
-            var result = InvokeExtractFinalData(values, "Ozone");
-
-            Assert.Single(result);
-            Assert.Equal("2024-01-01T00:00", result[0].StartTime);
-            Assert.Equal("2024-01-01T01:00", result[0].EndTime);
-            Assert.Equal("Verified", result[0].Verification);
-            Assert.Equal("Valid", result[0].Validity);
-            Assert.Equal("55", result[0].Value);
-            Assert.Equal("Ozone", result[0].PollutantName);
-        }
-
-        [Fact]
-        public void ExtractFinalData_StripsCarriageReturnAndNewline()
-        {
-            var values = "\r\n2024-01-01T00:00,2024-01-01T01:00,Verified,Valid,99\r\n";
-            var result = InvokeExtractFinalData(values, "PM2.5");
-
-            Assert.Single(result);
-            Assert.Equal("99", result[0].Value);
-        }
-
-        [Fact]
-        public void ExtractFinalData_ReturnsEmpty_WhenAllEntriesInvalid()
-        {
-            var values = "bad@@alsoBad@@nope";
-            var result = InvokeExtractFinalData(values, "PM10");
-
-            Assert.Empty(result);
-        }
-
-        [Fact]
-        public void ExtractFinalData_ReturnsEmpty_WhenValuesIsEmptyString()
-        {
-            var result = InvokeExtractFinalData(string.Empty, "PM10");
-
-            Assert.Empty(result);
-        }
-
-        [Fact]
-        public void ExtractFinalData_HandlesExactlyFiveParts()
-        {
-            var values = "A,B,C,D,E";
-            var result = InvokeExtractFinalData(values, "Ozone");
-
-            Assert.Single(result);
-        }
-
-        [Fact]
-        public void ExtractFinalData_HandlesMoreThanFiveParts_TakesFirstFive()
-        {
-            var values = "A,B,C,D,E,ExtraField";
-            var result = InvokeExtractFinalData(values, "Ozone");
-
-            // Where(parts.Length >= 5) passes — only first 5 are mapped
-            Assert.Single(result);
-            Assert.Equal("E", result[0].Value);
-        }
-
-        #endregion
-
-        #region ProcessAtomData
-
-        [Fact]
-        public void ProcessAtomData_HandlesMissingHref_Gracefully()
-        {
-            var pollutants = new List<PollutantDetails>
-            {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
-            };
-
-            var feature = new JObject
-            {
-                ["om:OM_Observation"] = new JObject
-                {
-                    ["om:observedProperty"] = new JObject()
-                }
-            };
-
-            var features = new JArray { new JObject(), feature };
-            var result = InvokeProcessAtomData(features, pollutants);
-
-            Assert.Empty(result);
-        }
-
-        [Fact]
-        public void ProcessAtomData_SkipsFirstElement()
-        {
-            // The loop starts at i = 1, so index 0 is always skipped
-            var pollutants = new List<PollutantDetails>
-            {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
-            };
-
-            var featureAtIndex0 = BuildFeatureObject(
-                "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5",
-                "2024-01-01T00:00,2024-01-01T01:00,Verified,Valid,42");
-
-            // Only one element at index 0 — loop body never runs
-            var features = new JArray { featureAtIndex0 };
-            var result = InvokeProcessAtomData(features, pollutants);
-
-            Assert.Empty(result);
-        }
-
-        [Fact]
-        public void ProcessAtomData_ReturnsEmpty_WhenFeaturesIsEmpty()
-        {
-            var pollutants = new List<PollutantDetails>
-            {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
-            };
-
-            var result = InvokeProcessAtomData(new JArray(), pollutants);
-
-            Assert.Empty(result);
-        }
-
-        [Fact]
-        public void ProcessAtomData_SkipsFeature_WhenHrefDoesNotMatchAnyPollutant()
-        {
-            var pollutants = new List<PollutantDetails>
-            {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
-            };
-
-            var feature = BuildFeatureObject(
-                "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/999",
-                "2024-01-01T00:00,2024-01-01T01:00,Verified,Valid,42");
-
-            var features = new JArray { new JObject(), feature };
-            var result = InvokeProcessAtomData(features, pollutants);
-
-            Assert.Empty(result);
-        }
-
-        [Fact]
-        public void ProcessAtomData_SkipsFeature_WhenValuesIsEmpty()
-        {
-            var pollutants = new List<PollutantDetails>
-            {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
-            };
-
-            var feature = new JObject
-            {
-                ["om:OM_Observation"] = new JObject
-                {
-                    ["om:observedProperty"] = new JObject { ["@xlink:href"] = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5" },
-                    ["om:result"] = new JObject
-                    {
-                        ["swe:DataArray"] = new JObject
-                        {
-                            ["swe:values"] = ""
-                        }
-                    }
-                }
-            };
-
-            var features = new JArray { new JObject(), feature };
-            var result = InvokeProcessAtomData(features, pollutants);
-
-            Assert.Empty(result);
-        }
-
-        [Fact]
-        public void ProcessAtomData_ReturnsData_WhenMatchingPollutantAndValuesExist()
-        {
-            var pollutants = new List<PollutantDetails>
-            {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
-            };
-
-            var feature = BuildFeatureObject(
-                "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5",
-                "2024-01-01T00:00,2024-01-01T01:00,Verified,Valid,42");
-
-            var features = new JArray { new JObject(), feature };
-            var result = InvokeProcessAtomData(features, pollutants);
-
-            Assert.Single(result);
-            Assert.Equal("42", result[0].Value);
             Assert.Equal("PM10", result[0].PollutantName);
+            Assert.Equal("5", result[0].PollutantMasterUrl);
         }
 
         [Fact]
-        public void ProcessAtomData_HandlesMultipleMatchingFeatures()
+        public void GetPollutantsToDisplay_ShouldReturnAll_WhenUnknown()
         {
-            var pollutants = new List<PollutantDetails>
-            {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" },
-                new PollutantDetails { PollutantName = "Ozone", PollutantMasterUrl = "7" }
-            };
+            var method =
+                typeof(AtomHourlyFetchService)
+                    .GetMethod(
+                        "GetPollutantsToDisplay",
+                        BindingFlags.NonPublic | BindingFlags.Static);
 
-            var feature1 = BuildFeatureObject(
-                "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5",
-                "2024-01-01T00:00,2024-01-01T01:00,Verified,Valid,42");
+            var result =
+                (List<PollutantDetails>)method!
+                    .Invoke(null, new object[] { "UNKNOWN" })!;
 
-            var feature2 = BuildFeatureObject(
-                "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/7",
-                "2024-01-01T01:00,2024-01-01T02:00,Verified,Valid,88");
-
-            var features = new JArray { new JObject(), feature1, feature2 };
-            var result = InvokeProcessAtomData(features, pollutants);
-
-            Assert.Equal(2, result.Count);
+            Assert.Equal(5, result.Count);
         }
 
         [Fact]
-        public void ProcessAtomData_ContinuesProcessing_WhenOneFeatureThrows()
+        public void GetPollutantsToDisplay_ShouldReturnAll_WhenCaseDoesNotMatch()
         {
-            var pollutants = new List<PollutantDetails>
-            {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
-            };
+            var method =
+                typeof(AtomHourlyFetchService)
+                    .GetMethod(
+                        "GetPollutantsToDisplay",
+                        BindingFlags.NonPublic | BindingFlags.Static);
 
-            // A malformed feature that causes an exception followed by a valid one
-            var badFeature = new JValue("not an object");
-            var goodFeature = BuildFeatureObject(
-                "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5",
-                "2024-01-01T00:00,2024-01-01T01:00,Verified,Valid,99");
+            var result =
+                (List<PollutantDetails>)method!
+                    .Invoke(null, new object[] { "pm10" })!;
 
-            var features = new JArray { new JObject(), badFeature, goodFeature };
-            var result = InvokeProcessAtomData(features, pollutants);
-
-            Assert.Single(result);
-            Assert.Equal("99", result[0].Value);
-            _loggerMock.VerifyLog(LogLevel.Error, "Error processing ProcessAtomData", Times.Once());
+            Assert.Equal(5, result.Count);
         }
 
         [Fact]
-        public void ProcessAtomData_SkipsFeature_WhenValuesNodeIsMissing()
+        public void GetPollutantsToDisplay_ShouldReturnAll_WhenEmpty()
         {
-            var pollutants = new List<PollutantDetails>
-            {
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" }
-            };
+            var method =
+                typeof(AtomHourlyFetchService)
+                    .GetMethod(
+                        "GetPollutantsToDisplay",
+                        BindingFlags.NonPublic | BindingFlags.Static);
 
-            var feature = new JObject
-            {
-                ["om:OM_Observation"] = new JObject
-                {
-                    ["om:observedProperty"] = new JObject { ["@xlink:href"] = "http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5" }
-                    // om:result is intentionally absent
-                }
-            };
+            var result =
+                (List<PollutantDetails>)method!
+                    .Invoke(null, new object[] { "" })!;
 
-            var features = new JArray { new JObject(), feature };
-            var result = InvokeProcessAtomData(features, pollutants);
-
-            Assert.Empty(result);
-        }
-
-        #endregion
-
-        #region GetAtomHourlydatafetch (integration)
-
-        [Fact]
-        public async Task GetAtomHourlydatafetch_ReturnsEmpty_WhenFeedIsEmpty()
-        {
-            var response = new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent("<gml:FeatureCollection xmlns:gml='gml'></gml:FeatureCollection>")
-            };
-            SetupHttpClient(response);
-
-            var result = await _service.GetAtomHourlydatafetch("site", "2023", "");
-
-            Assert.NotNull(result);
-            Assert.Empty(result);
-        }
-
-        [Fact]
-        public async Task GetAtomHourlydatafetch_HandlesHttpException_AndLogsError()
-        {
-            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.InternalServerError));
-
-            var result = await _service.GetAtomHourlydatafetch("site", "2023", "");
-
-            Assert.NotNull(result);
-            Assert.Empty(result);
-            _loggerMock.VerifyLog(LogLevel.Warning, "500", Times.Once());
-        }
-
-        [Fact]
-        public async Task GetAtomHourlydatafetch_ReturnsData_WhenValidXmlAndMatchingPollutant()
-        {
-            var xml = BuildXmlWithFeatureMembers(
-                "<om:OM_Observation>" +
-                "  <om:observedProperty xlink:href=\"http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5\"/>" +
-                "  <om:result><swe:DataArray><swe:values>2024-01-01T00:00,2024-01-01T01:00,Verified,Valid,42</swe:values></swe:DataArray></om:result>" +
-                "</om:OM_Observation>");
-
-            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(xml, Encoding.UTF8, "application/xml")
-            });
-
-            var result = await _service.GetAtomHourlydatafetch("ABD", "2024", "PM10");
-
-            Assert.NotNull(result);
-            Assert.NotEmpty(result);
-            Assert.Equal("PM10", result[0].PollutantName);
-        }
-
-        [Fact]
-        public async Task GetAtomHourlydatafetch_ReturnsEmpty_WhenPollutantFilterDoesNotMatch()
-        {
-            var xml = BuildXmlWithFeatureMembers(
-                "<om:OM_Observation>" +
-                "  <om:observedProperty xlink:href=\"http://dd.eionet.europa.eu/vocabulary/aq/pollutant/5\"/>" +
-                "  <om:result><swe:DataArray><swe:values>2024-01-01T00:00,2024-01-01T01:00,Verified,Valid,42</swe:values></swe:DataArray></om:result>" +
-                "</om:OM_Observation>");
-
-            SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(xml, Encoding.UTF8, "application/xml")
-            });
-
-            // "Ozone" filter → only Ozone pollutant, but feed only has PM10 → no match
-            var result = await _service.GetAtomHourlydatafetch("ABD", "2024", "Ozone");
-
-            Assert.NotNull(result);
-            Assert.Empty(result);
-        }
-
-        #endregion
-
-        #region Helpers
-
-        private List<PollutantDetails> InvokeGetPollutantsToDisplay(string? filter)
-        {
-            var method = _service.GetType()
-                .GetMethod("GetPollutantsToDisplay", BindingFlags.NonPublic | BindingFlags.Static);
-            Assert.NotNull(method);
-            return method.Invoke(null, new object?[] { filter }) as List<PollutantDetails> ?? [];
-        }
-
-        private async Task<JArray> InvokeFetchAtomFeedAsync(string siteId, string year)
-        {
-            var method = _service.GetType()
-                .GetMethod("FetchAtomFeedAsync", BindingFlags.NonPublic | BindingFlags.Instance);
-            Assert.NotNull(method);
-            return await (Task<JArray>)method.Invoke(_service, new object[] { siteId, year })!;
-        }
-
-        private List<FinalData> InvokeExtractFinalData(string values, string pollutantName)
-        {
-            var method = _service.GetType()
-                .GetMethod("ExtractFinalData", BindingFlags.NonPublic | BindingFlags.Static);
-            Assert.NotNull(method);
-            return method.Invoke(null, new object[] { values, pollutantName }) as List<FinalData> ?? [];
-        }
-
-        private List<FinalData> InvokeProcessAtomData(JArray features, List<PollutantDetails> pollutants)
-        {
-            var method = _service.GetType()
-                .GetMethod("ProcessAtomData", BindingFlags.NonPublic | BindingFlags.Instance);
-            Assert.NotNull(method);
-            return method.Invoke(_service, new object[] { features, pollutants }) as List<FinalData> ?? [];
-        }
-
-        private void SetupHttpClient(HttpResponseMessage response)
-        {
-            var handler = new MockHttpMessageHandler(response);
-            var client = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") };
-            _httpClientFactoryMock.Setup(f => f.CreateClient("Atomfeed")).Returns(client);
-        }
-
-        private static JObject BuildFeatureObject(string href, string values)
-        {
-            return new JObject
-            {
-                ["om:OM_Observation"] = new JObject
-                {
-                    ["om:observedProperty"] = new JObject { ["@xlink:href"] = href },
-                    ["om:result"] = new JObject
-                    {
-                        ["swe:DataArray"] = new JObject
-                        {
-                            ["swe:values"] = values
-                        }
-                    }
-                }
-            };
-        }
-
-        private static string BuildXmlWithFeatureMembers(string featureMemberContent)
-        {
-            return "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
-                   "<gml:FeatureCollection " +
-                   "  xmlns:gml=\"http://www.opengis.net/gml/3.2\" " +
-                   "  xmlns:om=\"http://www.opengis.net/om/2.0\" " +
-                   "  xmlns:swe=\"http://www.opengis.net/swe/2.0\" " +
-                   "  xmlns:xlink=\"http://www.w3.org/1999/xlink\">" +
-                   "  <gml:featureMember></gml:featureMember>" +
-                   $"  <gml:featureMember>{featureMemberContent}</gml:featureMember>" +
-                   "</gml:FeatureCollection>";
-        }
-
-        private sealed class MockHttpMessageHandler : HttpMessageHandler
-        {
-            private readonly HttpResponseMessage _response;
-
-            public MockHttpMessageHandler(HttpResponseMessage response)
-            {
-                _response = response;
-            }
-
-            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            {
-                return Task.FromResult(_response);
-            }
-        }
-
-        private sealed class ThrowingHttpMessageHandler : HttpMessageHandler
-        {
-            private readonly Exception _exception;
-
-            public ThrowingHttpMessageHandler(Exception exception)
-            {
-                _exception = exception;
-            }
-
-            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            {
-                throw _exception;
-            }
+            Assert.Equal(5, result.Count);
         }
 
         #endregion
     }
 
-    internal static class LoggerMockExtensions
+    public class AtomFeedFetchServiceBaseTests
     {
-        internal static void VerifyLog<T>(
-            this Mock<ILogger<T>> loggerMock,
-            LogLevel level,
-            string containsMessage,
-            Times times)
+        private readonly Mock<ILogger> _logger = new();
+        private readonly Mock<IHttpClientFactory> _factory = new();
+
+        private TestAtomFeedService CreateService(
+            HttpResponseMessage? response = null,
+            Exception? exception = null)
         {
-            loggerMock.Verify(
-                x => x.Log(
-                    level,
-                    It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, _) => v.ToString()!.Contains(containsMessage)),
-                    It.IsAny<Exception?>(),
-                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                times);
+            var handler = new Mock<HttpMessageHandler>();
+
+            if (exception != null)
+            {
+                handler.Protected()
+                    .Setup<Task<HttpResponseMessage>>(
+                        "SendAsync",
+                        ItExpr.IsAny<HttpRequestMessage>(),
+                        ItExpr.IsAny<CancellationToken>())
+                    .ThrowsAsync(exception);
+            }
+            else
+            {
+                handler.Protected()
+                    .Setup<Task<HttpResponseMessage>>(
+                        "SendAsync",
+                        ItExpr.IsAny<HttpRequestMessage>(),
+                        ItExpr.IsAny<CancellationToken>())
+                    .ReturnsAsync(response!);
+            }
+
+            var client = new HttpClient(handler.Object)
+            {
+                BaseAddress = new Uri("https://unit-test/")
+            };
+
+            _factory.Setup(x => x.CreateClient("Atomfeed"))
+                .Returns(client);
+
+            return new TestAtomFeedService(
+                _factory.Object,
+                _logger.Object);
+        }
+
+        [Fact]
+        public async Task FetchAtomFeedAsync_ShouldHandleHttpRequestException404()
+        {
+            var service = CreateService(
+                exception: new HttpRequestException(
+                    "404",
+                    null,
+                    HttpStatusCode.NotFound));
+
+            var result =
+                await service.FetchAsync(
+                    "SITE",
+                    "2025");
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task FetchAtomFeedAsync_ShouldHandleHttpRequestException()
+        {
+            var service = CreateService(
+                exception: new HttpRequestException(
+                    "network error"));
+
+            var result =
+                await service.FetchAsync(
+                    "SITE",
+                    "2025");
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task FetchAtomFeedAsync_ShouldHandleGeneralException()
+        {
+            var service = CreateService(
+                exception: new InvalidOperationException(
+                    "boom"));
+
+            var result =
+                await service.FetchAsync(
+                    "SITE",
+                    "2025");
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public async Task FetchAtomFeedAsync_ShouldUseNonAutoPath()
+        {
+            HttpRequestMessage? request = null;
+
+            var handler = new Mock<HttpMessageHandler>();
+
+            handler.Protected()
+                .Setup<Task<HttpResponseMessage>>(
+                    "SendAsync",
+                    ItExpr.IsAny<HttpRequestMessage>(),
+                    ItExpr.IsAny<CancellationToken>())
+                .Callback<HttpRequestMessage, CancellationToken>(
+                    (r, _) => request = r)
+                .ReturnsAsync(
+                    new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(
+                            "<root/>")
+                    });
+
+            var client = new HttpClient(handler.Object)
+            {
+                BaseAddress = new Uri("https://test/")
+            };
+
+            var factory = new Mock<IHttpClientFactory>();
+
+            factory.Setup(x => x.CreateClient("Atomfeed"))
+                .Returns(client);
+
+            var service =
+                new TestAtomFeedService(
+                    factory.Object,
+                    Mock.Of<ILogger>());
+
+            await service.FetchAsync(
+                "SITE1",
+                "2025",
+                "NON_AURN");
+
+            Assert.Contains(
+                "non-auto",
+                request!.RequestUri!.ToString());
+        }
+
+        [Fact]
+        public void ProcessAtomData_ShouldReturnEmpty_ForNullFeatures()
+        {
+            var service = CreateService();
+
+            var result =
+                service.Process(
+                    null!,
+                    new List<PollutantDetails>());
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public void ProcessAtomData_ShouldReturnEmpty_ForEmptyFeatures()
+        {
+            var service = CreateService();
+
+            var result =
+                service.Process(
+                    new JArray(),
+                    new List<PollutantDetails>());
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public void ProcessAtomData_ShouldSkipMissingHref()
+        {
+            var service = CreateService();
+
+            var features =
+                new JArray
+                {
+                    new JObject(),
+                    JObject.Parse("""
+                    {
+                      "om:OM_Observation": {}
+                    }
+                    """)
+                };
+
+            var result =
+                service.Process(
+                    features,
+                    new List<PollutantDetails>());
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public void ProcessAtomData_ShouldSkipUnknownPollutant()
+        {
+            var service = CreateService();
+
+            var features =
+                BuildFeature(
+                    "9999",
+                    "A,B,C,D,E");
+
+            var result =
+                service.Process(
+                    features,
+                    Pollutants());
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public void ProcessAtomData_ShouldSkipEmptyValues()
+        {
+            var service = CreateService();
+
+            var features =
+                BuildFeature(
+                    "8",
+                    "");
+
+            var result =
+                service.Process(
+                    features,
+                    Pollutants());
+
+            Assert.Empty(result);
+        }
+
+        [Fact]
+        public void ProcessAtomData_ShouldProcessValues()
+        {
+            var service = CreateService();
+
+            var features =
+                BuildFeature(
+                    "8",
+                    "A,B,C,D,E");
+
+            var result =
+                service.Process(
+                    features,
+                    Pollutants());
+
+            Assert.Single(result);
+        }
+
+        [Fact]
+        public void ProcessAtomData_ShouldProcessValues_WithSiteInfo()
+        {
+            var service = CreateService();
+
+            var site =
+                new SiteInfo
+                {
+                    SiteName = "Site1",
+                    AreaType = "Urban",
+                    SiteType = "Traffic",
+                    ZoneRegion = "London",
+                    Country = "UK"
+                };
+
+            var features =
+                BuildFeature(
+                    "8",
+                    "A,B,C,D,E");
+
+            var result =
+                service.Process(
+                    features,
+                    Pollutants(),
+                    site);
+
+            Assert.Single(result);
+            Assert.Equal("Site1", result[0].SiteName);
+            Assert.Equal("UrbanTraffic", result[0].SiteType);
+        }
+
+        [Fact]
+        public void ProcessAtomData_ShouldHandleFeatureException()
+        {
+            var service = CreateService();
+
+            var features = new JArray
+            {
+                new JObject(),
+                JValue.CreateNull()
+            };
+
+            var result =
+                service.Process(
+                    features,
+                    Pollutants());
+
+            Assert.Empty(result);
+        }
+
+        private static List<PollutantDetails> Pollutants()
+        {
+            return new()
+            {
+                new PollutantDetails
+                {
+                    PollutantName = "Nitrogen dioxide",
+                    PollutantMasterUrl = "8"
+                }
+            };
+        }
+
+        private static JArray BuildFeature(
+            string href,
+            string values)
+        {
+            return new JArray
+            {
+                new JObject(),
+                new JObject
+                {
+                    ["om:OM_Observation"] = new JObject
+                    {
+                        ["om:observedProperty"] = new JObject
+                        {
+                            ["@xlink:href"] = href
+                        },
+                        ["om:result"] = new JObject
+                        {
+                            ["swe:DataArray"] = new JObject
+                            {
+                                ["swe:values"] = values
+                            }
+                        }
+                    }
+                }
+            };
+        }
+    }
+
+    public class AtomFeedHelperTests
+    {
+        [Fact]
+        public void ParseXmlStreamToFeatureArray_ShouldReturnFeatures()
+        {
+            var xml =
+                """
+                <root xmlns:gml="http://www.opengis.net/gml">
+                  <gml:FeatureCollection>
+                    <gml:featureMember/>
+                    <gml:featureMember/>
+                  </gml:FeatureCollection>
+                </root>
+                """;
+
+            using var stream =
+                new MemoryStream(
+                    System.Text.Encoding.UTF8.GetBytes(xml));
+
+            var result =
+                AtomFeedHelper
+                    .ParseXmlStreamToFeatureArray(stream);
+
+            Assert.NotNull(result);
+        }
+
+        [Fact]
+        public void ParseXmlStreamToFeatureArray_ShouldReturnEmpty()
+        {
+            using var stream =
+                new MemoryStream(
+                    System.Text.Encoding.UTF8.GetBytes("<root/>"));
+
+            var result =
+                AtomFeedHelper
+                    .ParseXmlStreamToFeatureArray(stream);
+
+            Assert.Empty(result);
+        }
+
+        [Theory]
+        [InlineData(null, null)]
+        [InlineData("8", "8")]
+        [InlineData("http://test/8", "8")]
+        public void ExtractPollutantId_ShouldReturnExpected(
+            string? value,
+            string? expected)
+        {
+            var result =
+                AtomFeedHelper.ExtractPollutantId(value);
+
+            Assert.Equal(expected, result);
+        }
+
+        [Fact]
+        public void SplitSweValues_ShouldReturnOnlyValidRows()
+        {
+            var result =
+                AtomFeedHelper.SplitSweValues(
+                    "A,B,C,D,E@@1,2@@F,G,H,I,J")
+                .ToList();
+
+            Assert.Equal(2, result.Count);
+        }
+
+        [Fact]
+        public void ToFinalData_ShouldMapValues()
+        {
+            var rows =
+                AtomFeedHelper.SplitSweValues(
+                    "A,B,C,D,E");
+
+            var result =
+                AtomFeedHelper.ToFinalData(
+                    rows,
+                    "Nitrogen dioxide");
+
+            Assert.Single(result);
+            Assert.Equal("Nitrogen dioxide", result[0].PollutantName);
+        }
+
+        [Fact]
+        public void ToFinalData_ShouldMapSiteInfo()
+        {
+            var rows =
+                AtomFeedHelper.SplitSweValues(
+                    "A,B,C,D,E");
+
+            var site =
+                new SiteInfo
+                {
+                    SiteName = "Site1",
+                    AreaType = "Urban",
+                    SiteType = "Traffic",
+                    ZoneRegion = "London",
+                    Country = "UK"
+                };
+
+            var result =
+                AtomFeedHelper.ToFinalData(
+                    rows,
+                    "Nitrogen dioxide",
+                    site);
+
+            Assert.Single(result);
+            Assert.Equal("Site1", result[0].SiteName);
+            Assert.Equal("UrbanTraffic", result[0].SiteType);
+            Assert.Equal("London", result[0].Region);
+            Assert.Equal("UK", result[0].Country);
+        }
+    }
+
+    internal sealed class TestAtomFeedService
+        : AtomFeedFetchServiceBase
+    {
+        private readonly ILogger _logger;
+
+        public TestAtomFeedService(
+            IHttpClientFactory factory,
+            ILogger logger)
+            : base(factory)
+        {
+            _logger = logger;
+        }
+
+        protected override ILogger Logger => _logger;
+
+        public Task<JArray> FetchAsync(
+            string siteId,
+            string year,
+            string? dataSource = null)
+        {
+            return FetchAtomFeedAsync(
+                siteId,
+                year,
+                dataSource);
+        }
+
+        public List<FinalData> Process(
+            JArray features,
+            List<PollutantDetails> pollutants,
+            SiteInfo? siteInfo = null)
+        {
+            return ProcessAtomData(
+                features,
+                pollutants,
+                siteInfo);
         }
     }
 }

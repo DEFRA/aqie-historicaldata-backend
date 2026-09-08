@@ -6,110 +6,33 @@ using System.Text.RegularExpressions;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
-    public class AtomHourlyFetchService(ILogger<AtomHourlyFetchService> logger, IHttpClientFactory httpClientFactory) : IAtomHourlyFetchService
+    public class AtomHourlyFetchService(
+        ILogger<AtomHourlyFetchService> logger,
+        IHttpClientFactory httpClientFactory)
+        : AtomFeedFetchServiceBase(httpClientFactory), IAtomHourlyFetchService
     {
+        protected override ILogger Logger => logger;
+
         public async Task<List<FinalData>> GetAtomHourlydatafetch(string siteID, string year, string downloadfilter)
         {
             var pollutantsToDisplay = GetPollutantsToDisplay(downloadfilter);
             var atomJsonCollection = await FetchAtomFeedAsync(siteID, year);
-
             return ProcessAtomData(atomJsonCollection, pollutantsToDisplay);
         }
-
 
         private static List<PollutantDetails> GetPollutantsToDisplay(string filter)
         {
             var allPollutants = new List<PollutantDetails>
             {
-                new PollutantDetails { PollutantName = "Nitrogen dioxide", PollutantMasterUrl = "8" },
-                new PollutantDetails { PollutantName = "PM10", PollutantMasterUrl = "5" },
-                new PollutantDetails { PollutantName = "PM2.5", PollutantMasterUrl = "6001" },
-                new PollutantDetails { PollutantName = "Ozone", PollutantMasterUrl = "7" },
-                new PollutantDetails { PollutantName = "Sulphur dioxide", PollutantMasterUrl = "1" }
+                new() { PollutantName = "Nitrogen dioxide",  PollutantMasterUrl = "8"    },
+                new() { PollutantName = "PM10",              PollutantMasterUrl = "5"    },
+                new() { PollutantName = "PM2.5",             PollutantMasterUrl = "6001" },
+                new() { PollutantName = "Ozone",             PollutantMasterUrl = "7"    },
+                new() { PollutantName = "Sulphur dioxide",   PollutantMasterUrl = "1"    }
             };
 
             var filtered = allPollutants.Where(p => p.PollutantName == filter);
             return filtered.Any() ? filtered.ToList() : allPollutants;
         }
-
-        private async Task<JArray> FetchAtomFeedAsync(string siteID, string year)
-        {
-            var client = httpClientFactory.CreateClient("Atomfeed");
-            var url = $"data/atom-dls/observations/auto/GB_FixedObservations_{year}_{siteID}.xml";
-
-            try
-            {
-                logger.LogInformation("Fetching Atom feed for site {SiteID} year {Year} at {DateTime}", siteID, year, DateTime.Now);
-                var response = await client.GetAsync(url);
-                logger.LogInformation("Received Atom feed response for site {SiteID} year {Year}: {StatusCode}", siteID, year, (int)response.StatusCode);
-
-                if (response.StatusCode == System.Net.HttpStatusCode.NotModified)
-                {
-                    logger.LogWarning("Server returned 304 Not Modified for site {SiteID} year {Year}", siteID, year);
-                    return new JArray();
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    logger.LogWarning("HTTP {StatusCode} when fetching Atom feed for site {SiteID} year {Year}. Response: {Response}",
-                        (int)response.StatusCode, siteID, year, errorContent);
-
-                    if (response.StatusCode == System.Net.HttpStatusCode.PreconditionRequired)
-                    {
-                        logger.LogError("Server returned 428 Precondition Required. Check if User-Agent, cookies, or other headers are needed.");
-                    }
-
-                    return new JArray();
-                }
-
-                var stream = await response.Content.ReadAsStreamAsync();
-                return AtomFeedHelper.ParseXmlStreamToFeatureArray(stream);
-            }
-            catch (HttpRequestException ex)
-            {
-                logger.LogError(ex,"HTTP error fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex.Message);
-                return new JArray();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex,"Error fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", url, siteID, year, ex.Message);
-                return new JArray();
-            }
-        }
-
-        private List<FinalData> ProcessAtomData(JArray features, List<PollutantDetails> pollutants)
-        {
-            var finalList = new List<FinalData>();
-
-            for (int i = 1; i < features.Count; i++)
-            {
-                try
-                {
-                    var feature = features[i];
-                    var href = feature["om:OM_Observation"]?["om:observedProperty"]?["@xlink:href"]?.ToString();
-                    string? cleanedUrl = AtomFeedHelper.ExtractPollutantId(href);
-                    if (string.IsNullOrEmpty(href)) continue;
-                    var match = pollutants.FirstOrDefault(p => p.PollutantMasterUrl == cleanedUrl);
-                    if (match != null)
-                    {
-                        var values = feature["om:OM_Observation"]?["om:result"]?["swe:DataArray"]?["swe:values"]?.ToString();
-                        if (!string.IsNullOrEmpty(values))
-                        {
-                            finalList.AddRange(ExtractFinalData(values, match.PollutantName));
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex,"Error processing ProcessAtomData feature member");
-                }
-            }
-
-            return finalList;
-        }
-
-        private static List<FinalData> ExtractFinalData(string values, string pollutantName)
-            => AtomFeedHelper.ToFinalData(AtomFeedHelper.SplitSweValues(values), pollutantName);
     }
 }
