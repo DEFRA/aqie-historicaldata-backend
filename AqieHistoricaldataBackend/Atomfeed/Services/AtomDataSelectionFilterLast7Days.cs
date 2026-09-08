@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
@@ -50,6 +51,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             Apply(finalList, x => x.ReportDate);
 
         private static DateTime? TryParseDate(string? value) =>
-            DateTime.TryParse(value, out var result) ? result : (DateTime?)null;
+            DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var result)
+                ? result
+                : (DateTime?)null;
     }
 }
