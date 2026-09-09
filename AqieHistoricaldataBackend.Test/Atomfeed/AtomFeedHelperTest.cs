@@ -10,8 +10,36 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
     {
         #region ParseXmlStreamToFeatureArray
 
-        private static Stream ToStream(string xml)
-            => new MemoryStream(Encoding.UTF8.GetBytes(xml));
+        private static readonly string[] RowMapsAllFieldsCorrectly =
+            { "2024-01-01T00:00:00", "2024-01-01T01:00:00", "3", "1", "12.5" };
+
+        private static readonly string[][] RowsMultipleItems =
+        {
+            new[] { "start1", "end1", "v1", "val1", "1.0" },
+            new[] { "start2", "end2", "v2", "val2", "2.0" },
+            new[] { "start3", "end3", "v3", "val3", "3.0" }
+        };
+
+        private static readonly string[] RowSiteFieldsAreNull =
+            { "s", "e", "v", "vl", "0.0" };
+
+        private static readonly string[] RowWithSiteInfoMapsAllFields =
+            { "2024-01-01T00:00:00", "2024-01-01T01:00:00", "3", "1", "42.7" };
+
+        private static readonly string[][] RowsWithSiteInfoMultipleItems =
+        {
+            new[] { "s1", "e1", "v1", "vl1", "1.1" },
+            new[] { "s2", "e2", "v2", "vl2", "2.2" }
+        };
+
+        private static readonly string[] RowConcatenatesAreaTypeAndSiteType =
+            { "s", "e", "v", "vl", "0" };
+
+        private static readonly string[] RowHandlesNullAreaTypeAndSiteType =
+            { "s", "e", "v", "vl", "0" };
+
+        private static MemoryStream ToStream(string xml)
+            => new(Encoding.UTF8.GetBytes(xml));
 
         [Fact]
         public void ParseXmlStreamToFeatureArray_ReturnsFeatureArray_WhenFeatureMemberPresent()
@@ -252,10 +280,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public void ToFinalData_WithoutSiteInfo_MapsAllFieldsCorrectly()
         {
             // Arrange
-            var rows = new List<string[]>
-            {
-                new[] { "2024-01-01T00:00:00", "2024-01-01T01:00:00", "3", "1", "12.5" }
-            };
+            var rows = new List<string[]> { RowMapsAllFieldsCorrectly };
 
             // Act
             var result = AtomFeedHelper.ToFinalData(rows, "PM10");
@@ -285,12 +310,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public void ToFinalData_WithoutSiteInfo_ReturnsMultipleItems_WhenMultipleRowsGiven()
         {
             // Arrange
-            var rows = new List<string[]>
-            {
-                new[] { "start1", "end1", "v1", "val1", "1.0" },
-                new[] { "start2", "end2", "v2", "val2", "2.0" },
-                new[] { "start3", "end3", "v3", "val3", "3.0" }
-            };
+            var rows = new List<string[]>(RowsMultipleItems);
 
             // Act
             var result = AtomFeedHelper.ToFinalData(rows, "NO2");
@@ -304,10 +324,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public void ToFinalData_WithoutSiteInfo_SiteFieldsAreNull()
         {
             // Arrange
-            var rows = new List<string[]>
-            {
-                new[] { "s", "e", "v", "vl", "0.0" }
-            };
+            var rows = new List<string[]> { RowSiteFieldsAreNull };
 
             // Act
             var result = AtomFeedHelper.ToFinalData(rows, "O3");
@@ -337,10 +354,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public void ToFinalData_WithSiteInfo_MapsAllFieldsCorrectly()
         {
             // Arrange
-            var rows = new List<string[]>
-            {
-                new[] { "2024-01-01T00:00:00", "2024-01-01T01:00:00", "3", "1", "42.7" }
-            };
+            var rows = new List<string[]> { RowWithSiteInfoMapsAllFields };
             var siteInfo = BuildSiteInfo();
 
             // Act
@@ -375,11 +389,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public void ToFinalData_WithSiteInfo_ReturnsMultipleItems_WhenMultipleRowsGiven()
         {
             // Arrange
-            var rows = new List<string[]>
-            {
-                new[] { "s1", "e1", "v1", "vl1", "1.1" },
-                new[] { "s2", "e2", "v2", "vl2", "2.2" }
-            };
+            var rows = new List<string[]>(RowsWithSiteInfoMultipleItems);
             var siteInfo = BuildSiteInfo();
 
             // Act
@@ -399,10 +409,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public void ToFinalData_WithSiteInfo_ConcatenatesAreaTypeAndSiteType()
         {
             // Arrange
-            var rows = new List<string[]>
-            {
-                new[] { "s", "e", "v", "vl", "0" }
-            };
+            var rows = new List<string[]> { RowConcatenatesAreaTypeAndSiteType };
             var siteInfo = new SiteInfo { AreaType = "Rural", SiteType = "Background", ZoneRegion = "North", Country = "England", SiteName = "Test" };
 
             // Act
@@ -416,10 +423,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         public void ToFinalData_WithSiteInfo_HandlesNullAreaTypeAndSiteType()
         {
             // Arrange
-            var rows = new List<string[]>
-            {
-                new[] { "s", "e", "v", "vl", "0" }
-            };
+            var rows = new List<string[]> { RowHandlesNullAreaTypeAndSiteType };
             var siteInfo = new SiteInfo { AreaType = null, SiteType = null, ZoneRegion = null, Country = null, SiteName = null };
 
             // Act

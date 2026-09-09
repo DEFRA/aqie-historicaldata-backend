@@ -549,7 +549,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         }
 
         public async Task<List<SiteInfo>> GetSiteInfoAsync(string pollutantName, string networkId)
-            {
+        {
             var siteCollection = MongoDbClientFactory.GetCollection<StationDetailDocument>("aqie_atom_non_aurn_networks_station_details");
 
             var pollutantIds = pollutantName
@@ -572,7 +572,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             var documents = await siteCollection.Find(combinedFilter).ToListAsync();
 
             var filteredSites = documents
-                                .GroupBy(d => new { d.SiteID, d.NetworkID })  
+                                .GroupBy(d => new { d.SiteID, d.NetworkID })
                                 .Select(g =>
                                 {
                                     var first = g.First();

@@ -27,7 +27,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var siteYearPairs = filteredstationpollutant
                     .SelectMany(siteinfo => years.Select(year => new { siteinfo, year }));
 
-                await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 1 }, async (pair, ct) =>
+                await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 3 }, async (pair, ct) =>
                 {
                     try
                     {
