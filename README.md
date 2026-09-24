@@ -1,94 +1,259 @@
 # aqie-historicaldata-backend
 
-Core delivery C# ASP.NET backend template.
+Backend service for the **historical data** and **data selection** features of the Air Quality
+Information for England (AQIE) service. It fetches historical air quality measurements from
+Defra's UK-AIR ATOM feeds and related APIs, aggregates them, exports them as CSV, and delivers
+them to users via presigned S3 URLs — either immediately or asynchronously by email.
 
-* [Install MongoDB](#install-mongodb)
-* [Inspect MongoDB](#inspect-mongodb)
-* [Testing](#testing)
-* [Running](#running)
-* [Dependabot](#dependabot)
+This is the only .NET service in the AQIE estate (see [Why .NET?](#why-net)).
 
+- [How it works](#how-it-works)
+- [Requirements](#requirements)
+- [Local development](#local-development)
+- [Environment variables](#environment-variables)
+- [API endpoints](#api-endpoints)
+- [Background services](#background-services)
+- [MongoDB collections](#mongodb-collections)
+- [Why .NET?](#why-net)
+- [Licence](#licence)
+
+---
+
+## How it works
+
+AQIE lets the public download historical air quality data — for a single monitoring station, or
+for a filtered selection across many stations. The pipeline is the same in both cases: **fetch**
+observations from the ATOM feeds, **aggregate** them to hourly/daily/annual, **export** to CSV,
+then **upload** to S3 and hand back a presigned URL.
+
+There are two journeys:
+
+- **Single station** (`AtomHistoryHourlydata`) — one station, one year, returned synchronously.
+- **Data selection** (`AtomDataSelection`, `AtomEmailJobDataSelection`) — many stations × many
+  years. Too slow to hold an HTTP connection open, so it writes a `Pending` job to MongoDB and a
+  background service processes it and emails the link. Poll with `AtomDataSelectionJobStatus`,
+  then fetch the URL with `AtomDataSelectionPresignedUrlMail`.
+
+Stations can be filtered by UK country or local authority. Country boundaries ship as GeoJSON in
+[GeoBoundaries](AqieHistoricaldataBackend/GeoBoundaries); `AtomDataSelectionStationBoundryService`
+does point-in-polygon tests with NetTopologySuite and converts between OSGB36 British National
+Grid and WGS84 with ProjNET, since the upstream sources don't use a consistent coordinate system.
+
+### Data sources
+
+Two networks are supported and behave differently. **AURN** (Automatic Urban and Rural Network)
+takes its station metadata live from the Ricardo API. **Non-AURN** metadata is seeded into MongoDB
+from Excel files in S3 at startup.
+
+| Upstream | Base URL | Used for |
+| --- | --- | --- |
+| UK-AIR ATOM feeds | `https://uk-air.defra.gov.uk/` | Hourly observations, one feed per station per year, under `data/atom-dls/observations/auto/` (automatic) or `.../non-auto/` |
+| Ricardo UK-AIR API | `https://api-ukair.defra.gov.uk/` | AURN station metadata. Requires credentials |
+| LAQM Portal | `https://www.laqmportal.co.uk/` | Local authority list and non-AURN station data. Requires an API key |
+| aqie-notify-service | `https://aqie-notify-service.{Environment}.cdp-int.defra.cloud/` | "Your download is ready" emails |
+| AWS S3 | — | CSV output and the non-AURN master spreadsheets |
+
+---
+
+## Requirements
+
+- [.NET SDK 8.0](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) — recommended, as Compose
+  starts MongoDB and LocalStack alongside the app
+
+---
+
+## Local development
 
 ### Docker Compose
 
-A Docker Compose template is in [compose.yml](compose.yml).
-
-A local environment with:
-
-- Localstack for AWS services (S3, SQS)
-- Redis
-- MongoDB
-- This service.
-- A commented out frontend example.
+Starts LocalStack (S3), Redis, MongoDB and this service:
 
 ```bash
 docker compose up --build -d
 ```
 
-A more extensive setup is available in [github.com/DEFRA/cdp-local-environment](https://github.com/DEFRA/cdp-local-environment)
+The service listens on **http://localhost:8080**. LocalStack is on `4566` (initialised by
+[compose/start-localstack.sh](compose/start-localstack.sh) with the dummy credentials in
+[compose/aws.env](compose/aws.env)), MongoDB on `27019`, Redis on `6381`.
 
-### MongoDB
+The MongoDB and Redis host ports are deliberately offset from their defaults so the stack can run
+alongside the other AQIE services (aqie-back-end uses `27017`/`6379`, aqie-forecast-api uses
+`27018`/`6380`). Inside the Compose network the containers still use the standard ports.
 
-#### MongoDB via Docker
+A more extensive local platform is available at
+[DEFRA/cdp-local-environment](https://github.com/DEFRA/cdp-local-environment).
 
-See above.
+### .NET CLI
 
-```
+Listens on **http://localhost:5000**. Note the launch profile is named after the project, not
+`Development`:
+
+```bash
 docker compose up -d mongodb
+dotnet run --project AqieHistoricaldataBackend --launch-profile AqieHistoricaldataBackend
 ```
 
-#### MongoDB locally
+`appsettings.Development.json` points at `mongodb://127.0.0.1:27017`, so if you are using the
+Compose MongoDB you need to override the port:
 
-Alternatively install MongoDB locally:
-
-- Install [MongoDB](https://www.mongodb.com/docs/manual/tutorial/#installation) on your local machine
-- Start MongoDB:
 ```bash
-sudo mongod --dbpath ~/mongodb-cdp
+Mongo__DatabaseUri=mongodb://127.0.0.1:27019 \
+  dotnet run --project AqieHistoricaldataBackend --launch-profile AqieHistoricaldataBackend
 ```
 
-#### MongoDB in CDP environments
-
-In CDP environments a MongoDB instance is already set up
-and the credentials exposed as enviromment variables.
-
-
-### Inspect MongoDB
-
-To inspect the Database and Collections locally:
-```bash
-mongosh
-```
-
-You can use the CDP Terminal to access the environments' MongoDB.
-
-### Testing
-
-Run the tests with:
-
-Tests run by running a full `WebApplication` backed by [Ephemeral MongoDB](https://github.com/asimmon/ephemeral-mongo).
-Tests do not use mocking of any sort and read and write from the in-memory database.
+### Tests
 
 ```bash
 dotnet test
-````
-
-### Running
-
-Run CDP-Deployments application:
-```bash
-dotnet run --project AqieHistoricaldataBackend --launch-profile Development
 ```
 
-### SonarCloud
+xUnit, with Moq / NSubstitute / FluentAssertions and `RichardSzalay.MockHttp` for stubbing HTTP.
+Tests also run in the Docker build, so a failing test fails the image build.
 
-Example SonarCloud configuration are available in the GitHub Action workflows.
+### Inspecting MongoDB
 
-### Dependabot
+```bash
+docker compose exec mongodb mongosh
+use aqie-historicaldata-backend
+db.aqie_csvemailexport_jobs.find().sort({ _id: -1 }).limit(5).pretty()
+```
 
-We have added an example dependabot configuration file to the repository. You can enable it by renaming
-the [.github/example.dependabot.yml](.github/example.dependabot.yml) to `.github/dependabot.yml`
+In deployed environments, use the CDP Terminal.
 
+---
+
+## Environment variables
+
+There is no `.env` in this repo. Config comes from `appsettings.json` /
+`appsettings.Development.json` plus environment variables, injected by CDP when deployed. Locally,
+export them or add them to the `your-backend` `environment:` block in [compose.yml](compose.yml).
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `RICARDO_API_KEY` | For AURN | Ricardo UK-AIR API login. Despite the name this is an email address, not a key |
+| `RICARDO_API_VALUE` | For AURN | Ricardo UK-AIR API password |
+| `LAQM_API_KEY` | For LA filtering | `X-API-Key` header for the LAQM Portal |
+| `LAQM_USERID` | For LA filtering | `X-API-PartnerId` header for the LAQM Portal |
+| `S3_BUCKET_NAME` | Yes | Bucket for CSV exports and master spreadsheets. Startup seeding throws if unset |
+| `POLLUTANT_MASTER_KEY` | For non-AURN | S3 key of the non-AURN pollutant master `.xlsx` |
+| `POLLUTANT_STATION_MASTER_KEY` | For non-AURN | S3 key of the non-AURN station details `.xlsx` |
+| `NOTIFY_BASEADDRESS` | For email jobs | Base address of the notify service |
+| `NOTIFY_URL` | For email jobs | Path on the notify service used to send the email |
+| `EMAIL_TEMPLATEID` | For email jobs | GOV.UK Notify template ID |
+| `EMAIL_BASEADDRESS` | For email jobs | Prefix for the download link embedded in the email |
+
+Optional / platform:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TIME_INTERVAL` | `45` | Minutes between email job processing runs |
+| `Environment` | `dev` | Used to build the notify service hostname |
+| `HTTP_PROXY` | — | Outbound proxy. Credentials in the URI are supported and stripped before use |
+| `TRUSTSTORE_*` | — | Any var prefixed `TRUSTSTORE` is treated as a base64 CA cert and loaded at startup |
+| `SERVICE_VERSION` | `""` | Stamped onto log entries |
+| `ASPNETCORE_ENVIRONMENT` | — | `Development` selects `appsettings.Development.json` |
+| `Mongo__DatabaseUri` | see appsettings | Connection string. Set automatically in CDP, using IAM auth |
+| `Mongo__DatabaseName` | `aqie-historicaldata-backend` | Database name |
+
+---
+
+## API endpoints
+
+All routes are registered at the root (no `/api` prefix) in
+[AtomHistoryEndpoints.cs](AqieHistoricaldataBackend/Atomfeed/Endpoints/AtomHistoryEndpoints.cs).
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| GET | `/health` | Health check |
+| GET, POST | `/AtomHistoryHourlydata` | Single-station download. Returns a presigned S3 URL |
+| POST | `/AtomHistoryexceedence` | Exceedence data for a station (readings above statutory thresholds) |
+| POST | `/AtomDataSelection` | Runs a multi-station data selection synchronously |
+| POST | `/AtomEmailJobDataSelection` | Queues an asynchronous data selection job. Returns `"Success"` / `"Failure"` |
+| POST | `/AtomDataSelectionJobStatus` | Job status for a given `jobId` |
+| POST | `/AtomDataSelectionPresignedUrlMail` | Presigned URL for a completed job; flags the mail as sent |
+| POST | `/AtomDataSelectionNonAurnNetworks` | Non-AURN network station and pollutant data |
+| GET | `/AtomDataSelectionPollutantMaster` | All pollutants from the pollutant master |
+| POST | `/AtomDataSelectionPollutantDataSource` | Pollutant details for a given data source |
+
+Every POST takes the same loosely-typed `QueryStringData` object
+([AtomHistoryModel.cs](AqieHistoricaldataBackend/Atomfeed/Models/AtomHistoryModel.cs)) — all fields
+are optional strings and which ones matter depends on the endpoint. The main ones are `SiteId`,
+`Year`, `DownloadPollutant`, `DownloadPollutantType` (`Hourly`/`Daily`/`Annual`), `dataSource`
+(`AURN`/`NON-AURN`), `Region` + `regiontype` for boundary filtering, and `jobId` / `email` for the
+asynchronous journey.
+
+```bash
+curl http://localhost:8080/health
+
+# Single station download — returns a presigned S3 URL
+curl -X POST http://localhost:8080/AtomHistoryHourlydata \
+  -H 'Content-Type: application/json' \
+  -d '{ "SiteId": "CLL2", "SiteName": "London Bloomsbury", "Year": "2019",
+        "DownloadPollutant": "NO2", "DownloadPollutantType": "Hourly" }'
+
+# Queue an email job, then poll it
+curl -X POST http://localhost:8080/AtomEmailJobDataSelection \
+  -H 'Content-Type: application/json' \
+  -d '{ "Region": "England", "regiontype": "country", "Year": "2023",
+        "pollutantName": "NO2", "dataSource": "AURN", "email": "you@example.com" }'
+
+curl -X POST http://localhost:8080/AtomDataSelectionJobStatus \
+  -H 'Content-Type: application/json' -d '{ "jobId": "<jobId>" }'
+```
+
+Note that the handlers catch all exceptions and return `404 Not Found`, so a 404 usually means
+something went wrong upstream rather than that no data exists — check the logs.
+
+---
+
+## Background services
+
+| Service | Trigger | What it does |
+| --- | --- | --- |
+| [AtomDataSelectionEmailJobHostedService](AqieHistoricaldataBackend/Atomfeed/Services/AtomDataSelectionEmailJobHostedService.cs) | Every `TIME_INTERVAL` minutes (default 45) | Polls `aqie_csvemailexport_jobs` for `Pending` jobs. Runs the selection, builds the CSV, uploads to S3, and asks aqie-notify-service to email the presigned URL. Moves the job Pending → Processing → Completed/Failed. There is no retry — a failure at any step marks the job `Failed` |
+| [AtomNonAurnNetworksSeedHostedService](AqieHistoricaldataBackend/Atomfeed/Services/AtomNonAurnNetworksSeedHostedService.cs) | Once, at startup | Downloads the non-AURN pollutant and station spreadsheets from S3 and replaces the corresponding MongoDB collections. Uses a Mongo-based distributed lock (`aqie_atom_seed_locks`, 10-minute TTL) so only one instance seeds when several start together |
+
+To exercise the email pipeline without waiting 45 minutes, set `TIME_INTERVAL=1` and restart.
+
+---
+
+## MongoDB collections
+
+Database: `aqie-historicaldata-backend`
+
+| Collection | Contents |
+| --- | --- |
+| `aqie_csvexport_jobs` | Data selection export jobs |
+| `aqie_csvemailexport_jobs` | Asynchronous email delivery jobs, with status and presigned URL |
+| `aqie_atom_seed_locks` | Distributed startup-seeding lock (TTL indexed) |
+| `aqie_atom_non_aurn_networks_pollutant_master` | Non-AURN pollutant lookup, seeded from S3 Excel |
+| `aqie_atom_non_aurn_networks_station_details` | Non-AURN station metadata, seeded from S3 Excel |
+
+---
+
+## Why .NET?
+
+Every other AQIE service is Node.js. Per Karthick Muthukrishnan (architect), both were evaluated
+and .NET was chosen for the high data volume and performance requirements — specifically its
+ability to process ATOM feed data in parallel efficiently.
+
+That shows up in the code: `AtomDataSelectionHourlyFetchService` fans out across every
+(station × year) pair with `Parallel.ForEachAsync`, and `AtomDataSelectionStationBoundryService`
+runs partitioned parallel point-in-polygon matching over all stations.
+
+---
+
+## Licence
+
+THIS INFORMATION IS LICENSED UNDER THE CONDITIONS OF THE OPEN GOVERNMENT LICENCE found at:
+
+<http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3>
+
+The following attribution statement MUST be cited in your products and applications when using
+this information.
+
+> Contains public sector information licensed under the Open Government Licence v3
 
 ### About the licence
 
