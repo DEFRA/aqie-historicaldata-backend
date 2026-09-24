@@ -75,18 +75,31 @@ docker compose up --build -d
 
 The service listens on **http://localhost:8080**. LocalStack is on `4566` (initialised by
 [compose/start-localstack.sh](compose/start-localstack.sh) with the dummy credentials in
-[compose/aws.env](compose/aws.env)), MongoDB on `27017`, Redis on `6379`.
+[compose/aws.env](compose/aws.env)), MongoDB on `27019`, Redis on `6381`.
+
+The MongoDB and Redis host ports are deliberately offset from their defaults so the stack can run
+alongside the other AQIE services (aqie-back-end uses `27017`/`6379`, aqie-forecast-api uses
+`27018`/`6380`). Inside the Compose network the containers still use the standard ports.
 
 A more extensive local platform is available at
 [DEFRA/cdp-local-environment](https://github.com/DEFRA/cdp-local-environment).
 
 ### .NET CLI
 
-Requires MongoDB on `mongodb://127.0.0.1:27017` (`docker compose up -d mongodb`). Listens on
-**http://localhost:5000**. Note the launch profile is named after the project, not `Development`:
+Listens on **http://localhost:5000**. Note the launch profile is named after the project, not
+`Development`:
 
 ```bash
+docker compose up -d mongodb
 dotnet run --project AqieHistoricaldataBackend --launch-profile AqieHistoricaldataBackend
+```
+
+`appsettings.Development.json` points at `mongodb://127.0.0.1:27017`, so if you are using the
+Compose MongoDB you need to override the port:
+
+```bash
+Mongo__DatabaseUri=mongodb://127.0.0.1:27019 \
+  dotnet run --project AqieHistoricaldataBackend --launch-profile AqieHistoricaldataBackend
 ```
 
 ### Tests
