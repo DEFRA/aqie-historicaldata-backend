@@ -3,16 +3,31 @@ using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
+    /// <summary>
+    /// Outcome of an upstream feed fetch. <paramref name="UpstreamFailed"/> separates "the feed
+    /// could not be read" from "the feed was read and holds nothing", which callers need in order
+    /// to return a meaningful status code.
+    /// </summary>
+    public sealed record AtomFeedFetchResult(JArray Features, bool UpstreamFailed)
+    {
+        public static AtomFeedFetchResult Ok(JArray features) => new(features, false);
+        public static AtomFeedFetchResult NoData() => new(new JArray(), false);
+        public static AtomFeedFetchResult Failed() => new(new JArray(), true);
+    }
+
     public abstract class AtomFeedFetchServiceBase(IHttpClientFactory httpClientFactory)
     {
         protected abstract ILogger Logger { get; }
 
         protected async Task<JArray> FetchAtomFeedAsync(string? siteID, string year, string? dataSource = null)
+            => (await FetchAtomFeedResultAsync(siteID, year, dataSource)).Features;
+
+        protected async Task<AtomFeedFetchResult> FetchAtomFeedResultAsync(string? siteID, string year, string? dataSource = null)
         {
             if (string.IsNullOrWhiteSpace(siteID) || string.IsNullOrWhiteSpace(year))
             {
                 Logger.LogWarning("Invalid FetchAtomFeedAsync siteID or year: siteID='{SiteID}', year='{Year}'", siteID, year);
-                return new JArray();
+                return AtomFeedFetchResult.NoData();
             }
 
             var client = httpClientFactory.CreateClient("Atomfeed");
@@ -26,44 +41,45 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var response = await client.GetAsync(path);
                 Logger.LogInformation("Received Atom feed response for site {SiteID} year {Year}: {StatusCode}", siteID, year, (int)response.StatusCode);
 
-                if (await ShouldReturnEmptyArrayAsync(response, path, siteID, year))
-                    return new JArray();
+                var shortCircuit = await ClassifyResponseAsync(response, path, siteID, year);
+                if (shortCircuit is not null)
+                    return shortCircuit;
 
                 var stream = await response.Content.ReadAsStreamAsync();
-                return AtomFeedHelper.ParseXmlStreamToFeatureArray(stream);
+                return AtomFeedFetchResult.Ok(AtomFeedHelper.ParseXmlStreamToFeatureArray(stream));
             }
             catch (HttpRequestException ex)
             {
                 if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
                     Logger.LogWarning(ex, "Atom feed not found (404) for URL: {Url} (siteID: {SiteID}, year: {Year})", path, siteID, year);
-                }
-                else
-                {
-                    Logger.LogError(ex, "HTTP error FetchAtomFeedAsync fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", path, siteID, year, ex.Message);
+                    return AtomFeedFetchResult.NoData();
                 }
 
-                return new JArray();
+                Logger.LogError(ex, "HTTP error FetchAtomFeedAsync fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", path, siteID, year, ex.Message);
+                return AtomFeedFetchResult.Failed();
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Error FetchAtomFeedAsync fetching Atom feed for URL: {Url} (siteID: {SiteID}, year: {Year}): {Error}", path, siteID, year, ex.Message);
-                return new JArray();
+                return AtomFeedFetchResult.Failed();
             }
         }
 
-        private async Task<bool> ShouldReturnEmptyArrayAsync(HttpResponseMessage response, string path, string? siteID, string year)
+        /// <summary>Returns null when the response should be parsed, otherwise the outcome to report.</summary>
+        private async Task<AtomFeedFetchResult?> ClassifyResponseAsync(HttpResponseMessage response, string path, string? siteID, string year)
         {
             if (response.StatusCode == System.Net.HttpStatusCode.NotModified)
             {
                 Logger.LogWarning("Server returned 304 Not Modified for site {SiteID} year {Year}", siteID, year);
-                return true;
+                return AtomFeedFetchResult.Failed();
             }
 
+            // A missing feed file means this station published nothing for this year.
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 Logger.LogWarning("Atom feed not found (404) for URL: {Url} (siteID: {SiteID}, year: {Year})", path, siteID, year);
-                return true;
+                return AtomFeedFetchResult.NoData();
             }
 
             if (!response.IsSuccessStatusCode)
@@ -75,10 +91,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 if (response.StatusCode == System.Net.HttpStatusCode.PreconditionRequired)
                     Logger.LogError("Server returned 428 Precondition Required. Check if User-Agent, cookies, or other headers are needed.");
 
-                return true;
+                return AtomFeedFetchResult.Failed();
             }
 
-            return false;
+            return null;
         }
 
         protected List<FinalData> ProcessAtomData(JArray features, List<PollutantDetails> pollutants, SiteInfo? siteinfo = null)

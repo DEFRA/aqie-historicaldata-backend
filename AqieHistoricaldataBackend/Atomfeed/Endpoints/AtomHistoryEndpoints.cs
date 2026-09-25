@@ -23,6 +23,50 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             app.MapGet("AtomDataSelectionPollutantMaster", GetAtomDataSelectionPollutantMaster);
             app.MapPost("AtomDataSelectionPollutantDataSource", GetAtomDataSelectionPollutantDataSource);            
             app.MapGet("AtomHistoryObservations", GetObservations);
+            app.MapGet("AtomObservationStations", GetObservationStations);
+        }
+
+        private static async Task<IResult> GetObservationStations(
+            [FromQuery] string? network,
+            [FromQuery] string? pollutant,
+            IAtomObservationStationsService stations,
+            ILogger<AtomObservationStationsService> logger)
+        {
+            var resolvedNetwork = string.IsNullOrWhiteSpace(network) ? "AURN" : network.Trim().ToUpperInvariant();
+            if (resolvedNetwork is not ("AURN" or "NON-AURN"))
+            {
+                return Results.BadRequest(new { error = "network must be one of: AURN, NON-AURN." });
+            }
+
+            string? pollutantCode = null;
+            if (!string.IsNullOrWhiteSpace(pollutant))
+            {
+                var matched = ObservationsPollutants.Resolve(pollutant);
+                if (matched is null)
+                {
+                    return Results.BadRequest(new
+                    {
+                        error = "pollutant must be one of: "
+                              + string.Join(", ", ObservationsPollutants.All.Select(p => $"{p.Name} ({p.Code})"))
+                              + "."
+                    });
+                }
+
+                pollutantCode = matched.Code;
+            }
+
+            try
+            {
+                var result = await stations.GetStationsAsync(resolvedNetwork, pollutantCode);
+                return Results.Ok(result);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error GetObservationStations for network {Network}", resolvedNetwork);
+                return Results.Problem(
+                    "Station metadata is currently unavailable.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
         }
 
         private static async Task<IResult> GetObservations(
@@ -31,12 +75,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             [FromQuery] string? period,
             [FromQuery] string? aggregation,
             [FromQuery] string? year,
+            [FromQuery] string? network,
+            [FromQuery] string? anchor,
             IAtomObservationsService observations,
             ILogger<AtomObservationsService> logger)
         {
             if (!ObservationsRequest.TryCreate(
-                    siteId, pollutant, period, aggregation, year,
-                    AtomObservationsService.KnownPollutants, out var request, out var error))
+                    siteId, pollutant, period, aggregation, year, network, anchor,
+                    out var request, out var error))
             {
                 return Results.BadRequest(new { error });
             }
@@ -47,10 +93,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
                 return result.Count == 0
                     ? Results.NotFound(new
                     {
-                        error = "No observations found for the requested site and period. "
-                              + "This can also indicate an upstream feed failure — check the service logs."
+                        error = "No observations found for the requested site and period."
                     })
                     : Results.Ok(result);
+            }
+            catch (UpstreamFeedException ex)
+            {
+                logger.LogError(ex, "Upstream feed failure for site {SiteId}", siteId);
+                return Results.Problem(
+                    "The upstream Defra feed could not be read. This is not the same as the station having no data.",
+                    statusCode: StatusCodes.Status502BadGateway);
             }
             catch (Exception ex)
             {

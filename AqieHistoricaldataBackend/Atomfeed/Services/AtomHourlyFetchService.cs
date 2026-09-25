@@ -14,10 +14,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         protected override ILogger Logger => logger;
 
         public async Task<List<FinalData>> GetAtomHourlydatafetch(string siteID, string year, string downloadfilter)
+            => (await GetAtomHourlydatafetchWithStatus(siteID, year, downloadfilter)).Rows;
+
+        public async Task<AtomHourlyFetchOutcome> GetAtomHourlydatafetchWithStatus(
+            string siteID, string year, string downloadfilter, string? dataSource = null)
         {
             var pollutantsToDisplay = GetPollutantsToDisplay(downloadfilter);
-            var atomJsonCollection = await FetchAtomFeedAsync(siteID, year);
-            return ProcessAtomData(atomJsonCollection, pollutantsToDisplay);
+            var fetch = await FetchAtomFeedResultAsync(siteID, year, dataSource);
+            return new AtomHourlyFetchOutcome(ProcessAtomData(fetch.Features, pollutantsToDisplay), fetch.UpstreamFailed);
         }
 
         private static List<PollutantDetails> GetPollutantsToDisplay(string filter)

@@ -25,8 +25,10 @@ services:
 
   redis:
     image: redis:7.2.3-alpine3.18
+    # Host ports are offset from the defaults so this stack can run alongside
+    # aqie-back-end (27017/6379) and aqie-forecast-api (27018/6380).
     ports:
-      - '6379:6379'
+      - '6381:6379'
     restart: always
     networks:
       - cdp-tenant
@@ -36,7 +38,7 @@ services:
     networks:
       - cdp-tenant
     ports:
-      - '27017:27017'
+      - '27019:27017'
     volumes:
       - mongodb-data:/data
     restart: always
@@ -80,6 +82,9 @@ services:
         condition: service_started
     env_file:
       - 'compose/aws.env'
+      # Local credentials (Ricardo, LAQM). Git-ignored; absent by default.
+      - path: 'compose/secrets.env'
+        required: false
     environment:
       PORT: 8080
       LOCALSTACK_ENDPOINT: http://localstack:4566

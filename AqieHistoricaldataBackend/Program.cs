@@ -134,12 +134,14 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     
     builder.Services.AddHealthChecks();
     builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+    builder.Services.AddMemoryCache();
     
     // Set up the endpoints and their dependencies
     builder.Services.AddSingleton<IExamplePersistence, ExamplePersistence>();
     builder.Services.AddSingleton<IAtomHistoryService, AtomHistoryService>();
     builder.Services.AddSingleton<IAtomHourlyFetchService, AtomHourlyFetchService>();
     builder.Services.AddSingleton<IAtomObservationsService, AtomObservationsService>();
+    builder.Services.AddSingleton<IAtomObservationStationsService, AtomObservationStationsService>();
     builder.Services.AddSingleton<IAtomDailyFetchService, AtomDailyFetchService>();
     builder.Services.AddSingleton<IAtomAnnualFetchService, AtomAnnualFetchService>();
     builder.Services.AddSingleton<IAwss3BucketService, Awss3BucketService>();

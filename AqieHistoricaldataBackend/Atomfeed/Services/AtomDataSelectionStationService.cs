@@ -170,6 +170,57 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return ParseSiteMeta(responsebody);
         }
 
+        public async Task<List<SiteInfo>> GetObservationStationsAsync(string network)
+        {
+            if (string.Equals(network, "NON-AURN", StringComparison.OrdinalIgnoreCase))
+            {
+                return await GetAllNonAurnSitesAsync();
+            }
+
+            var token = await GetRicardoToken();
+            var sites = await FetchSiteMetadata(token);
+            return sites.Where(s => !string.IsNullOrWhiteSpace(s.LocalSiteId)).ToList();
+        }
+
+        private async Task<List<SiteInfo>> GetAllNonAurnSitesAsync()
+        {
+            var siteCollection = MongoDbClientFactory
+                .GetCollection<StationDetailDocument>("aqie_atom_non_aurn_networks_station_details");
+
+            var documents = await siteCollection
+                .Find(Builders<StationDetailDocument>.Filter.Empty)
+                .ToListAsync();
+
+            return documents
+                .Where(d => !string.IsNullOrWhiteSpace(d.SiteID))
+                .GroupBy(d => new { d.SiteID, d.NetworkID })
+                .Select(g =>
+                {
+                    var first = g.First();
+                    var (areaType, siteType) = SplitEnvironmentType(first.EnvironmentType);
+                    return new SiteInfo
+                    {
+                        LocalSiteId = first.SiteID,
+                        SiteName = first.SiteName,
+                        AreaType = areaType,
+                        SiteType = siteType,
+                        Latitude = first.Latitude,
+                        Longitude = first.Longitude,
+                        NetworkType = first.NetworkType,
+                        ZoneRegion = first.Region,
+                        Pollutants = g.Where(d => d.PollutantName != null)
+                            .Select(d => new PollutantInfo
+                            {
+                                Name = d.PollutantName,
+                                StartDate = d.StartDate,
+                                EndDate = d.EndDate
+                            })
+                            .ToList()
+                    };
+                })
+                .ToList();
+        }
+
         private static List<SiteInfo> FilterSitesByPollutants(List<SiteInfo> sites, string pollutantName, ILogger logger)
         {
             var mappedPollutants = GetMappedPollutants(pollutantName, logger, includeUnknowns: true);

@@ -35,8 +35,8 @@ There are three journeys:
   years. Too slow to hold an HTTP connection open, so it writes a `Pending` job to MongoDB and a
   background service processes it and emails the link. Poll with `AtomDataSelectionJobStatus`,
   then fetch the URL with `AtomDataSelectionPresignedUrlMail`.
-- **Observations API** (`AtomHistoryObservations`) — one station over a chosen time window,
-  returned inline as JSON for a front end to render. No CSV, no S3. See
+- **Observations API** (`AtomHistoryObservations`, `AtomObservationStations`) — one station over
+  a chosen time window, returned inline as JSON for a front end to render. No CSV, no S3. See
   [Observations API](#observations-api).
 
 Stations can be filtered by UK country or local authority. Country boundaries ship as GeoJSON in
@@ -140,6 +140,21 @@ export them or add them to the `your-backend` `environment:` block in [compose.y
 | `RICARDO_API_VALUE` | For AURN | Ricardo UK-AIR API password |
 | `LAQM_API_KEY` | For LA filtering | `X-API-Key` header for the LAQM Portal |
 | `LAQM_USERID` | For LA filtering | `X-API-PartnerId` header for the LAQM Portal |
+
+On CDP these are set as service secrets in the portal. Locally, put them in
+`compose/secrets.env`, which is git-ignored and loaded automatically if present:
+
+```bash
+cat > compose/secrets.env <<'EOF'
+RICARDO_API_KEY=your.email@example.com
+RICARDO_API_VALUE=your-password
+LAQM_API_KEY=
+LAQM_USERID=
+EOF
+docker compose up -d --force-recreate your-backend
+```
+
+Do not put credentials in `compose/aws.env` — that file is committed.
 | `S3_BUCKET_NAME` | Yes | Bucket for CSV exports and master spreadsheets. Startup seeding throws if unset |
 | `POLLUTANT_MASTER_KEY` | For non-AURN | S3 key of the non-AURN pollutant master `.xlsx` |
 | `POLLUTANT_STATION_MASTER_KEY` | For non-AURN | S3 key of the non-AURN station details `.xlsx` |
@@ -172,6 +187,7 @@ All routes are registered at the root (no `/api` prefix) in
 | --- | --- | --- |
 | GET | `/health` | Health check |
 | GET | `/AtomHistoryObservations` | Single-station observations as JSON over a time window. See [Observations API](#observations-api) |
+| GET | `/AtomObservationStations` | Station list keyed by the id the observations endpoint expects |
 | GET, POST | `/AtomHistoryHourlydata` | Single-station download. Returns a presigned S3 URL |
 | POST | `/AtomHistoryexceedence` | Exceedence data for a station (readings above statutory thresholds) |
 | POST | `/AtomDataSelection` | Runs a multi-station data selection synchronously |
@@ -210,76 +226,154 @@ curl -X POST http://localhost:8080/AtomDataSelectionJobStatus \
 
 Note that the handlers catch all exceptions and return `404 Not Found`, so a 404 usually means
 something went wrong upstream rather than that no data exists — check the logs.
-`/AtomHistoryObservations` is the exception — it distinguishes its status codes properly.
+The observations endpoints are the exception — they distinguish their status codes properly.
 
 ---
 
 ## Observations API
 
-`GET /AtomHistoryObservations` serves a single station's readings inline as JSON, for a front end
-to chart or tabulate. It reuses the same fetch-and-parse chain as the download endpoints but stops
-before the CSV step — nothing is written to S3 and nothing is persisted.
+Two endpoints serve the front end directly as JSON. They reuse the same fetch-and-parse chain as
+the download endpoints but stop before the CSV step — nothing is written to S3 and nothing is
+persisted.
 
-### Parameters
+### `GET /AtomHistoryObservations`
+
+A single station's readings over a time window.
 
 | Parameter | Required | Default | Values |
 | --- | --- | --- | --- |
-| `siteId` | yes | — | Station code, e.g. `CLL2` |
+| `siteId` | yes | — | Station code, e.g. `CLL2`. Same id as `/AtomObservationStations` returns |
 | `period` | no | `7days` | `24hours`, `7days`, `30days`, `year` |
 | `aggregation` | no | `hourly` | `hourly`, `daily` |
-| `pollutant` | no | all | `Nitrogen dioxide`, `PM10`, `PM2.5`, `Ozone`, `Sulphur dioxide` |
+| `pollutant` | no | all | Display name or code: `Nitrogen dioxide`/`NO2`, `PM10`, `PM2.5`/`PM25`, `Ozone`/`O3`, `Sulphur dioxide`/`SO2` |
+| `network` | no | `AURN` | `AURN`, `NON-AURN`. Selects the `auto/` or `non-auto/` feed |
+| `anchor` | no | `latest` | `latest` ends the window at the newest reading; `now` ends it at the current time |
 | `year` | no | current | Anchor year, 1960 to present |
 
 Unlike `DownloadPollutant` on the CSV endpoints, an unrecognised `pollutant` is rejected with a
 `400` rather than silently falling back to all five.
 
 ```bash
-curl 'http://localhost:8080/AtomHistoryObservations?siteId=CLL2&period=24hours&pollutant=Nitrogen%20dioxide&year=2019'
+curl 'http://localhost:8080/AtomHistoryObservations?siteId=CLL2&period=24hours&pollutant=NO2&year=2019'
 ```
 
 ```json
 {
   "siteId": "CLL2",
+  "network": "AURN",
   "period": "24hours",
   "aggregation": "hourly",
+  "anchor": "latest",
+  "windowFrom": "2019-12-30T23:00:00Z",
+  "windowTo": "2019-12-31T23:00:00Z",
   "from": "2019-12-31T00:00:00Z",
   "to": "2019-12-31T23:00:00Z",
   "pollutants": ["Nitrogen dioxide"],
   "count": 24,
   "observations": [
-    { "timestamp": "2019-12-31T00:00:00Z", "pollutant": "Nitrogen dioxide", "value": 44.52505, "status": "V" }
+    {
+      "timestamp": "2019-12-31T00:00:00Z",
+      "pollutant": "Nitrogen dioxide",
+      "pollutantCode": "NO2",
+      "value": 44.52505,
+      "status": "V"
+    }
   ]
 }
 ```
+
+`windowFrom`/`windowTo` are the bounds that were *requested*; `from`/`to` are the bounds of the
+data actually returned. A gap between them means the feed has no readings for part of the window.
 
 With `aggregation=daily`, each entry covers one day and carries a `capture` ratio instead of a
 `status`:
 
 ```json
-{ "timestamp": "2019-12-25", "pollutant": "PM10", "value": 10.52, "capture": 1 }
+{ "timestamp": "2019-12-25", "pollutant": "PM10", "pollutantCode": "PM10", "value": 10.52, "capture": 1 }
 ```
+
+### `GET /AtomObservationStations`
+
+The station list, keyed by the same `siteId` the observations endpoint expects, so the two cannot
+drift apart. AURN metadata comes from the Ricardo API; non-AURN from MongoDB.
+
+| Parameter | Required | Default | Values |
+| --- | --- | --- | --- |
+| `network` | no | `AURN` | `AURN`, `NON-AURN` |
+| `pollutant` | no | all | Filters to stations that measure it. Name or code |
+
+```json
+{
+  "network": "AURN",
+  "count": 173,
+  "stations": [
+    {
+      "siteId": "CLL2",
+      "name": "London Bloomsbury",
+      "network": "AURN",
+      "latitude": 51.52229,
+      "longitude": -0.125889,
+      "region": "Greater London",
+      "areaType": "Urban",
+      "siteType": "Background",
+      "pollutants": [
+        { "name": "Nitrogen dioxide", "code": "NO2", "startDate": "01/01/1992" }
+      ]
+    }
+  ]
+}
+```
+
+`siteId` is Ricardo's `localSiteId` — the form the ATOM feed filenames use (`CLL2`), **not** the
+`UKA00315` form that `aqie-back-end` `/monitoringStations` publishes as `localSiteID`.
+
+Pollutant names are normalised. Ricardo HTML-encodes subscripts and splits PM into instrument
+variants (`PM<sub>10</sub> particulate matter (Hourly measured)`, `Volatile PM<sub>10</sub> ...`);
+these collapse onto a single `PM10` entry, matching the download journey's mapping. Pollutants
+outside the served five are passed through with markup stripped and an empty `code`.
+
+**Closed stations are included.** The upstream call uses `with-closed=true`, so the list contains
+sites that stopped reporting years ago — useful for historical data, but check each pollutant's
+`endDate` before implying a station is live.
+
+Requires `RICARDO_API_KEY` and `RICARDO_API_VALUE` for the AURN path; without them the endpoint
+returns `502`.
 
 ### Behaviour worth knowing
 
 - **`value` is `null`, never `-99`.** The upstream no-data sentinel is normalised away. For daily
   aggregation, `value` is also `null` when `capture` falls below 0.75, so a poorly-covered day is
   distinguishable from a genuine reading of zero.
-- **Windows anchor on the latest reading in the feed, not on wall-clock now.** The Defra feeds
-  publish with a lag, so anchoring on `now` would routinely return nothing. `period=24hours`
-  against a 2019 feed returns the last 24 hours *of 2019*.
+- **`pollutantCode` is the stable identifier.** Switch on it rather than the display name.
+- **Windows anchor on the latest reading by default, not wall-clock now.** The Defra feeds publish
+  with a lag, so `anchor=latest` avoids routinely returning nothing. Pass `anchor=now` when you
+  need a true trailing window — for example to report honest data capture.
 - **Cross-year windows fetch twice.** The ATOM feed is one file per station per year, so a window
   spanning 1 January pulls the preceding year's feed and stitches the two together.
 - **An unpublished current year falls back one year**, but only when `year` was not given
   explicitly.
-- **Status codes are meaningful**: `400` for bad parameters (with the reason in `error`), `404`
-  when the site and period yield nothing, `500` on an unexpected failure.
+- **`period=year` with `aggregation=hourly` and no pollutant is rejected** with a `400`. That
+  combination is ~43,800 objects.
+- **Status codes are meaningful**: `400` for bad parameters (reason in `error`), `404` when the
+  site and period genuinely yield nothing, `502` when the upstream Defra feed could not be read,
+  `500` on an unexpected failure. A `404` and a `502` are deliberately distinct — an empty station
+  and a broken feed are different problems.
+
+### Publication lag
+
+Measured 2026-09-25: the ATOM feeds are regenerated daily at roughly **00:30–00:40 UTC** and
+contain readings up to **23:00 the previous day**. Observed lag was 15.3 hours at 14:19 UTC for
+both `CLL2` and `MY1`, so in practice it ranges from about 1.5 hours just after regeneration to
+about 25 hours just before the next.
+
+**This is not a near-real-time source.** If you need current-hour data, use a different upstream.
 
 ### Caching
 
-There is none. Every request pulls and parses the station's entire year of XML, even to serve 24
-hours of it. That is acceptable at low volume but will not scale to per-page-load traffic — Redis
-is already in the Compose stack and unused by this service, so caching the parsed year per
-`(siteId, year)` is the obvious next step.
+Parsed feed rows are cached in memory for 15 minutes per `(network, siteId, year, pollutant)`, so
+the two calls a station page typically makes only parse the year's XML once. Station lists are
+cached for 6 hours. The cache is per-instance — there is no shared Redis cache, so with multiple
+replicas each warms independently.
 
 ---
 

@@ -1,6 +1,7 @@
 using AqieHistoricaldataBackend.Atomfeed.Models;
 using AqieHistoricaldataBackend.Atomfeed.Services;
 using FluentAssertions;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -15,7 +16,10 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
         public AtomObservationsServiceTest()
         {
-            _sut = new AtomObservationsService(Mock.Of<ILogger<AtomObservationsService>>(), _fetch.Object);
+            _sut = new AtomObservationsService(
+                Mock.Of<ILogger<AtomObservationsService>>(),
+                _fetch.Object,
+                new MemoryCache(new MemoryCacheOptions()));
         }
 
         private static FinalData Row(string startTime, string value, string pollutant = "Ozone", string verification = "1")
@@ -30,17 +34,41 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             };
 
         private void SetupYear(int year, params FinalData[] rows)
-            => _fetch.Setup(f => f.GetAtomHourlydatafetch(It.IsAny<string>(), year.ToString(), It.IsAny<string>()))
-                     .ReturnsAsync(rows.ToList());
+            => _fetch.Setup(f => f.GetAtomHourlydatafetchWithStatus(
+                        It.IsAny<string>(), year.ToString(), It.IsAny<string>(), It.IsAny<string>()))
+                     .ReturnsAsync(new AtomHourlyFetchOutcome(rows.ToList(), false));
+
+        private void SetupUpstreamFailure(int year)
+            => _fetch.Setup(f => f.GetAtomHourlydatafetchWithStatus(
+                        It.IsAny<string>(), year.ToString(), It.IsAny<string>(), It.IsAny<string>()))
+                     .ReturnsAsync(new AtomHourlyFetchOutcome([], true));
 
         private static ObservationsRequest Request(
-            string period = "7days", string aggregation = "hourly", string? year = "2019", string? pollutant = null)
+            string period = "7days",
+            string aggregation = "hourly",
+            string? year = "2019",
+            string? pollutant = null,
+            string? network = null,
+            string? anchor = null)
         {
             ObservationsRequest.TryCreate(
-                "CLL2", pollutant, period, aggregation, year,
-                AtomObservationsService.KnownPollutants, out var request, out _).Should().BeTrue();
+                "CLL2", pollutant, period, aggregation, year, network, anchor,
+                out var request, out _).Should().BeTrue();
             return request!;
         }
+
+        private static bool TryCreate(
+            out ObservationsRequest? request,
+            out string? error,
+            string? siteId = "CLL2",
+            string? pollutant = null,
+            string? period = null,
+            string? aggregation = null,
+            string? year = null,
+            string? network = null,
+            string? anchor = null)
+            => ObservationsRequest.TryCreate(
+                siteId, pollutant, period, aggregation, year, network, anchor, out request, out error);
 
         #region Request validation
 
@@ -48,84 +76,112 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [InlineData("24hours")]
         [InlineData("7days")]
         [InlineData("30days")]
-        [InlineData("year")]
         public void TryCreate_AcceptsSupportedPeriods(string period)
         {
-            var ok = ObservationsRequest.TryCreate(
-                "CLL2", null, period, null, null,
-                AtomObservationsService.KnownPollutants, out var request, out var error);
-
-            ok.Should().BeTrue();
+            TryCreate(out var request, out var error, period: period).Should().BeTrue();
             error.Should().BeNull();
             request!.Period.Should().Be(period);
         }
 
         [Fact]
-        public void TryCreate_DefaultsToSevenDaysHourly_WhenPeriodAndAggregationOmitted()
+        public void TryCreate_DefaultsToSevenDaysHourlyAurnLatest()
         {
-            ObservationsRequest.TryCreate(
-                "CLL2", null, null, null, null,
-                AtomObservationsService.KnownPollutants, out var request, out _);
+            TryCreate(out var request, out _);
 
             request!.Period.Should().Be("7days");
             request.Aggregation.Should().Be(ObservationsAggregation.Hourly);
+            request.Anchor.Should().Be(ObservationsAnchor.Latest);
+            request.Network.Should().Be("AURN");
             request.Window.Should().Be(TimeSpan.FromDays(7));
         }
 
         [Fact]
         public void TryCreate_LeavesWindowNull_ForWholeYear()
         {
-            ObservationsRequest.TryCreate(
-                "CLL2", null, "year", null, null,
-                AtomObservationsService.KnownPollutants, out var request, out _);
-
+            TryCreate(out var request, out _, period: "year", aggregation: "daily");
             request!.Window.Should().BeNull();
         }
 
         [Theory]
-        [InlineData(null, "siteId is required.")]
-        [InlineData("", "siteId is required.")]
-        [InlineData("   ", "siteId is required.")]
-        public void TryCreate_RejectsMissingSiteId(string? siteId, string expected)
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void TryCreate_RejectsMissingSiteId(string? siteId)
         {
-            var ok = ObservationsRequest.TryCreate(
-                siteId, null, null, null, null,
-                AtomObservationsService.KnownPollutants, out _, out var error);
-
-            ok.Should().BeFalse();
-            error.Should().Be(expected);
+            TryCreate(out _, out var error, siteId: siteId).Should().BeFalse();
+            error.Should().Be("siteId is required.");
         }
 
         [Fact]
         public void TryCreate_RejectsUnknownPeriod()
         {
-            var ok = ObservationsRequest.TryCreate(
-                "CLL2", null, "3months", null, null,
-                AtomObservationsService.KnownPollutants, out _, out var error);
-
-            ok.Should().BeFalse();
-            error.Should().Contain("period must be one of");
+            TryCreate(out _, out var error, period: "3months").Should().BeFalse();
+            error.Should().StartWith("period must be one of");
         }
 
         [Fact]
         public void TryCreate_RejectsUnknownPollutantRatherThanSilentlyReturningAll()
         {
-            var ok = ObservationsRequest.TryCreate(
-                "CLL2", "NO2", null, null, null,
-                AtomObservationsService.KnownPollutants, out _, out var error);
+            TryCreate(out _, out var error, pollutant: "carbon monoxide").Should().BeFalse();
+            error.Should().StartWith("pollutant must be one of");
+        }
 
-            ok.Should().BeFalse();
-            error.Should().Contain("pollutant must be one of");
+        [Theory]
+        [InlineData("nitrogen DIOXIDE", "Nitrogen dioxide")]
+        [InlineData("NO2", "Nitrogen dioxide")]
+        [InlineData("pm25", "PM2.5")]
+        [InlineData("PM2.5", "PM2.5")]
+        [InlineData("o3", "Ozone")]
+        public void TryCreate_ResolvesPollutantByNameOrCode(string input, string expected)
+        {
+            TryCreate(out var request, out _, pollutant: input).Should().BeTrue();
+            request!.Pollutant.Should().Be(expected);
+        }
+
+        [Theory]
+        [InlineData("aurn", "AURN")]
+        [InlineData("non-aurn", "NON-AURN")]
+        public void TryCreate_NormalisesNetwork(string input, string expected)
+        {
+            TryCreate(out var request, out _, network: input).Should().BeTrue();
+            request!.Network.Should().Be(expected);
         }
 
         [Fact]
-        public void TryCreate_MatchesPollutantCaseInsensitively()
+        public void TryCreate_RejectsUnknownNetwork()
         {
-            ObservationsRequest.TryCreate(
-                "CLL2", "nitrogen DIOXIDE", null, null, null,
-                AtomObservationsService.KnownPollutants, out var request, out _);
+            TryCreate(out _, out var error, network: "LAQN").Should().BeFalse();
+            error.Should().Be("network must be one of: AURN, NON-AURN.");
+        }
 
-            request!.Pollutant.Should().Be("Nitrogen dioxide");
+        [Theory]
+        [InlineData("now", ObservationsAnchor.Now)]
+        [InlineData("latest", ObservationsAnchor.Latest)]
+        public void TryCreate_AcceptsAnchor(string input, ObservationsAnchor expected)
+        {
+            TryCreate(out var request, out _, anchor: input).Should().BeTrue();
+            request!.Anchor.Should().Be(expected);
+        }
+
+        [Fact]
+        public void TryCreate_RejectsUnknownAnchor()
+        {
+            TryCreate(out _, out var error, anchor: "yesterday").Should().BeFalse();
+            error.Should().Be("anchor must be one of: latest, now.");
+        }
+
+        [Fact]
+        public void TryCreate_RejectsWholeYearOfHourlyRowsForAllPollutants()
+        {
+            TryCreate(out _, out var error, period: "year", aggregation: "hourly").Should().BeFalse();
+            error.Should().StartWith("period=year with aggregation=hourly requires a pollutant");
+        }
+
+        [Fact]
+        public void TryCreate_AllowsWholeYearOfHourlyRows_ForASinglePollutant()
+        {
+            TryCreate(out _, out _, period: "year", aggregation: "hourly", pollutant: "NO2")
+                .Should().BeTrue();
         }
 
         [Theory]
@@ -134,12 +190,59 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [InlineData("3000")]
         public void TryCreate_RejectsOutOfRangeYear(string year)
         {
-            var ok = ObservationsRequest.TryCreate(
-                "CLL2", null, null, null, year,
-                AtomObservationsService.KnownPollutants, out _, out var error);
+            TryCreate(out _, out var error, year: year).Should().BeFalse();
+            error.Should().StartWith("year must be a number");
+        }
 
-            ok.Should().BeFalse();
-            error.Should().Contain("year must be a number");
+        #endregion
+
+        #region Upstream failure
+
+        [Fact]
+        public async Task GetObservations_Throws_WhenUpstreamFeedFails()
+        {
+            SetupUpstreamFailure(2019);
+
+            var act = () => _sut.GetObservationsAsync(Request());
+
+            await act.Should().ThrowAsync<UpstreamFeedException>();
+        }
+
+        [Fact]
+        public async Task GetObservations_DoesNotThrow_WhenFeedIsReadableButEmpty()
+        {
+            SetupYear(2019);
+
+            var result = await _sut.GetObservationsAsync(Request());
+
+            result.Count.Should().Be(0);
+        }
+
+        #endregion
+
+        #region Network passthrough
+
+        [Theory]
+        [InlineData("AURN")]
+        [InlineData("NON-AURN")]
+        public async Task GetObservations_PassesNetworkToTheFetchService(string network)
+        {
+            SetupYear(2019, Row("2019-06-10T00:00:00Z", "10"));
+
+            await _sut.GetObservationsAsync(Request(network: network));
+
+            _fetch.Verify(f => f.GetAtomHourlydatafetchWithStatus(
+                "CLL2", "2019", It.IsAny<string>(), network), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetObservations_EchoesNetworkInTheResult()
+        {
+            SetupYear(2019, Row("2019-06-10T00:00:00Z", "10"));
+
+            var result = await _sut.GetObservationsAsync(Request(network: "NON-AURN"));
+
+            result.Network.Should().Be("NON-AURN");
         }
 
         #endregion
@@ -163,16 +266,41 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         [Fact]
+        public async Task GetObservations_ReturnsNothing_WhenAnchoredOnNowAndFeedLags()
+        {
+            SetupYear(2019, Row("2019-06-10T00:00:00Z", "10"));
+
+            var result = await _sut.GetObservationsAsync(Request(period: "7days", anchor: "now"));
+
+            result.Count.Should().Be(0);
+        }
+
+        [Fact]
+        public async Task GetObservations_ReportsRequestedWindowBounds_SeparatelyFromDataBounds()
+        {
+            SetupYear(2019,
+                Row("2019-06-01T00:00:00Z", "10"),
+                Row("2019-06-10T00:00:00Z", "30"));
+
+            var result = await _sut.GetObservationsAsync(Request(period: "7days"));
+
+            result.WindowFrom.Should().Be("2019-06-03T00:00:00Z");
+            result.WindowTo.Should().Be("2019-06-10T00:00:00Z");
+            result.From.Should().Be("2019-06-10T00:00:00Z");
+        }
+
+        [Fact]
         public async Task GetObservations_ReturnsWholeYear_WhenPeriodIsYear()
         {
             SetupYear(2019,
                 Row("2019-01-01T00:00:00Z", "10"),
                 Row("2019-12-31T23:00:00Z", "20"));
 
-            var result = await _sut.GetObservationsAsync(Request(period: "year"));
+            var result = await _sut.GetObservationsAsync(Request(period: "year", aggregation: "daily"));
 
             result.Count.Should().Be(2);
-            _fetch.Verify(f => f.GetAtomHourlydatafetch(It.IsAny<string>(), "2018", It.IsAny<string>()), Times.Never);
+            _fetch.Verify(f => f.GetAtomHourlydatafetchWithStatus(
+                It.IsAny<string>(), "2018", It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
         [Fact]
@@ -183,7 +311,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             var result = await _sut.GetObservationsAsync(Request(period: "7days"));
 
-            _fetch.Verify(f => f.GetAtomHourlydatafetch("CLL2", "2018", It.IsAny<string>()), Times.Once);
+            _fetch.Verify(f => f.GetAtomHourlydatafetchWithStatus(
+                "CLL2", "2018", It.IsAny<string>(), It.IsAny<string>()), Times.Once);
             result.Count.Should().Be(3);
             result.From.Should().Be("2018-12-30T00:00:00Z");
         }
@@ -195,7 +324,36 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             await _sut.GetObservationsAsync(Request(period: "24hours"));
 
-            _fetch.Verify(f => f.GetAtomHourlydatafetch(It.IsAny<string>(), "2018", It.IsAny<string>()), Times.Never);
+            _fetch.Verify(f => f.GetAtomHourlydatafetchWithStatus(
+                It.IsAny<string>(), "2018", It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        }
+
+        #endregion
+
+        #region Caching
+
+        [Fact]
+        public async Task GetObservations_FetchesUpstreamOnlyOnce_ForRepeatedIdenticalRequests()
+        {
+            SetupYear(2019, Row("2019-06-10T00:00:00Z", "10"));
+
+            await _sut.GetObservationsAsync(Request());
+            await _sut.GetObservationsAsync(Request());
+
+            _fetch.Verify(f => f.GetAtomHourlydatafetchWithStatus(
+                "CLL2", "2019", It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetObservations_DoesNotShareCacheAcrossNetworks()
+        {
+            SetupYear(2019, Row("2019-06-10T00:00:00Z", "10"));
+
+            await _sut.GetObservationsAsync(Request(network: "AURN"));
+            await _sut.GetObservationsAsync(Request(network: "NON-AURN"));
+
+            _fetch.Verify(f => f.GetAtomHourlydatafetchWithStatus(
+                It.IsAny<string>(), "2019", It.IsAny<string>(), It.IsAny<string>()), Times.Exactly(2));
         }
 
         #endregion
@@ -210,6 +368,21 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var result = await _sut.GetObservationsAsync(Request());
 
             result.Observations.Single().Value.Should().BeNull();
+        }
+
+        [Theory]
+        [InlineData("Nitrogen dioxide", "NO2")]
+        [InlineData("PM2.5", "PM25")]
+        [InlineData("Ozone", "O3")]
+        [InlineData("Sulphur dioxide", "SO2")]
+        [InlineData("PM10", "PM10")]
+        public async Task GetObservations_EmitsStablePollutantCode(string name, string code)
+        {
+            SetupYear(2019, Row("2019-06-10T00:00:00Z", "10", pollutant: name));
+
+            var result = await _sut.GetObservationsAsync(Request());
+
+            result.Observations.Single().PollutantCode.Should().Be(code);
         }
 
         [Theory]
@@ -299,7 +472,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             SetupYear(currentYear);
             SetupYear(currentYear - 1, Row($"{currentYear - 1}-06-10T00:00:00Z", "10"));
 
-            var result = await _sut.GetObservationsAsync(Request(year: null));
+            var result = await _sut.GetObservationsAsync(Request(year: null, period: "year", aggregation: "daily"));
 
             result.Count.Should().Be(1);
         }
