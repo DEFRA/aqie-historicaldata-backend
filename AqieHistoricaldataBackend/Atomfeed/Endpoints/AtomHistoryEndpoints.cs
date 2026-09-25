@@ -22,6 +22,41 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             app.MapPost("AtomDataSelectionNonAurnNetworks", GetAtomDataSelectionNonAurnNetworks);
             app.MapGet("AtomDataSelectionPollutantMaster", GetAtomDataSelectionPollutantMaster);
             app.MapPost("AtomDataSelectionPollutantDataSource", GetAtomDataSelectionPollutantDataSource);            
+            app.MapGet("AtomHistoryObservations", GetObservations);
+        }
+
+        private static async Task<IResult> GetObservations(
+            [FromQuery] string? siteId,
+            [FromQuery] string? pollutant,
+            [FromQuery] string? period,
+            [FromQuery] string? aggregation,
+            [FromQuery] string? year,
+            IAtomObservationsService observations,
+            ILogger<AtomObservationsService> logger)
+        {
+            if (!ObservationsRequest.TryCreate(
+                    siteId, pollutant, period, aggregation, year,
+                    AtomObservationsService.KnownPollutants, out var request, out var error))
+            {
+                return Results.BadRequest(new { error });
+            }
+
+            try
+            {
+                var result = await observations.GetObservationsAsync(request!);
+                return result.Count == 0
+                    ? Results.NotFound(new
+                    {
+                        error = "No observations found for the requested site and period. "
+                              + "This can also indicate an upstream feed failure — check the service logs."
+                    })
+                    : Results.Ok(result);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error GetObservations for site {SiteId}", siteId);
+                return Results.Problem("Failed to retrieve observations.", statusCode: 500);
+            }
         }
         private static async Task<IResult> GetHistorydataById([FromBody] QueryStringData data,IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {

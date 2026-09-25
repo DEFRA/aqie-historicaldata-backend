@@ -12,6 +12,7 @@ This is the only .NET service in the AQIE estate (see [Why .NET?](#why-net)).
 - [Local development](#local-development)
 - [Environment variables](#environment-variables)
 - [API endpoints](#api-endpoints)
+- [Observations API](#observations-api)
 - [Background services](#background-services)
 - [MongoDB collections](#mongodb-collections)
 - [Why .NET?](#why-net)
@@ -22,17 +23,21 @@ This is the only .NET service in the AQIE estate (see [Why .NET?](#why-net)).
 ## How it works
 
 AQIE lets the public download historical air quality data — for a single monitoring station, or
-for a filtered selection across many stations. The pipeline is the same in both cases: **fetch**
-observations from the ATOM feeds, **aggregate** them to hourly/daily/annual, **export** to CSV,
-then **upload** to S3 and hand back a presigned URL.
+for a filtered selection across many stations. The pipeline for downloads is the same in both
+cases: **fetch** observations from the ATOM feeds, **aggregate** them to hourly/daily/annual,
+**export** to CSV, then **upload** to S3 and hand back a presigned URL.
 
-There are two journeys:
+There are three journeys:
 
-- **Single station** (`AtomHistoryHourlydata`) — one station, one year, returned synchronously.
+- **Single station download** (`AtomHistoryHourlydata`) — one station, one year, returned
+  synchronously as a presigned URL.
 - **Data selection** (`AtomDataSelection`, `AtomEmailJobDataSelection`) — many stations × many
   years. Too slow to hold an HTTP connection open, so it writes a `Pending` job to MongoDB and a
   background service processes it and emails the link. Poll with `AtomDataSelectionJobStatus`,
   then fetch the URL with `AtomDataSelectionPresignedUrlMail`.
+- **Observations API** (`AtomHistoryObservations`) — one station over a chosen time window,
+  returned inline as JSON for a front end to render. No CSV, no S3. See
+  [Observations API](#observations-api).
 
 Stations can be filtered by UK country or local authority. Country boundaries ship as GeoJSON in
 [GeoBoundaries](AqieHistoricaldataBackend/GeoBoundaries); `AtomDataSelectionStationBoundryService`
@@ -166,6 +171,7 @@ All routes are registered at the root (no `/api` prefix) in
 | Method | Route | Purpose |
 | --- | --- | --- |
 | GET | `/health` | Health check |
+| GET | `/AtomHistoryObservations` | Single-station observations as JSON over a time window. See [Observations API](#observations-api) |
 | GET, POST | `/AtomHistoryHourlydata` | Single-station download. Returns a presigned S3 URL |
 | POST | `/AtomHistoryexceedence` | Exceedence data for a station (readings above statutory thresholds) |
 | POST | `/AtomDataSelection` | Runs a multi-station data selection synchronously |
@@ -190,7 +196,7 @@ curl http://localhost:8080/health
 curl -X POST http://localhost:8080/AtomHistoryHourlydata \
   -H 'Content-Type: application/json' \
   -d '{ "SiteId": "CLL2", "SiteName": "London Bloomsbury", "Year": "2019",
-        "DownloadPollutant": "NO2", "DownloadPollutantType": "Hourly" }'
+        "DownloadPollutant": "Nitrogen dioxide", "DownloadPollutantType": "Hourly" }'
 
 # Queue an email job, then poll it
 curl -X POST http://localhost:8080/AtomEmailJobDataSelection \
@@ -204,6 +210,76 @@ curl -X POST http://localhost:8080/AtomDataSelectionJobStatus \
 
 Note that the handlers catch all exceptions and return `404 Not Found`, so a 404 usually means
 something went wrong upstream rather than that no data exists — check the logs.
+`/AtomHistoryObservations` is the exception — it distinguishes its status codes properly.
+
+---
+
+## Observations API
+
+`GET /AtomHistoryObservations` serves a single station's readings inline as JSON, for a front end
+to chart or tabulate. It reuses the same fetch-and-parse chain as the download endpoints but stops
+before the CSV step — nothing is written to S3 and nothing is persisted.
+
+### Parameters
+
+| Parameter | Required | Default | Values |
+| --- | --- | --- | --- |
+| `siteId` | yes | — | Station code, e.g. `CLL2` |
+| `period` | no | `7days` | `24hours`, `7days`, `30days`, `year` |
+| `aggregation` | no | `hourly` | `hourly`, `daily` |
+| `pollutant` | no | all | `Nitrogen dioxide`, `PM10`, `PM2.5`, `Ozone`, `Sulphur dioxide` |
+| `year` | no | current | Anchor year, 1960 to present |
+
+Unlike `DownloadPollutant` on the CSV endpoints, an unrecognised `pollutant` is rejected with a
+`400` rather than silently falling back to all five.
+
+```bash
+curl 'http://localhost:8080/AtomHistoryObservations?siteId=CLL2&period=24hours&pollutant=Nitrogen%20dioxide&year=2019'
+```
+
+```json
+{
+  "siteId": "CLL2",
+  "period": "24hours",
+  "aggregation": "hourly",
+  "from": "2019-12-31T00:00:00Z",
+  "to": "2019-12-31T23:00:00Z",
+  "pollutants": ["Nitrogen dioxide"],
+  "count": 24,
+  "observations": [
+    { "timestamp": "2019-12-31T00:00:00Z", "pollutant": "Nitrogen dioxide", "value": 44.52505, "status": "V" }
+  ]
+}
+```
+
+With `aggregation=daily`, each entry covers one day and carries a `capture` ratio instead of a
+`status`:
+
+```json
+{ "timestamp": "2019-12-25", "pollutant": "PM10", "value": 10.52, "capture": 1 }
+```
+
+### Behaviour worth knowing
+
+- **`value` is `null`, never `-99`.** The upstream no-data sentinel is normalised away. For daily
+  aggregation, `value` is also `null` when `capture` falls below 0.75, so a poorly-covered day is
+  distinguishable from a genuine reading of zero.
+- **Windows anchor on the latest reading in the feed, not on wall-clock now.** The Defra feeds
+  publish with a lag, so anchoring on `now` would routinely return nothing. `period=24hours`
+  against a 2019 feed returns the last 24 hours *of 2019*.
+- **Cross-year windows fetch twice.** The ATOM feed is one file per station per year, so a window
+  spanning 1 January pulls the preceding year's feed and stitches the two together.
+- **An unpublished current year falls back one year**, but only when `year` was not given
+  explicitly.
+- **Status codes are meaningful**: `400` for bad parameters (with the reason in `error`), `404`
+  when the site and period yield nothing, `500` on an unexpected failure.
+
+### Caching
+
+There is none. Every request pulls and parses the station's entire year of XML, even to serve 24
+hours of it. That is acceptable at low volume but will not scale to per-page-load traffic — Redis
+is already in the Compose stack and unused by this service, so caching the parsed year per
+`(siteId, year)` is the obvious next step.
 
 ---
 

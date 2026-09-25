@@ -139,6 +139,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IExamplePersistence, ExamplePersistence>();
     builder.Services.AddSingleton<IAtomHistoryService, AtomHistoryService>();
     builder.Services.AddSingleton<IAtomHourlyFetchService, AtomHourlyFetchService>();
+    builder.Services.AddSingleton<IAtomObservationsService, AtomObservationsService>();
     builder.Services.AddSingleton<IAtomDailyFetchService, AtomDailyFetchService>();
     builder.Services.AddSingleton<IAtomAnnualFetchService, AtomAnnualFetchService>();
     builder.Services.AddSingleton<IAwss3BucketService, Awss3BucketService>();
