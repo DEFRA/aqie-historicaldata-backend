@@ -49,4 +49,8 @@
     <Folder Include="Atomfeed\Validators\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="AqieHistoricaldataBackend.Test" />
+  </ItemGroup>
+
 </Project>

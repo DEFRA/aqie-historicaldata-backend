@@ -2,6 +2,7 @@ using Amazon.Extensions.NETCore.Setup;
 using Amazon.S3;
 using AqieHistoricaldataBackend.Atomfeed.Endpoints;
 using AqieHistoricaldataBackend.Atomfeed.Services;
+using AqieHistoricaldataBackend.Atomfeed.Services.GeoBoundary;
 using AqieHistoricaldataBackend.Config;
 using AqieHistoricaldataBackend.Example.Endpoints;
 using AqieHistoricaldataBackend.Example.Services;
@@ -156,12 +157,15 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IAtomDataSelectionStationService, AtomDataSelectionStationService>();
     builder.Services.AddSingleton<IDataSelectionHourlyAtomFeedExportCsv, DataSelectionHourlyAtomFeedExportCsv>();
     builder.Services.AddSingleton<IAuthService, AuthService>();
+    builder.Services.AddSingleton<IAtomRegionService, AtomRegionService>();
     builder.Services.AddSingleton<IAtomDataSelectionJobStatus, AtomDataSelectionJobStatus>();
     builder.Services.AddSingleton<IAtomDataSelectionEmailJobService, AtomDataSelectionEmailJobService>();
     builder.Services.AddSingleton<IAtomDataSelectionPresignedUrlMail, AtomDataSelectionPresignedUrlMail>();
     builder.Services.AddSingleton<IAtomDataSelectionNonAurnNetworks, AtomDataSelectionNonAurnNetworks>();
     builder.Services.AddSingleton<IAtomDataSelectionPollutantMaster, AtomDataSelectionPollutantMaster>();
     builder.Services.AddSingleton<IAtomDataSelectionPollutantDataSource, AtomDataSelectionPollutantDataSource>();
+    builder.Services.AddSingleton<IGeoBoundaryProvider, GeoBoundaryProvider>();
+    builder.Services.AddHostedService<GeoBoundaryWarmupHostedService>();
     builder.Services.AddHostedService<AtomDataSelectionEmailJobHostedService>();
     builder.Services.AddHostedService<AtomNonAurnNetworksSeedHostedService>();
 }
