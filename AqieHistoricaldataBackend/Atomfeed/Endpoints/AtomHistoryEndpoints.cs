@@ -21,7 +21,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             app.MapPost("AtomDataSelectionPresignedUrlMail", GetAtomDataSelectionPresignedUrlMail);
             app.MapPost("AtomDataSelectionNonAurnNetworks", GetAtomDataSelectionNonAurnNetworks);
             app.MapGet("AtomDataSelectionPollutantMaster", GetAtomDataSelectionPollutantMaster);
-            app.MapPost("AtomDataSelectionPollutantDataSource", GetAtomDataSelectionPollutantDataSource);            
+            app.MapPost("AtomDataSelectionPollutantDataSource", GetAtomDataSelectionPollutantDataSource);
+            app.MapGet("AtomDataSelectionRegionMaster", GetAtomDataSelectionRegionMaster);
         }
         private static async Task<IResult> GetHistorydataById([FromBody] QueryStringData data,IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {
@@ -207,6 +208,20 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
                 logger.LogError(ex, "Error GetAtomDataSelectionPollutantDataSource endpoints Info message {Error}", ex);
                 return Results.NotFound();
 
+            }
+        }
+
+        private static async Task<IResult> GetAtomDataSelectionRegionMaster(IAtomRegionService Persistence, ILogger<AtomRegionService> logger)
+        {
+            try
+            {
+                var regions = await Persistence.GetDistinctRegions();
+                return regions is { Count: > 0 } ? Results.Ok(regions) : Results.NotFound();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error GetAtomDataSelectionRegionMaster endpoint {Error}", ex.Message);
+                return Results.NotFound();
             }
         }
     }

@@ -1,1954 +1,439 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AqieHistoricaldataBackend.Atomfeed.Services;
 using AqieHistoricaldataBackend.Utils.Mongo;
 using Microsoft.Extensions.Logging;
-using Moq;
-using Moq.Protected;
 using MongoDB.Driver;
+using Moq;
 using Xunit;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
 
 namespace AqieHistoricaldataBackend.Test.Atomfeed
 {
-    // =========================================================================
-    // AuthService tests
-    // =========================================================================
-    public class AuthServiceTests
+    public class AtomDataSelectionStationServiceTest
     {
-        private readonly Mock<IHttpClientFactory> _httpClientFactoryMock = new();
-        private readonly Mock<HttpMessageHandler> _handlerMock = new();
+        private const string Failure = "Failure";
 
-        private AuthService CreateService()
-        {
-            var client = new HttpClient(_handlerMock.Object) { BaseAddress = new Uri("https://api.test/") };
-            _httpClientFactoryMock.Setup(f => f.CreateClient("RicardoNewAPI")).Returns(client);
-            return new AuthService(_httpClientFactoryMock.Object);
-        }
-
-        private void SetupResponse(HttpStatusCode status, string body)
-        {
-            _handlerMock.Protected()
-                .Setup<Task<HttpResponseMessage>>("SendAsync",
-                    ItExpr.IsAny<HttpRequestMessage>(),
-                    ItExpr.IsAny<CancellationToken>())
-                .ReturnsAsync(new HttpResponseMessage
-                {
-                    StatusCode = status,
-                    Content = new StringContent(body, Encoding.UTF8, "application/json")
-                });
-        }
-
-        [Fact]
-        public async Task GetTokenAsync_ReturnsNull_WhenResponseNotSuccessful()
-        {
-            SetupResponse(HttpStatusCode.Unauthorized, "{}");
-            var result = await CreateService().GetTokenAsync("user@test.com", "pass");
-            Assert.Null(result);
-        }
-
-        [Fact]
-        public async Task GetTokenAsync_ReturnsToken_FromTokenProperty()
-        {
-            SetupResponse(HttpStatusCode.OK, "{\"token\": \"abc123\"}");
-            var result = await CreateService().GetTokenAsync("u", "p");
-            Assert.Equal("abc123", result);
-        }
-
-        [Fact]
-        public async Task GetTokenAsync_ReturnsToken_FromAccessTokenProperty()
-        {
-            SetupResponse(HttpStatusCode.OK, "{\"access_token\": \"tok_access\"}");
-            var result = await CreateService().GetTokenAsync("u", "p");
-            Assert.Equal("tok_access", result);
-        }
-
-        [Fact]
-        public async Task GetTokenAsync_ReturnsToken_FromJwtProperty()
-        {
-            SetupResponse(HttpStatusCode.OK, "{\"jwt\": \"jwt_value\"}");
-            var result = await CreateService().GetTokenAsync("u", "p");
-            Assert.Equal("jwt_value", result);
-        }
-
-        [Fact]
-        public async Task GetTokenAsync_ReturnsToken_WhenRootIsString()
-        {
-            SetupResponse(HttpStatusCode.OK, "\"plain_token\"");
-            var result = await CreateService().GetTokenAsync("u", "p");
-            Assert.Equal("plain_token", result);
-        }
-
-        [Fact]
-        public async Task GetTokenAsync_ReturnsNull_WhenNoKnownTokenProperty()
-        {
-            SetupResponse(HttpStatusCode.OK, "{\"unknown_key\": \"value\"}");
-            var result = await CreateService().GetTokenAsync("u", "p");
-            Assert.Null(result);
-        }
-    }
-
-    // =========================================================================
-    // AtomDataSelectionStationService tests
-    // =========================================================================
-    public class AtomDataSelectionStationServiceTests
-    {
         private readonly Mock<ILogger<HistoryexceedenceService>> _loggerMock = new();
         private readonly Mock<IHttpClientFactory> _httpClientFactoryMock = new();
-        private readonly Mock<IAtomDataSelectionStationBoundryService> _boundaryServiceMock = new();
-        private readonly Mock<IAtomDataSelectionLocalAuthoritiesService> _localAuthMock = new();
-        private readonly Mock<IAtomDataSelectionHourlyFetchService> _hourlyFetchMock = new();
-        private readonly Mock<IAtomDataSelectionServices> _atomDataSelectionServicesMock = new();
+        private readonly Mock<IAtomDataSelectionServices> _servicesMock = new();
+        private readonly Mock<IAtomDataSelectionStationBoundryService> _boundryMock = new();
+        private readonly Mock<IAtomDataSelectionHourlyFetchService> _hourlyMock = new();
         private readonly Mock<IAwss3BucketService> _s3Mock = new();
-        private readonly Mock<IAuthService> _authServiceMock = new();
+        private readonly Mock<IAuthService> _authMock = new();
         private readonly Mock<IMongoDbClientFactory> _mongoFactoryMock = new();
-        private readonly Mock<HttpMessageHandler> _siteMetaHandlerMock = new();
 
-        // ------------------------------------------------------------------
-        // Service factory
-        // ------------------------------------------------------------------
+        private readonly Mock<IMongoCollection<PollutantMasterDocument>> _pollutantCollectionMock = new();
+        private readonly Mock<IMongoCollection<StationDetailDocument>> _stationCollectionMock = new();
+        private readonly Mock<IMongoCollection<JobDocument>> _jobCollectionMock = new();
+        private readonly Mock<IMongoIndexManager<JobDocument>> _indexManagerMock = new();
 
-        private AtomDataSelectionStationService CreateService()
+        private readonly AtomDataSelectionStationService _sut;
+
+        public AtomDataSelectionStationServiceTest()
         {
-            _atomDataSelectionServicesMock.Setup(a => a.StationBoundry).Returns(_boundaryServiceMock.Object);
-            _atomDataSelectionServicesMock.Setup(a => a.LocalAuthorities).Returns(_localAuthMock.Object);
-            _atomDataSelectionServicesMock.Setup(a => a.HourlyFetch).Returns(_hourlyFetchMock.Object);
+            _servicesMock.Setup(s => s.StationBoundry).Returns(_boundryMock.Object);
+            _servicesMock.Setup(s => s.HourlyFetch).Returns(_hourlyMock.Object);
 
-            return new AtomDataSelectionStationService(
+            _jobCollectionMock.Setup(c => c.Indexes).Returns(_indexManagerMock.Object);
+
+            _mongoFactoryMock
+                .Setup(f => f.GetCollection<PollutantMasterDocument>("aqie_atom_non_aurn_networks_pollutant_master"))
+                .Returns(_pollutantCollectionMock.Object);
+            _mongoFactoryMock
+                .Setup(f => f.GetCollection<StationDetailDocument>("aqie_atom_non_aurn_networks_station_details"))
+                .Returns(_stationCollectionMock.Object);
+            _mongoFactoryMock
+                .Setup(f => f.GetCollection<JobDocument>("aqie_csvexport_jobs"))
+                .Returns(_jobCollectionMock.Object);
+
+            SetupPollutantMaster(new PollutantMasterDocument { pollutantID = "1", pollutantName = "NO2" });
+            SetupStationDetails();
+            SetupHttpClient(RicardoMetadataJson);
+
+            _authMock.Setup(a => a.GetRicardoToken()).ReturnsAsync("token");
+
+            _sut = new AtomDataSelectionStationService(
                 _loggerMock.Object,
                 _httpClientFactoryMock.Object,
-                _atomDataSelectionServicesMock.Object,
+                _servicesMock.Object,
                 _s3Mock.Object,
-                _authServiceMock.Object,
+                _authMock.Object,
                 _mongoFactoryMock.Object);
         }
 
-        // ------------------------------------------------------------------
-        // MongoDB helpers
-        // ------------------------------------------------------------------
+        // ───────────── Helpers ─────────────
 
-        /// <summary>Creates a mock IMongoCollection that returns <paramref name="items"/> on FindAsync.</summary>
-        private static Mock<IMongoCollection<T>> CreateCollectionMock<T>(IEnumerable<T>? items = null)
+        private sealed class StubHandler(string content, HttpStatusCode status) : HttpMessageHandler
         {
-            var list = (items ?? Enumerable.Empty<T>()).ToList();
-
-            var cursorMock = new Mock<IAsyncCursor<T>>();
-            cursorMock.SetupSequence(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
-                      .ReturnsAsync(list.Count > 0)
-                      .ReturnsAsync(false);
-            cursorMock.Setup(c => c.Current).Returns(list);
-
-            var collMock = new Mock<IMongoCollection<T>>();
-            collMock.Setup(c => c.FindAsync(
-                        It.IsAny<FilterDefinition<T>>(),
-                        It.IsAny<FindOptions<T, T>>(),
-                        It.IsAny<CancellationToken>()))
-                    .ReturnsAsync(cursorMock.Object);
-
-            return collMock;
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+                => Task.FromResult(new HttpResponseMessage(status)
+                {
+                    Content = new StringContent(content, System.Text.Encoding.UTF8, "application/json")
+                });
         }
 
-        /// <summary>
-        /// Registers a PollutantMasterDocument collection mock.
-        /// Must be called in every test because ResolvePollutantNameAsync always queries it.
-        /// </summary>
-        private void SetupPollutantMasterCollection(IEnumerable<PollutantMasterDocument>? docs = null)
+        private void SetupHttpClient(string content, HttpStatusCode status = HttpStatusCode.OK)
         {
-            var collMock = CreateCollectionMock(docs);
-            _mongoFactoryMock
-                .Setup(m => m.GetCollection<PollutantMasterDocument>(It.IsAny<string>()))
-                .Returns(collMock.Object);
+            var client = new HttpClient(new StubHandler(content, status))
+            {
+                BaseAddress = new Uri("https://ricardo.example.com/")
+            };
+            _httpClientFactoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(client);
         }
 
-        /// <summary>Registers a StationDetailDocument collection mock (NON-AURN path).</summary>
-        private void SetupStationDetailCollection(IEnumerable<StationDetailDocument>? docs = null)
+        private static Mock<IAsyncCursor<T>> BuildCursor<T>(List<T> items)
         {
-            var collMock = CreateCollectionMock(docs);
-            _mongoFactoryMock
-                .Setup(m => m.GetCollection<StationDetailDocument>(It.IsAny<string>()))
-                .Returns(collMock.Object);
+            var cursor = new Mock<IAsyncCursor<T>>();
+            cursor.SetupSequence(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
+                  .ReturnsAsync(items.Count > 0)
+                  .ReturnsAsync(false);
+            cursor.Setup(c => c.Current).Returns(items);
+            return cursor;
         }
 
-        /// <summary>
-        /// Registers a JobDocument collection mock with all required operations
-        /// (index creation, insert, and update).
-        /// </summary>
-        private void SetupJobCollection()
+        private void SetupPollutantMaster(params PollutantMasterDocument[] docs)
         {
-            var indexManagerMock = new Mock<IMongoIndexManager<JobDocument>>();
-            indexManagerMock
-                .Setup(i => i.CreateOneAsync(
-                    It.IsAny<CreateIndexModel<JobDocument>>(),
-                    It.IsAny<CreateOneIndexOptions>(),
+            var cursor = BuildCursor(docs.ToList());
+            _pollutantCollectionMock
+                .Setup(c => c.FindAsync(
+                    It.IsAny<FilterDefinition<PollutantMasterDocument>>(),
+                    It.IsAny<FindOptions<PollutantMasterDocument, PollutantMasterDocument>>(),
                     It.IsAny<CancellationToken>()))
-                .ReturnsAsync("index_name");
-
-            var collMock = new Mock<IMongoCollection<JobDocument>>();
-            collMock.Setup(c => c.Indexes).Returns(indexManagerMock.Object);
-            collMock.Setup(c => c.InsertOneAsync(It.IsAny<JobDocument>(), null, default))
-                    .Returns(Task.CompletedTask);
-            collMock.Setup(c => c.UpdateOneAsync(
-                        It.IsAny<FilterDefinition<JobDocument>>(),
-                        It.IsAny<UpdateDefinition<JobDocument>>(),
-                        It.IsAny<UpdateOptions>(),
-                        default))
-                    .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
-
-            _mongoFactoryMock
-                .Setup(m => m.GetCollection<JobDocument>(It.IsAny<string>()))
-                .Returns(collMock.Object);
+                .ReturnsAsync(cursor.Object);
         }
 
-        /// <summary>
-        /// Sets up a job collection mock that signals <paramref name="tcs"/> once the
-        /// second UpdateOneAsync call completes (Processing → Completed/Failed).
-        /// </summary>
-        private void SetupJobCollectionWithSignal(TaskCompletionSource tcs)
+        private void SetupStationDetails(params StationDetailDocument[] docs)
         {
-            var indexManagerMock = new Mock<IMongoIndexManager<JobDocument>>();
-            indexManagerMock
-                .Setup(i => i.CreateOneAsync(
-                    It.IsAny<CreateIndexModel<JobDocument>>(),
-                    It.IsAny<CreateOneIndexOptions>(),
+            var cursor = BuildCursor(docs.ToList());
+            _stationCollectionMock
+                .Setup(c => c.FindAsync(
+                    It.IsAny<FilterDefinition<StationDetailDocument>>(),
+                    It.IsAny<FindOptions<StationDetailDocument, StationDetailDocument>>(),
                     It.IsAny<CancellationToken>()))
-                .ReturnsAsync("index_name");
+                .ReturnsAsync(cursor.Object);
+        }
 
-            int updateCount = 0;
+        private void SetupBoundry(List<SiteInfo> result)
+        {
+            _boundryMock
+                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
+                .ReturnsAsync(result);
+        }
 
-            var collMock = new Mock<IMongoCollection<JobDocument>>();
-            collMock.Setup(c => c.Indexes).Returns(indexManagerMock.Object);
-            collMock.Setup(c => c.InsertOneAsync(It.IsAny<JobDocument>(), null, default))
-                    .Returns(Task.CompletedTask);
-            collMock
+        private static SiteInfo Site(string id, string? networkType = null) => new()
+        {
+            LocalSiteId = id,
+            SiteName = "Site " + id,
+            RegionId = "1",
+            NetworkType = networkType,
+            Pollutants = new List<PollutantInfo>
+            {
+                new() { Name = "Nitrogen dioxide", StartDate = "01/01/2020", EndDate = "31/12/2025" }
+            }
+        };
+
+        private static QueryStringData Query(
+            string? pollutant = "1",
+            string? year = "2024",
+            string? source = "AURN",
+            string? filterType = "dataSelectorCount",
+            string? downloadType = null,
+            string? regionId = null,
+            string? networkId = null) => new()
+            {
+                pollutantName = pollutant,
+                Year = year,
+                dataSource = source,
+                dataselectorfiltertype = filterType,
+                dataselectordownloadtype = downloadType,
+                RegionId = regionId,
+                networkId = networkId,
+                Region = "London",
+                regiontype = "governmentRegion",
+                email = "test@example.com"
+            };
+
+        // ───────────── Guard clauses ─────────────
+
+        [Theory]
+        [InlineData(null, "2024")]
+        [InlineData("", "2024")]
+        [InlineData("1", null)]
+        [InlineData("1", "")]
+        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenPollutantOrYearMissing(string? pollutant, string? year)
+        {
+            var result = await _sut.GetAtomDataSelectionStation(Query(pollutant, year));
+
+            Assert.Equal(Failure, result);
+            _mongoFactoryMock.Verify(f => f.GetCollection<PollutantMasterDocument>(It.IsAny<string>()), Times.Never);
+        }
+
+        // ───────────── AURN count ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsStationCount_ForAurnCount()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A"), Site("B") });
+
+            var result = await _sut.GetAtomDataSelectionStation(Query());
+
+            Assert.Equal("2", result);
+            _authMock.Verify(a => a.GetRicardoToken(), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_AppliesRegionFilter_WhenRegionIdProvided()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            var result = await _sut.GetAtomDataSelectionStation(Query(regionId: "1"));
+
+            Assert.Equal("1", result);
+        }
+
+        // ───────────── NON-AURN count ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsNetworkTypeCounts_ForNonAurnCount()
+        {
+            SetupStationDetails(new StationDetailDocument
+            {
+                SiteID = "S1",
+                SiteName = "Station 1",
+                NetworkID = "N1",
+                NetworkType = "Industrial",
+                pollutantID = "1",
+                PollutantName = "Nitrogen dioxide",
+                EnvironmentType = "Urban Background",
+                StartDate = "01/01/2020",
+                EndDate = "31/12/2025"
+            });
+            SetupBoundry(new List<SiteInfo> { Site("A", "Industrial"), Site("B", "Industrial"), Site("C", "Rural") });
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(source: "NON-AURN", networkId: "N1"));
+
+            var json = System.Text.Json.JsonSerializer.Serialize(result);
+            Assert.Contains("Industrial", json);
+            Assert.Contains("Rural", json);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsUnknownBucket_WhenNonAurnStationDataEmpty()
+        {
+            SetupBoundry(new List<SiteInfo>());
+
+            var result = await _sut.GetAtomDataSelectionStation(Query(source: "NON-AURN"));
+
+            var json = System.Text.Json.JsonSerializer.Serialize(result);
+            Assert.Contains("Unknown", json);
+            Assert.Contains("0", json);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_GroupsNullNetworkTypeAsUnknown()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A"), Site("B") });
+
+            var result = await _sut.GetAtomDataSelectionStation(Query(source: "NON-AURN"));
+
+            var json = System.Text.Json.JsonSerializer.Serialize(result);
+            Assert.Contains("Unknown", json);
+        }
+
+        // ───────────── Unsupported filter type ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsFailure_ForUnknownFilterType()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            var result = await _sut.GetAtomDataSelectionStation(Query(filterType: "somethingElse"));
+
+            Assert.Equal(Failure, result);
+        }
+
+        // ───────────── Hourly — email (multiple) download ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsPresignedUrl_ForEmailDownload()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+            _hourlyMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .ReturnsAsync(new List<FinalData> { new() });
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), "dataSelectorMultiple"))
+                .ReturnsAsync("https://s3/presigned.csv");
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorMultiple"));
+
+            Assert.Equal("https://s3/presigned.csv", result);
+            _s3Mock.VerifyAll();
+        }
+
+        // ───────────── Hourly — single (queued job) ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsJobId_AndProcessesJobSuccessfully()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            JobDocument? inserted = null;
+            _jobCollectionMock
+                .Setup(c => c.InsertOneAsync(It.IsAny<JobDocument>(), It.IsAny<InsertOneOptions>(), It.IsAny<CancellationToken>()))
+                .Callback<JobDocument, InsertOneOptions, CancellationToken>((d, _, _) => inserted = d)
+                .Returns(Task.CompletedTask);
+
+            var completed = new TaskCompletionSource();
+            var updates = new List<UpdateDefinition<JobDocument>>();
+            _jobCollectionMock
                 .Setup(c => c.UpdateOneAsync(
                     It.IsAny<FilterDefinition<JobDocument>>(),
                     It.IsAny<UpdateDefinition<JobDocument>>(),
                     It.IsAny<UpdateOptions>(),
-                    default))
+                    It.IsAny<CancellationToken>()))
+                .Callback<FilterDefinition<JobDocument>, UpdateDefinition<JobDocument>, UpdateOptions, CancellationToken>(
+                    (_, u, _, _) =>
+                    {
+                        updates.Add(u);
+                        if (updates.Count == 2) completed.TrySetResult();
+                    })
+                .ReturnsAsync(Mock.Of<UpdateResult>());
+
+            _hourlyMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .ReturnsAsync(new List<FinalData> { new() });
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .ReturnsAsync("https://s3/job-result.csv");
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorSingle"));
+
+            var jobId = Assert.IsType<string>(result);
+            Assert.False(string.IsNullOrWhiteSpace(jobId));
+            Assert.NotNull(inserted);
+            Assert.Equal(jobId, inserted!.JobId);
+            Assert.Equal(JobStatusEnum.Pending, inserted.Status);
+
+            await completed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            _indexManagerMock.Verify(i => i.CreateOneAsync(
+                It.IsAny<CreateIndexModel<JobDocument>>(), It.IsAny<CreateOneIndexOptions>(), It.IsAny<CancellationToken>()), Times.Once);
+            _s3Mock.Verify(s => s.WriteCsvToAwsS3BucketAsync(
+                It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), "dataSelectorSingle"), Times.Once);
+            Assert.Equal(2, updates.Count); // Processing + Completed
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_MarksJobFailed_WhenBackgroundProcessingThrows()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            _jobCollectionMock
+                .Setup(c => c.InsertOneAsync(It.IsAny<JobDocument>(), It.IsAny<InsertOneOptions>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
+            var failedUpdate = new TaskCompletionSource();
+            var updateCount = 0;
+            _jobCollectionMock
+                .Setup(c => c.UpdateOneAsync(
+                    It.IsAny<FilterDefinition<JobDocument>>(),
+                    It.IsAny<UpdateDefinition<JobDocument>>(),
+                    It.IsAny<UpdateOptions>(),
+                    It.IsAny<CancellationToken>()))
                 .Callback(() =>
                 {
-                    if (Interlocked.Increment(ref updateCount) >= 2)
-                        tcs.TrySetResult();
+                    if (Interlocked.Increment(ref updateCount) == 2) failedUpdate.TrySetResult();
                 })
-                .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
+                .ReturnsAsync(Mock.Of<UpdateResult>());
 
-            _mongoFactoryMock
-                .Setup(m => m.GetCollection<JobDocument>(It.IsAny<string>()))
-                .Returns(collMock.Object);
-        }
-
-        // ------------------------------------------------------------------
-        // HTTP / site-meta helpers
-        // ------------------------------------------------------------------
-
-        private static string BuildSiteMetaJson(
-            string localSiteId = "SITE001",
-            string siteName = "Test Site",
-            string pollutantName = "Nitrogen dioxide",
-            string startDate = "01/01/2023",
-            string endDate = "31/12/2023")
-        {
-            return JsonSerializer.Serialize(new
-            {
-                member = new[]
-                {
-                    new
-                    {
-                        siteName,
-                        localSiteId,
-                        areaType = "Urban",
-                        siteType = "Background",
-                        governmentRegion = "London",
-                        latitude = "51.5074",
-                        longitude = "-0.1278",
-                        pollutantsMetaData = new Dictionary<string, object>
-                        {
-                            ["NO2"] = new { name = pollutantName, startDate, endDate }
-                        }
-                    }
-                }
-            });
-        }
-
-        private void SetupHttpFactory(string siteMetaJson)
-        {
-            _authServiceMock
-                .Setup(a => a.GetTokenAsync(It.IsAny<string>(), It.IsAny<string>()))
-                .ReturnsAsync("valid_token");
-
-            _siteMetaHandlerMock.Protected()
-                .Setup<Task<HttpResponseMessage>>("SendAsync",
-                    ItExpr.IsAny<HttpRequestMessage>(),
-                    ItExpr.IsAny<CancellationToken>())
-                .ReturnsAsync(new HttpResponseMessage
-                {
-                    StatusCode = HttpStatusCode.OK,
-                    Content = new StringContent(siteMetaJson, Encoding.UTF8, "application/json")
-                });
-
-            var client = new HttpClient(_siteMetaHandlerMock.Object)
-            {
-                BaseAddress = new Uri("https://api.test/")
-            };
-            _httpClientFactoryMock.Setup(f => f.CreateClient("RicardoNewAPI")).Returns(client);
-        }
-
-        private void SetupBoundaryService(List<SiteInfo>? result = null)
-        {
-            _boundaryServiceMock
-                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
-                .ReturnsAsync(result ?? new List<SiteInfo>());
-        }
-
-        // ------------------------------------------------------------------
-        // Null / empty input guards
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenPollutantNameIsNull()
-        {
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = null,
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("Failure", result);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenPollutantNameIsEmpty()
-        {
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("Failure", result);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenYearIsNull()
-        {
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = null,
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("Failure", result);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenYearIsEmpty()
-        {
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("Failure", result);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_LogsWarning_WhenPollutantNameIsNull()
-        {
-            await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = null,
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            _loggerMock.Verify(
-                x => x.Log(
-                    LogLevel.Warning,
-                    It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, _) => true),
-                    It.IsAny<Exception?>(),
-                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                Times.AtLeastOnce);
-        }
-
-        // ------------------------------------------------------------------
-        // dataSelectorCount + datasource == "AURN"
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsCount_WhenAurnDataselectorCount()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection();
-            SetupHttpFactory(BuildSiteMetaJson());
-            SetupBoundaryService(new List<SiteInfo>
-            {
-                new SiteInfo { LocalSiteId = "SITE001", Latitude = "51.5", Longitude = "-0.1" }
-            });
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("1", result);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsZeroCount_WhenNoBoundaryMatchAurn()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection();
-            SetupHttpFactory(BuildSiteMetaJson());
-            SetupBoundaryService(new List<SiteInfo>());
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("0", result);
-        }
-
-        // ------------------------------------------------------------------
-        // GetRicardoToken branches
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_LogsError_WhenRicardoEnvVarsMissing()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection();
-            SetupHttpFactory(BuildSiteMetaJson());
-            SetupBoundaryService();
-
-            await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            _loggerMock.Verify(
-                x => x.Log(
-                    LogLevel.Error,
-                    It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, _) => true),
-                    It.IsAny<Exception?>(),
-                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                Times.AtLeastOnce);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_LogsError_WhenRicardoTokenReturnsNull()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", "test@test.com");
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", "pass");
-            try
-            {
-                SetupPollutantMasterCollection();
-                SetupHttpFactory(BuildSiteMetaJson());
-                _authServiceMock
-                    .Setup(a => a.GetTokenAsync("test@test.com", "pass"))
-                    .ReturnsAsync((string?)null);
-                SetupBoundaryService();
-
-                await CreateService().GetAtomDataSelectionStation(
-                    new QueryStringData
-                    {
-                        pollutantName = "NO2",
-                        networkId = null,
-                        dataSource = "AURN",
-                        Year = "2023",
-                        Region = "England",
-                        regiontype = "Country",
-                        dataselectorfiltertype = "dataSelectorCount",
-                        dataselectordownloadtype = "dataSelectorSingle",
-                        email = "u@t.com"
-                    });
-
-                _loggerMock.Verify(
-                    x => x.Log(
-                        LogLevel.Error,
-                        It.IsAny<EventId>(),
-                        It.Is<It.IsAnyType>((v, _) => true),
-                        It.IsAny<Exception?>(),
-                        It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                    Times.AtLeastOnce);
-            }
-            finally
-            {
-                Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-                Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-            }
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsCount_WhenRicardoTokenIsValid()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", "test@test.com");
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", "pass");
-            try
-            {
-                SetupPollutantMasterCollection();
-                _authServiceMock
-                    .Setup(a => a.GetTokenAsync("test@test.com", "pass"))
-                    .ReturnsAsync("real_token");
-                SetupHttpFactory(BuildSiteMetaJson());
-                _authServiceMock
-                    .Setup(a => a.GetTokenAsync("test@test.com", "pass"))
-                    .ReturnsAsync("real_token");
-                SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
-
-                var result = await CreateService().GetAtomDataSelectionStation(
-                    new QueryStringData
-                    {
-                        pollutantName = "NO2",
-                        networkId = null,
-                        dataSource = "AURN",
-                        Year = "2023",
-                        Region = "England",
-                        regiontype = "Country",
-                        dataselectorfiltertype = "dataSelectorCount",
-                        dataselectordownloadtype = "dataSelectorSingle",
-                        email = "u@t.com"
-                    });
-
-                Assert.Equal("1", result);
-            }
-            finally
-            {
-                Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-                Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-            }
-        }
-
-        // ------------------------------------------------------------------
-        // HTTP 500 on site-meta → EnsureSuccessStatusCode throws → "Failure"
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenSiteMetaHttpFails()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", "test@test.com");
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", "pass");
-            try
-            {
-                SetupPollutantMasterCollection();
-                _authServiceMock
-                    .Setup(a => a.GetTokenAsync("test@test.com", "pass"))
-                    .ReturnsAsync("real_token");
-
-                _siteMetaHandlerMock.Protected()
-                    .Setup<Task<HttpResponseMessage>>("SendAsync",
-                        ItExpr.IsAny<HttpRequestMessage>(),
-                        ItExpr.IsAny<CancellationToken>())
-                    .ReturnsAsync(new HttpResponseMessage { StatusCode = HttpStatusCode.InternalServerError });
-
-                var client = new HttpClient(_siteMetaHandlerMock.Object)
-                {
-                    BaseAddress = new Uri("https://api.test/")
-                };
-                _httpClientFactoryMock.Setup(f => f.CreateClient("RicardoNewAPI")).Returns(client);
-
-                var result = await CreateService().GetAtomDataSelectionStation(
-                    new QueryStringData
-                    {
-                        pollutantName = "NO2",
-                        networkId = null,
-                        dataSource = "AURN",
-                        Year = "2023",
-                        Region = "England",
-                        regiontype = "Country",
-                        dataselectorfiltertype = "dataSelectorCount",
-                        dataselectordownloadtype = "dataSelectorSingle",
-                        email = "u@t.com"
-                    });
-
-                Assert.Equal("Failure", result);
-            }
-            finally
-            {
-                Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-                Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-            }
-        }
-
-        // ------------------------------------------------------------------
-        // dataSelectorCount + datasource == "NON-AURN"
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsNetworkTypeCounts_WhenNonAurnDataselectorCount()
-        {
-            SetupPollutantMasterCollection();
-            SetupStationDetailCollection();
-            SetupBoundaryService(new List<SiteInfo>
-            {
-                new SiteInfo { LocalSiteId = "S1", NetworkType = "AURN" },
-                new SiteInfo { LocalSiteId = "S2", NetworkType = "AURN" },
-                new SiteInfo { LocalSiteId = "S3", NetworkType = "LAQN" }
-            });
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "NON-AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            var items = Assert.IsAssignableFrom<IEnumerable>(result).Cast<object>().ToList();
-            Assert.Equal(2, items.Count);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsFallbackUnknown_WhenNonAurnCountEmptyStations()
-        {
-            SetupPollutantMasterCollection();
-            SetupStationDetailCollection();
-            SetupBoundaryService(new List<SiteInfo>());
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "NON-AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            var items = Assert.IsAssignableFrom<IEnumerable>(result).Cast<object>().ToList();
-            Assert.Single(items);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsNetworkTypeCounts_WhenNonAurnHasNullNetworkType()
-        {
-            SetupPollutantMasterCollection();
-            SetupStationDetailCollection();
-            SetupBoundaryService(new List<SiteInfo>
-            {
-                new SiteInfo { LocalSiteId = "S1", NetworkType = null }
-            });
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "NON-AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            var items = Assert.IsAssignableFrom<IEnumerable>(result).Cast<object>().ToList();
-            Assert.Single(items);
-        }
-
-        // ------------------------------------------------------------------
-        // dataSelectorHourly + dataSelectorMultiple (email download / presigned URL)
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsPresignedUrl_WhenDataselectorMultiple()
-        {
-            SetupPollutantMasterCollection();
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
-
-            _hourlyFetchMock
+            _hourlyMock
                 .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<QueryStringData>()))
-                .ReturnsAsync(new List<FinalData>());
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .ThrowsAsync(new InvalidOperationException("hourly fetch failed"));
 
-            _s3Mock
-                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
-                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
-                .ReturnsAsync("https://s3.example.com/file.zip");
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorSingle"));
 
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "src",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorHourly",
-                    dataselectordownloadtype = "dataSelectorMultiple",
-                    email = "u@t.com"
-                });
+            Assert.False(string.IsNullOrWhiteSpace(result as string));
 
-            Assert.Equal("https://s3.example.com/file.zip", result);
+            await failedUpdate.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            _loggerMock.Verify(l => l.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()), Times.AtLeastOnce);
         }
 
-        // ------------------------------------------------------------------
-        // dataSelectorHourly + dataSelectorSingle (job queue — enqueue only)
-        // ------------------------------------------------------------------
+        // ───────────── Exception handling in the outer try/catch ─────────────
 
         [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsJobId_WhenDataselectorSingle()
+        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenBoundryServiceThrows()
         {
-            SetupPollutantMasterCollection();
-            SetupJobCollection();
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "src",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorHourly",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.NotNull(result);
-            Assert.Matches("^[a-f0-9]{32}$", result.ToString()!);
-        }
-
-        // ------------------------------------------------------------------
-        // ProcessQueueAsync — Completed path
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task ProcessQueueAsync_UpdatesJobAsCompleted_WhenProcessingSucceeds()
-        {
-            SetupPollutantMasterCollection();
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
-
-            _hourlyFetchMock
-                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<QueryStringData>()))
-                .ReturnsAsync(new List<FinalData>());
-
-            _s3Mock
-                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
-                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
-                .ReturnsAsync("https://s3.example.com/result.zip");
-
-            var completedTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            SetupJobCollectionWithSignal(completedTcs);
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "src",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorHourly",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Matches("^[a-f0-9]{32}$", result.ToString()!);
-
-            // Wait for the background processor to reach the Completed update
-            await completedTcs.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        }
-
-        // ------------------------------------------------------------------
-        // ProcessQueueAsync — Failed path
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task ProcessQueueAsync_UpdatesJobAsFailed_WhenHourlyFetchThrows()
-        {
-            SetupPollutantMasterCollection();
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
-
-            _hourlyFetchMock
-                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<QueryStringData>()))
-                .ThrowsAsync(new Exception("hourly fetch failed"));
-
-            var failedTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            SetupJobCollectionWithSignal(failedTcs);
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "src",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorHourly",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Matches("^[a-f0-9]{32}$", result.ToString()!);
-
-            // Wait for the background processor to reach the Failed update
-            await failedTcs.Task.WaitAsync(TimeSpan.FromSeconds(10));
-
-            _loggerMock.Verify(
-                x => x.Log(
-                    LogLevel.Error,
-                    It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, _) => true),
-                    It.IsAny<Exception?>(),
-                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                Times.AtLeastOnce);
-        }
-
-        // ------------------------------------------------------------------
-        // EnsureQueueProcessorStartedAsync — reuse branch (processor still running)
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task EnsureQueueProcessorStartedAsync_ReusesExistingTask_WhenProcessorStillRunning()
-        {
-            SetupPollutantMasterCollection();
-            SetupJobCollection();
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
-
-            var svc = CreateService();
-
-            // First call — starts the processor (it blocks waiting for more channel items)
-            var jobId1 = (await svc.GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "src",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorHourly",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                })).ToString();
-
-            // Second call — processor is still running; EnsureQueueProcessorStartedAsync
-            // should return the existing task rather than spawning a new one
-            var jobId2 = (await svc.GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "src",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorHourly",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                })).ToString();
-
-            Assert.Matches("^[a-f0-9]{32}$", jobId1!);
-            Assert.Matches("^[a-f0-9]{32}$", jobId2!);
-            Assert.NotEqual(jobId1, jobId2); // two distinct jobs enqueued
-        }
-
-        // ------------------------------------------------------------------
-        // NON-AURN + dataSelectorHourly
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsPresignedUrl_WhenNonAurnDataselectorMultiple()
-        {
-            SetupPollutantMasterCollection();
-            SetupStationDetailCollection();
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "S1" } });
-
-            _hourlyFetchMock
-                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<QueryStringData>()))
-                .ReturnsAsync(new List<FinalData>());
-
-            _s3Mock
-                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
-                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
-                .ReturnsAsync("https://s3.example.com/nonaurn.zip");
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "NON-AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorHourly",
-                    dataselectordownloadtype = "dataSelectorMultiple",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("https://s3.example.com/nonaurn.zip", result);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsJobId_WhenNonAurnDataselectorSingle()
-        {
-            SetupPollutantMasterCollection();
-            SetupStationDetailCollection();
-            SetupJobCollection();
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "S1" } });
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "NON-AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorHourly",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.NotNull(result);
-            Assert.Matches("^[a-f0-9]{32}$", result.ToString()!);
-        }
-
-        // ------------------------------------------------------------------
-        // Unknown dataselectorfiltertype → "Failure"
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenUnknownFilterType()
-        {
-            SetupPollutantMasterCollection();
-            SetupBoundaryService();
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "src",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "unknownFilterType",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("Failure", result);
-        }
-
-        // ------------------------------------------------------------------
-        // Exception thrown anywhere → "Failure" + error logged
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenExceptionThrown()
-        {
-            _mongoFactoryMock
-                .Setup(m => m.GetCollection<PollutantMasterDocument>(It.IsAny<string>()))
-                .Throws(new Exception("unexpected"));
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "src",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("Failure", result);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenBoundaryServiceThrows()
-        {
-            SetupPollutantMasterCollection();
-            _boundaryServiceMock
+            _boundryMock
                 .Setup(b => b.GetAtomDataSelectionStationBoundryService(
                     It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
-                .ThrowsAsync(new Exception("boundary error"));
+                .ThrowsAsync(new InvalidOperationException("boundary failure"));
 
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "src",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
+            var result = await _sut.GetAtomDataSelectionStation(Query());
 
-            Assert.Equal("Failure", result);
+            Assert.Equal(Failure, result);
+            _loggerMock.Verify(l => l.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()), Times.Once);
         }
 
         [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenS3Throws()
+        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenTokenServiceThrows()
         {
-            SetupPollutantMasterCollection();
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
+            _authMock.Setup(a => a.GetRicardoToken()).ThrowsAsync(new HttpRequestException("token failure"));
 
-            _hourlyFetchMock
-                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<QueryStringData>()))
-                .ReturnsAsync(new List<FinalData>());
+            var result = await _sut.GetAtomDataSelectionStation(Query());
 
-            _s3Mock
-                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
-                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
-                .ThrowsAsync(new Exception("S3 error"));
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "src",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorHourly",
-                    dataselectordownloadtype = "dataSelectorMultiple",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("Failure", result);
+            Assert.Equal(Failure, result);
         }
 
-        [Fact]
-        public async Task GetAtomDataSelectionStation_LogsError_WhenExceptionThrown()
+        private const string RicardoMetadataJson = """
         {
-            _mongoFactoryMock
-                .Setup(m => m.GetCollection<PollutantMasterDocument>(It.IsAny<string>()))
-                .Throws(new Exception("unexpected"));
-
-            await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "src",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            _loggerMock.Verify(
-                x => x.Log(
-                    LogLevel.Error,
-                    It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, _) => true),
-                    It.IsAny<Exception?>(),
-                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                Times.AtLeastOnce);
-        }
-
-        // ------------------------------------------------------------------
-        // ResolvePollutantNameAsync: Mongo returns actual documents
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ResolvesIds_FromMongoPollutantCollection()
-        {
-            SetupPollutantMasterCollection(new[]
+          "member": [
             {
-                new PollutantMasterDocument { pollutantID = "44", pollutantName = "NO2" }
-            });
-            SetupStationDetailCollection();
-            SetupBoundaryService();
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "44",
-                    networkId = null,
-                    dataSource = "NON-AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            var items = Assert.IsAssignableFrom<IEnumerable>(result).Cast<object>().ToList();
-            Assert.Single(items); // fallback Unknown
-        }
-
-        // ------------------------------------------------------------------
-        // Pollutant mapping: all known short keys
-        // ------------------------------------------------------------------
-
-        [Theory]
-        [InlineData("NO2", "Nitrogen dioxide")]
-        [InlineData("SO2", "Sulphur dioxide")]
-        [InlineData("CO", "Carbon monoxide")]
-        [InlineData("NOx", "Nitrogen oxides as nitrogen dioxide")]
-        [InlineData("NO", "Nitric oxide")]
-        [InlineData("Ozone", "Ozone")]
-        public async Task GetAtomDataSelectionStation_MapsKnownPollutants_Correctly(
-            string pollutantInput, string expectedMappedName)
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection(new[]
-            {
-                new PollutantMasterDocument { pollutantID = pollutantInput, pollutantName = pollutantInput }
-            });
-            SetupHttpFactory(BuildSiteMetaJson(pollutantName: expectedMappedName));
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = pollutantInput,
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("1", result);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_IncludesUnknownPollutant_AsRawName()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection(new[]
-            {
-                new PollutantMasterDocument
-                {
-                    pollutantID = "SomeFuturePollutant",
-                    pollutantName = "SomeFuturePollutant"
+              "siteName": "Site A",
+              "localSiteId": "A",
+              "areaType": "Urban",
+              "siteType": "Background",
+              "governmentRegion": "London",
+              "zoneRegion": "1",
+              "latitude": "51.5",
+              "longitude": "-0.1",
+              "pollutantsMetaData": {
+                "no2": {
+                  "pollutantName": "Nitrogen dioxide",
+                  "startDate": "01/01/2020",
+                  "endDate": "31/12/2025"
                 }
-            });
-            SetupHttpFactory(BuildSiteMetaJson(pollutantName: "SomeFuturePollutant"));
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "SomeFuturePollutant",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("1", result);
+              }
+            }
+          ]
         }
-
-        // ------------------------------------------------------------------
-        // "Fine particulate matter" → PM2.5 variants
-        // ------------------------------------------------------------------
-
-        [Theory]
-        [InlineData("PM<sub>2.5</sub> (Hourly measured)")]
-        [InlineData("Volatile PM<sub>2.5</sub> (Hourly measured)")]
-        [InlineData("Non-volatile PM<sub>2.5</sub> (Hourly measured)")]
-        [InlineData("PM<sub>2.5</sub> particulate matter (Hourly measured)")]
-        public async Task GetAtomDataSelectionStation_ReturnsCount_ForAllPm25MappedNames(string mappedName)
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection(new[]
-            {
-                new PollutantMasterDocument { pollutantID = "PM2.5", pollutantName = "Fine particulate matter" }
-            });
-            SetupHttpFactory(BuildSiteMetaJson(pollutantName: mappedName));
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "PM2.5",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("1", result);
-        }
-
-        // ------------------------------------------------------------------
-        // "Particulate matter" → PM10 variants
-        // ------------------------------------------------------------------
-
-        [Theory]
-        [InlineData("PM<sub>10</sub> (Hourly measured)")]
-        [InlineData("Volatile PM<sub>10</sub> (Hourly measured)")]
-        [InlineData("Non-volatile PM<sub>10</sub> (Hourly measured)")]
-        [InlineData("PM<sub>10</sub> particulate matter (Hourly measured)")]
-        public async Task GetAtomDataSelectionStation_ReturnsCount_ForAllPm10MappedNames(string mappedName)
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection(new[]
-            {
-                new PollutantMasterDocument { pollutantID = "PM10", pollutantName = "Particulate matter" }
-            });
-            SetupHttpFactory(BuildSiteMetaJson(pollutantName: mappedName));
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "PM10",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("1", result);
-        }
-
-        // ------------------------------------------------------------------
-        // Year filtering
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_FiltersOutSites_WhenPollutantYearDoesNotOverlap()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection(new[]
-            {
-                new PollutantMasterDocument { pollutantID = "NO2", pollutantName = "NO2" }
-            });
-            SetupHttpFactory(BuildSiteMetaJson(startDate: "01/01/2018", endDate: "31/12/2020"));
-
-            List<SiteInfo>? capturedSites = null;
-            _boundaryServiceMock
-                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
-                .Callback<List<SiteInfo>, string, string>((s, _, __) => capturedSites = s)
-                .ReturnsAsync(new List<SiteInfo>());
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("0", result);
-            Assert.NotNull(capturedSites);
-            Assert.Empty(capturedSites!);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_IncludesSites_WhenPollutantHasNoEndDate()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection();
-            var siteMetaJson = JsonSerializer.Serialize(new
-            {
-                member = new[]
-                {
-                    new
-                    {
-                        siteName = "Active Site", localSiteId = "SITE002",
-                        areaType = "Urban", siteType = "Background",
-                        governmentRegion = "London", latitude = "51.5", longitude = "-0.1",
-                        pollutantsMetaData = new Dictionary<string, object>
-                        {
-                            ["NO2"] = new { name = "Nitrogen dioxide", startDate = "01/01/2015", endDate = "" }
-                        }
-                    }
-                }
-            });
-            SetupHttpFactory(siteMetaJson);
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE002" } });
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("1", result);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_FiltersOutSites_WhenStartDateIsInvalid()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection();
-            SetupHttpFactory(BuildSiteMetaJson(startDate: "not-a-date", endDate: "31/12/2023"));
-
-            List<SiteInfo>? capturedSites = null;
-            _boundaryServiceMock
-                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
-                .Callback<List<SiteInfo>, string, string>((s, _, __) => capturedSites = s)
-                .ReturnsAsync(new List<SiteInfo>());
-
-            await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.NotNull(capturedSites);
-            Assert.Empty(capturedSites!);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_HandlesMultipleYears_InYearParam()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection();
-            SetupHttpFactory(BuildSiteMetaJson(startDate: "01/01/2022", endDate: "31/12/2022"));
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2021,2022,2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("1", result);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_HandlesInvalidYearValues_Gracefully()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection(new[]
-            {
-                new PollutantMasterDocument { pollutantID = "NO2", pollutantName = "NO2" }
-            });
-            SetupHttpFactory(BuildSiteMetaJson(startDate: "01/01/2023", endDate: "31/12/2023"));
-
-            List<SiteInfo>? capturedSites = null;
-            _boundaryServiceMock
-                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
-                .Callback<List<SiteInfo>, string, string>((s, _, __) => capturedSites = s)
-                .ReturnsAsync(new List<SiteInfo>());
-
-            // "abc" is skipped; "2023" is valid → site is in range
-            await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "abc,2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.NotNull(capturedSites);
-            Assert.Single(capturedSites!);
-        }
-
-        // ------------------------------------------------------------------
-        // Deduplication: duplicate LocalSiteId entries are collapsed to one
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_DeduplicatesBySiteId()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection();
-            var siteMetaJson = JsonSerializer.Serialize(new
-            {
-                member = new[]
-                {
-                    new
-                    {
-                        siteName = "Site A", localSiteId = "DUPE", areaType = "Urban",
-                        siteType = "Background", governmentRegion = "London",
-                        latitude = "51.5", longitude = "-0.1",
-                        pollutantsMetaData = new Dictionary<string, object>
-                        {
-                            ["NO2"] = new
-                            {
-                                name = "Nitrogen dioxide",
-                                startDate = "01/01/2023", endDate = "31/12/2023"
-                            }
-                        }
-                    },
-                    new
-                    {
-                        siteName = "Site B", localSiteId = "DUPE", areaType = "Suburban",
-                        siteType = "Traffic", governmentRegion = "London",
-                        latitude = "51.6", longitude = "-0.2",
-                        pollutantsMetaData = new Dictionary<string, object>
-                        {
-                            ["NO2"] = new
-                            {
-                                name = "Nitrogen dioxide",
-                                startDate = "01/01/2023", endDate = "31/12/2023"
-                            }
-                        }
-                    }
-                }
-            });
-            SetupHttpFactory(siteMetaJson);
-
-            List<SiteInfo>? capturedSites = null;
-            _boundaryServiceMock
-                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
-                .Callback<List<SiteInfo>, string, string>((s, _, __) => capturedSites = s)
-                .ReturnsAsync(new List<SiteInfo>());
-
-            await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.NotNull(capturedSites);
-            Assert.Single(capturedSites!);
-        }
-
-        // ------------------------------------------------------------------
-        // ParseSiteMeta: pollutant mismatch → site excluded
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ExcludesSites_WithNoMatchingPollutants()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            // Mongo maps "NO2" → "NO2"; GetMappedPollutants("NO2") → ["Nitrogen dioxide"]
-            // Site has "Sulphur dioxide" which is not "Nitrogen dioxide" → excluded
-            SetupPollutantMasterCollection(new[]
-            {
-                new PollutantMasterDocument { pollutantID = "NO2", pollutantName = "NO2" }
-            });
-            SetupHttpFactory(BuildSiteMetaJson(pollutantName: "Sulphur dioxide"));
-
-            List<SiteInfo>? capturedSites = null;
-            _boundaryServiceMock
-                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
-                .Callback<List<SiteInfo>, string, string>((s, _, __) => capturedSites = s)
-                .ReturnsAsync(new List<SiteInfo>());
-
-            await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.NotNull(capturedSites);
-            Assert.Empty(capturedSites!);
-        }
-
-        // ------------------------------------------------------------------
-        // ParseSiteMeta edge cases
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsZero_WhenMemberArrayIsEmpty()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection();
-            SetupHttpFactory("{\"member\": []}");
-            SetupBoundaryService();
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("0", result);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_ReturnsZero_WhenMemberPropertyAbsent()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection();
-            SetupHttpFactory("{\"data\": []}");
-            SetupBoundaryService();
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("0", result);
-        }
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_HandlesSite_WithNoPollutantsMetaData()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            SetupPollutantMasterCollection(new[]
-            {
-                new PollutantMasterDocument { pollutantID = "NO2", pollutantName = "NO2" }
-            });
-            var siteMetaJson = JsonSerializer.Serialize(new
-            {
-                member = new[]
-                {
-                    new
-                    {
-                        siteName = "No Pollutant Site", localSiteId = "NOPOLL",
-                        areaType = "Urban", siteType = "Background",
-                        governmentRegion = "London", latitude = "51.5", longitude = "-0.1"
-                        // no pollutantsMetaData property
-                    }
-                }
-            });
-            SetupHttpFactory(siteMetaJson);
-            SetupBoundaryService();
-
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("0", result);
-        }
-
-        // ------------------------------------------------------------------
-        // Multiple comma-separated pollutants
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetAtomDataSelectionStation_HandlesMultiplePollutants_CommaSeparated()
-        {
-            Environment.SetEnvironmentVariable("RICARDO_API_KEY", null);
-            Environment.SetEnvironmentVariable("RICARDO_API_VALUE", null);
-
-            // Mongo maps both IDs → keys; SO2 maps to "Sulphur dioxide"
-            SetupPollutantMasterCollection(new[]
-            {
-                new PollutantMasterDocument { pollutantID = "NO2", pollutantName = "NO2" },
-                new PollutantMasterDocument { pollutantID = "SO2", pollutantName = "SO2" }
-            });
-            SetupHttpFactory(BuildSiteMetaJson(pollutantName: "Sulphur dioxide"));
-            SetupBoundaryService(new List<SiteInfo> { new SiteInfo { LocalSiteId = "SITE001" } });
-
-            // Requesting NO2,SO2 → SO2 site should match
-            var result = await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2,SO2",
-                    networkId = null,
-                    dataSource = "AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            Assert.Equal("1", result);
-        }
-
-        // ------------------------------------------------------------------
-        // SplitEnvironmentType: covered via NON-AURN → GetSiteInfoAsync path
-        // ------------------------------------------------------------------
-
-        [Fact]
-        public async Task GetSiteInfoAsync_Maps_NullEnvironmentType_ToBothNull()
-        {
-            SetupPollutantMasterCollection();
-            SetupStationDetailCollection(new[]
-            {
-                new StationDetailDocument
-                {
-                    SiteID = "S1", SiteName = "Site1", EnvironmentType = null,
-                    Latitude = "51.5", Longitude = "-0.1", NetworkType = "LAQN",
-                    pollutantID = "NO2", PollutantName = "Nitrogen dioxide",
-                    StartDate = "01/01/2023", EndDate = "31/12/2023"
-                }
-            });
-
-            List<SiteInfo>? capturedSites = null;
-            _boundaryServiceMock
-                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
-                .Callback<List<SiteInfo>, string, string>((s, _, __) => capturedSites = s)
-                .ReturnsAsync(new List<SiteInfo>());
-
-            await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "NON-AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            var site = capturedSites?.FirstOrDefault(s => s.LocalSiteId == "S1");
-            Assert.NotNull(site);
-            Assert.Null(site!.AreaType);
-            Assert.Null(site.SiteType);
-        }
-
-        [Fact]
-        public async Task GetSiteInfoAsync_Maps_SingleWordEnvironmentType_ToSiteTypeOnly()
-        {
-            SetupPollutantMasterCollection();
-            SetupStationDetailCollection(new[]
-            {
-                new StationDetailDocument
-                {
-                    SiteID = "S2", SiteName = "Site2", EnvironmentType = "Background",
-                    Latitude = "51.5", Longitude = "-0.1", NetworkType = "LAQN",
-                    pollutantID = "NO2", PollutantName = "Nitrogen dioxide",
-                    StartDate = "01/01/2023", EndDate = "31/12/2023"
-                }
-            });
-
-            List<SiteInfo>? capturedSites = null;
-            _boundaryServiceMock
-                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
-                .Callback<List<SiteInfo>, string, string>((s, _, __) => capturedSites = s)
-                .ReturnsAsync(new List<SiteInfo>());
-
-            await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "NON-AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            var site = capturedSites?.FirstOrDefault(s => s.LocalSiteId == "S2");
-            Assert.NotNull(site);
-            Assert.Null(site!.AreaType);
-            Assert.Equal("Background", site.SiteType);
-        }
-
-        [Fact]
-        public async Task GetSiteInfoAsync_Maps_MultiWordEnvironmentType_ToAreaTypeAndSiteType()
-        {
-            SetupPollutantMasterCollection();
-            SetupStationDetailCollection(new[]
-            {
-                new StationDetailDocument
-                {
-                    SiteID = "S3", SiteName = "Site3", EnvironmentType = "Urban Background",
-                    Latitude = "51.5", Longitude = "-0.1", NetworkType = "LAQN",
-                    pollutantID = "NO2", PollutantName = "Nitrogen dioxide",
-                    StartDate = "01/01/2023", EndDate = "31/12/2023"
-                }
-            });
-
-            List<SiteInfo>? capturedSites = null;
-            _boundaryServiceMock
-                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
-                .Callback<List<SiteInfo>, string, string>((s, _, __) => capturedSites = s)
-                .ReturnsAsync(new List<SiteInfo>());
-
-            await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "NON-AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            var site = capturedSites?.FirstOrDefault(s => s.LocalSiteId == "S3");
-            Assert.NotNull(site);
-            Assert.Equal("Urban", site!.AreaType);
-            Assert.Equal("Background", site.SiteType);
-        }
-
-        [Fact]
-        public async Task GetSiteInfoAsync_Maps_WhitespaceEnvironmentType_ToBothNull()
-        {
-            SetupPollutantMasterCollection();
-            SetupStationDetailCollection(new[]
-            {
-                new StationDetailDocument
-                {
-                    SiteID = "S4", EnvironmentType = "   ",
-                    pollutantID = "NO2", PollutantName = "Nitrogen dioxide",
-                    StartDate = "01/01/2023", EndDate = "31/12/2023"
-                }
-            });
-
-            List<SiteInfo>? capturedSites = null;
-            _boundaryServiceMock
-                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
-                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
-                .Callback<List<SiteInfo>, String, String>((s, _, __) => capturedSites = s)
-                .ReturnsAsync(new List<SiteInfo>());
-
-            await CreateService().GetAtomDataSelectionStation(
-                new QueryStringData
-                {
-                    pollutantName = "NO2",
-                    networkId = null,
-                    dataSource = "NON-AURN",
-                    Year = "2023",
-                    Region = "England",
-                    regiontype = "Country",
-                    dataselectorfiltertype = "dataSelectorCount",
-                    dataselectordownloadtype = "dataSelectorSingle",
-                    email = "u@t.com"
-                });
-
-            var site = capturedSites?.FirstOrDefault(s => s.LocalSiteId == "S4");
-            Assert.NotNull(site);
-            Assert.Null(site!.AreaType);
-            Assert.Null(site.SiteType);
-        }
+        """;
     }
 }

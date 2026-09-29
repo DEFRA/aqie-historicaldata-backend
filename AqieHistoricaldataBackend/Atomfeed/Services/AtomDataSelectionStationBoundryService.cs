@@ -1,3 +1,4 @@
+using AqieHistoricaldataBackend.Atomfeed.Services.GeoBoundary;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite;
@@ -5,14 +6,10 @@ using NetTopologySuite.Features;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.Geometries.Prepared;
 using NetTopologySuite.Index.Strtree;
-using NetTopologySuite.IO;
-using NetTopologySuite.Operation.Union;
-using NetTopologySuite.Simplify;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -24,208 +21,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     public class AtomDataSelectionStationBoundryService(
         ILogger<AtomDataSelectionStationBoundryService> Logger,
         IAtomDataSelectionLocalAuthoritiesService AtomDataSelectionLocalAuthoritiesService,
-        IHostEnvironment env
+        IGeoBoundaryProvider BoundaryProvider
     ) : IAtomDataSelectionStationBoundryService
     {
-        private readonly IHostEnvironment _env = env;
-
         private static readonly GeometryFactory s_geometryFactory =
             NtsGeometryServices.Instance.CreateGeometryFactory(srid: 4326);
-
-        private sealed class Boundary
-        {
-            public string Name { get; }
-            public Geometry Geometry { get; }
-            public IPreparedGeometry Prepared { get; }
-            public Envelope Envelope { get; }
-
-            public Boundary(string name, Geometry geometry)
-            {
-                Name = name;
-                Geometry = geometry;
-                Prepared = PreparedGeometryFactory.Prepare(geometry);
-                Envelope = geometry.EnvelopeInternal;
-            }
-        }
-
-        private static readonly ConcurrentDictionary<string, Lazy<Boundary>> CountryBoundariesLazy =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        private static readonly Dictionary<string, string> GeoJsonPaths =
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["England"] = "GeoBoundaries/england.geojson",
-                ["Wales"] = "GeoBoundaries/wales.geojson",
-                ["Scotland"] = "GeoBoundaries/scotland.geojson",
-                ["Northern Ireland"] = "GeoBoundaries/northern_ireland.geojson",
-            };
-
-        private static string? GetGeoJsonPath(string country) =>
-            GeoJsonPaths.TryGetValue(country, out var p) ? p : null;
-
-        /// <summary>
-        /// Load (or get cached) prepared boundary for a country.
-        /// Uses Lazy<T> to ensure single-load and lock-free reads.
-        /// </summary>
-        private Boundary GetOrLoadBoundary(string country, ILogger logger) =>
-            CountryBoundariesLazy.GetOrAdd(country, c => new Lazy<Boundary>(() =>
-            {
-                var relPath = GetGeoJsonPath(c) ?? c;
-
-                logger.LogInformation("Attempting to load GeoJSON for country: {Country}, relative path: {RelPath}", c, relPath);
-
-                string? fullPath = null;
-
-                var fileInfo = _env.ContentRootFileProvider.GetFileInfo(relPath);
-                logger.LogInformation("fileInfo path: {fileInfo}", fileInfo);
-                if (fileInfo.Exists && !string.IsNullOrEmpty(fileInfo.PhysicalPath))
-                {
-                    fullPath = fileInfo.PhysicalPath;
-                    logger.LogInformation("Resolved via ContentRootFileProvider: {Path}", fullPath);
-                }
-
-                if (string.IsNullOrEmpty(fullPath) || !File.Exists(fullPath))
-                {
-                    throw new FileNotFoundException(
-                        $"GeoJSON file not found for country '{c}'. Relative path attempted: '{relPath}'.",
-                        relPath);
-                }
-
-                logger.LogInformation("Successfully resolved GeoJSON file: {Path}", fullPath);
-                var geom = LoadGeometryFromGeoJsonFullPath(fullPath, logger);
-
-                geom = FixIfInvalid(geom, logger);
-
-                var simplified = TopologyPreservingSimplifier.Simplify(geom, 1e-4);
-
-                return new Boundary(c, simplified);
-            }, LazyThreadSafetyMode.ExecutionAndPublication)).Value;
-
-        /// <summary>
-        /// Non-throwing wrapper. Logs and returns null on failure.
-        /// </summary>
-        private Boundary? TryGetOrLoadBoundary(string country, ILogger logger)
-        {
-            try { return GetOrLoadBoundary(country, logger); }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Boundary retrieval failed for {Country}", country);
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Ensure specified countries are present in the cache (upserts via Lazy).
-        /// </summary>
-        private void EnsureBoundariesLoaded(IEnumerable<string> countries, ILogger logger)
-        {
-            foreach (var c in countries)
-            {
-                try { _ = GetOrLoadBoundary(c, logger); }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Failed to load boundary for {Country}", c);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Read GeoJSON robustly from a full path.
-        /// </summary>
-        private static Geometry LoadGeometryFromGeoJsonFullPath(string fullPath, ILogger logger)
-        {
-            var geoJsonText = File.ReadAllText(fullPath);
-            var reader = new GeoJsonReader();
-
-            var geom = TryReadAsFeatureCollection(reader, geoJsonText, fullPath, logger);
-            if (geom is not null)
-                return geom;
-
-            geom = TryReadAsSingleGeometry(reader, geoJsonText, fullPath, logger);
-            if (geom is not null)
-                return geom;
-
-            throw new InvalidDataException($"Unsupported or invalid GeoJSON at: {fullPath}");
-        }
-
-        private static Geometry? TryReadAsFeatureCollection(GeoJsonReader reader, string geoJsonText, string fullPath, ILogger logger)
-        {
-            try
-            {
-                var fc = reader.Read<FeatureCollection>(geoJsonText);
-                if (fc is null || fc.Count == 0)
-                    return null;
-
-                var geoms = new List<Geometry>(fc.Count);
-                foreach (var f in fc)
-                {
-                    if (f?.Geometry is not null)
-                        geoms.Add(f.Geometry);
-                }
-
-                if (geoms.Count == 0)
-                    throw new InvalidDataException($"No geometries in FeatureCollection: {fullPath}");
-
-                if (geoms.Count == 1)
-                    return geoms[0];
-
-                var union = UnaryUnionOp.Union(geoms);
-                if (union is not null)
-                    return union;
-
-                throw new InvalidDataException($"Failed to union geometries from: {fullPath}");
-            }
-            catch (Exception ex)
-            {
-                logger.LogDebug(ex, "FeatureCollection read failed; trying single Geometry for {Path}", fullPath);
-                return null;
-            }
-        }
-
-        private static Geometry? TryReadAsSingleGeometry(GeoJsonReader reader, string geoJsonText, string fullPath, ILogger logger)
-        {
-            try
-            {
-                var geom = reader.Read<Geometry>(geoJsonText);
-                if (geom is not null)
-                    return geom;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to read geometry from GeoJSON at {Path}", fullPath);
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Try robust ways to fix invalid geometry.
-        /// </summary>
-        private static Geometry FixIfInvalid(Geometry geom, ILogger logger)
-        {
-            if (geom.IsValid)
-                return geom;
-
-            try
-            {
-                return NetTopologySuite.Geometries.Utilities.GeometryFixer.Fix(geom);
-            }
-            catch { /* ignore and try next */ }
-
-            try
-            {
-                var fixedByBuffer = geom.Buffer(0);
-                if (fixedByBuffer is not null && fixedByBuffer.IsValid)
-                    return fixedByBuffer;
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Buffer(0) attempt to fix invalid geometry failed");
-            }
-
-            logger.LogWarning("Geometry remains invalid after fix attempts; proceeding as-is");
-            return geom;
-        }
 
         private static int CountryPriority(string country) => country switch
         {
@@ -246,12 +46,16 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             string regiontype)
         {
             try
-            {
+            {               
+
                 if (string.Equals(regiontype, "Country", StringComparison.OrdinalIgnoreCase))
                     return HandleCountryFilter(filteredstationpollutant, region);
 
                 if (string.Equals(regiontype, "LocalAuthority", StringComparison.OrdinalIgnoreCase))
                     return await HandleLocalAuthorityFilterAsync(filteredstationpollutant, region).ConfigureAwait(false);
+
+                if (string.Equals(regiontype, "Region", StringComparison.OrdinalIgnoreCase))
+                    return filteredstationpollutant;
 
                 return new List<SiteInfo>();
             }
@@ -281,16 +85,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             if (selectedCountries.Count == 0)
                 return new List<SiteInfo>();
 
-            EnsureBoundariesLoaded(selectedCountries, Logger);
-
-            var boundaries = selectedCountries
-                .Select(c => TryGetOrLoadBoundary(c, Logger))
-                .Where(b => b is not null)
-                .Cast<Boundary>()
-                .ToList();
+            // Boundaries are already in memory (loaded once at application start)
+            var boundaries = BoundaryProvider.GetMany(selectedCountries);
 
             if (boundaries.Count == 0)
+            {
+                Logger.LogWarning("No in-memory boundaries found for region {Region}", region);
                 return new List<SiteInfo>();
+            }
 
             bool useParallel = sites.Count >= 1500 && Environment.ProcessorCount > 1;
             return useParallel
@@ -393,7 +195,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         // Processing helpers (Country)
         // ------------------------------
 
-        private static string? TryMatchSiteToCountry(SiteInfo site, List<Boundary> boundaries, Envelope unionEnv)
+        private static string? TryMatchSiteToCountry(SiteInfo site, IReadOnlyList<CountryBoundary> boundaries, Envelope unionEnv)
         {
             if (!TryParseLatLon(site.Latitude, site.Longitude, out double lat, out double lon))
                 return null;
@@ -418,7 +220,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return null;
         }
 
-        private static List<SiteInfo> ProcessSequential(List<SiteInfo> sites, List<Boundary> boundaries)
+        private static List<SiteInfo> ProcessSequential(List<SiteInfo> sites, IReadOnlyList<CountryBoundary> boundaries)
         {
             var filtered = new List<SiteInfo>(sites.Count);
 
@@ -441,7 +243,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             return filtered;
         }
 
-        private static List<SiteInfo> ProcessParallel(List<SiteInfo> sites, List<Boundary> boundaries)
+        private static List<SiteInfo> ProcessParallel(List<SiteInfo> sites, IReadOnlyList<CountryBoundary> boundaries)
         {
             var unionEnv = new Envelope();
             for (int b = 0; b < boundaries.Count; b++)

@@ -43,6 +43,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
         public class QueryStringData
         {
             public string? StationReadDate { get; set; }
+            public string? RegionId { get; set; }
             public string? Region { get; set; }
             public string? regiontype { get; set; }
             public string? SiteType { get; set; }
@@ -108,6 +109,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? AreaType { get; init; }
             public string? SiteType { get; init; }
             public string? ZoneRegion { get; init; }
+            public string? RegionId { get; init; }
             public string? Latitude { get; init; }
             public string? Longitude { get; init; }
             public string? NetworkType { get; set; }
@@ -378,6 +380,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? pollutantName { get; set; }
             public string? pollutant_Abbreviation { get; set; }
             public string? pollutant_value { get; set; }           
+        }
+
+        public class RegionInfo
+        {
+            public string? RegionId { get; set; }
+            public string? RegionName { get; set; }
         }
     }
 }
