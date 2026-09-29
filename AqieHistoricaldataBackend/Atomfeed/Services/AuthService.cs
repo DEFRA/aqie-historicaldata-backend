@@ -4,9 +4,7 @@ using System.Text.Json;
 namespace AqieHistoricaldataBackend.Atomfeed.Services
 {
     public class AuthService : IAuthService
-    {
-        private const string FailureResult = "Failure";
-
+    {      
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<AuthService> _logger;
 
