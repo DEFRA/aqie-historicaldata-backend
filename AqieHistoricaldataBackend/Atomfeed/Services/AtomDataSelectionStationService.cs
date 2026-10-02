@@ -228,55 +228,5 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
             }
         }
-
-        //private async Task<(string? DataSource, List<SiteInfo> Sites)> ResolveSitesAsync(
-        //    QueryStringData queryStringData, string pollutantName, string resolvedPollutantName)
-        //{
-        //    string? datasource = queryStringData.dataSource;
-        //    string? networkId = queryStringData.networkId;
-        //    var sites = new List<SiteInfo>();
-
-        //    if (datasource == "AURN" && NonAurnPollutants.Contains(pollutantName))
-        //    {
-        //        datasource = "NON-AURN";
-        //        networkId = "10";
-        //    }
-
-        //    if (datasource == "AURN")
-        //    {
-        //        var token = await AuthService.GetRicardoToken();
-        //        var sitemetadatainfo = await RicardoSiteMetadata.FetchSiteMetadata(httpClientFactory, token);
-        //        sites = AtomSiteFilterHelper.FilterSitesByPollutants(sitemetadatainfo, resolvedPollutantName, Logger);
-        //    }
-        //    else if (datasource == "NON-AURN")
-        //    {
-        //        sites = await AtomSiteFilterHelper.GetSiteInfoAsync(pollutantName, networkId ?? string.Empty, MongoDbClientFactory);
-
-        //        // networkId 10 represents AURN within the NON-AURN data source
-        //        if (networkId == "10")
-        //        {
-        //            datasource = "AURN";
-        //        }
-        //    }
-
-        //    return (datasource, sites);
-        //}
-
-        //private static object BuildCountResult(List<SiteInfo> stationData, string? datasource)
-        //{
-        //    if (datasource == "AURN")
-        //    {
-        //        return stationData.Count.ToString();
-        //    }
-
-        //    var networkTypeCounts = stationData
-        //        .GroupBy(s => s.NetworkType ?? "Unknown")
-        //        .Select(g => new { NetworkType = g.Key, Count = g.Count() })
-        //        .ToList();
-
-        //    return networkTypeCounts.Count > 0
-        //        ? networkTypeCounts
-        //        : new[] { new { NetworkType = "Unknown", Count = stationData.Count } }.ToList();
-        //}
     }
 }
