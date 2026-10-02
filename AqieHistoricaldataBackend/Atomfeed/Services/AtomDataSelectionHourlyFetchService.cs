@@ -150,7 +150,37 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 new() { PollutantName = "Benzo(c)phenanthrene",                     PollutantMasterUrl = "5525"   },
                 new() { PollutantName = "Benzo(e)pyrene",                           PollutantMasterUrl = "5381"   },
                 new() { PollutantName = "Benzo(ghi)perylene",                       PollutantMasterUrl = "5623"   },
-                new() { PollutantName = "Naphthalene",                              PollutantMasterUrl = "7465"   }
+                new() { PollutantName = "Naphthalene",                              PollutantMasterUrl = "7465"   },
+                new() { PollutantName = "Ethane",                              PollutantMasterUrl = "428" },
+                new() { PollutantName = "Ethene",                              PollutantMasterUrl = "430" },
+                new() { PollutantName = "Ethyne",                              PollutantMasterUrl = "432" },
+                new() { PollutantName = "Propane",                              PollutantMasterUrl = "503" },
+                new() { PollutantName = "Propene",                              PollutantMasterUrl = "505" },
+                new() { PollutantName = "Iso-butane",                              PollutantMasterUrl = "447" },
+                new() { PollutantName = "N-butane",                              PollutantMasterUrl = "394" },
+                new() { PollutantName = "1-butene",                              PollutantMasterUrl = "6005" },
+                new() { PollutantName = "Trans-2-butene",                              PollutantMasterUrl = "6006" },
+                new() { PollutantName = "Cis-2-butene",                              PollutantMasterUrl = "6007" },
+                new() { PollutantName = "Iso-pentane",                              PollutantMasterUrl = "450" },
+                new() { PollutantName = "N-pentane",                              PollutantMasterUrl = "486" },
+                new() { PollutantName = "1,3-butadiene",                              PollutantMasterUrl = "24" },
+                new() { PollutantName = "Trans-2-pentene",                              PollutantMasterUrl = "82" },
+                new() { PollutantName = "1-pentene",                              PollutantMasterUrl = "6008" },
+                new() { PollutantName = "2-methylpentane",                              PollutantMasterUrl = "316" },
+                new() { PollutantName = "Isoprene",                              PollutantMasterUrl = "451" },
+                new() { PollutantName = "N-hexane",                              PollutantMasterUrl = "443" },
+                new() { PollutantName = "N-heptane",                              PollutantMasterUrl = "441" },
+                new() { PollutantName = "Iso-octane",                              PollutantMasterUrl = "449" },
+                new() { PollutantName = "N-octane",                              PollutantMasterUrl = "475" },
+                new() { PollutantName = "Benzene",                              PollutantMasterUrl = "20" },
+                new() { PollutantName = "Toluene",                              PollutantMasterUrl = "21" },
+                new() { PollutantName = "Ethylbenzene",                              PollutantMasterUrl = "431" },
+                new() { PollutantName = "M+p-xylene",                              PollutantMasterUrl = "464" },
+                new() { PollutantName = "O-xylene",                              PollutantMasterUrl = "482" },
+                new() { PollutantName = "1,2,3-trimethylbenzene",                              PollutantMasterUrl = "6012" },
+                new() { PollutantName = "1,2,4-trimethylbenzene",                              PollutantMasterUrl = "6011" },
+                new() { PollutantName = "1,3,5-trimethylbenzene",                              PollutantMasterUrl = "6013" }
+
             };
 
             var filterList = (filter ?? string.Empty)

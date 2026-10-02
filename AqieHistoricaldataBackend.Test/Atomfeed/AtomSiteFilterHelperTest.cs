@@ -153,7 +153,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             AtomSiteFilterHelper.FilterSitesByRegionId(sites, regionId!).Should().HaveCount(2);
         }
-
+        private static readonly string[] ExpectedRegionFilteredSiteIds = ["S1", "S3"];
         [Fact]
         public void FilterSitesByRegionId_FiltersByCommaSeparatedIds_AndIgnoresNullRegionIds()
         {
@@ -163,11 +163,11 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 Site("S2", "2"),
                 Site("S3", "3"),
                 Site("S4", null)
-            };
+            };      
 
             var result = AtomSiteFilterHelper.FilterSitesByRegionId(sites, "1, 3,,");
 
-            result.Select(s => s.LocalSiteId).Should().BeEquivalentTo(new[] { "S1", "S3" });
+            result.Select(s => s.LocalSiteId).Should().BeEquivalentTo(ExpectedRegionFilteredSiteIds );
         }
 
         // ─── FilterSitesByYearRanges ──────────────────────────────────────────
@@ -296,13 +296,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             AtomSiteFilterHelper.GetMappedPollutants(key, _logger).Should().HaveCount(expectedCount);
         }
-
+        private static readonly string[] ExpectedMappedPollutants = ["Nitrogen dioxide", "Carbon monoxide"];
         [Fact]
         public void GetMappedPollutants_TrimsNames_AndSupportsMultipleKeys()
         {
             var result = AtomSiteFilterHelper.GetMappedPollutants(" NO2 , CO ", _logger);
 
-            result.Should().BeEquivalentTo(new[] { "Nitrogen dioxide", "Carbon monoxide" });
+            result.Should().BeEquivalentTo(ExpectedMappedPollutants);
         }
 
         [Fact]

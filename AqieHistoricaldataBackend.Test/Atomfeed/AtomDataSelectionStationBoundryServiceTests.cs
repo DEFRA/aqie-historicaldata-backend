@@ -212,6 +212,9 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             Assert.Empty(result);
         }
 
+        private static readonly string[] ExpectedPrioritisedCountries =
+            ["Northern Ireland", "Wales", "Scotland", "England", "Mars"];
+
         [Fact]
         public async Task Country_MultipleCountries_AreDeduplicatedAndPrioritised()
         {
@@ -224,9 +227,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             await _service.GetAtomDataSelectionStationBoundryService(
                 new List<SiteInfo>(), "England, england , Scotland,Wales,Northern Ireland,Mars", "Country");
 
-            Assert.Equal(
-                new[] { "Northern Ireland", "Wales", "Scotland", "England", "Mars" },
-                captured);
+            Assert.Equal(ExpectedPrioritisedCountries, captured);
         }
 
         [Fact]

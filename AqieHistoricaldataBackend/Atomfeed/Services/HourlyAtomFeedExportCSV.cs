@@ -11,7 +11,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 var groupedData = GroupFinalData(Final_list);
-                var distinctPollutants = Final_list.Select(s => s.PollutantName).Distinct().OrderBy(m => m).ToList();
+                var distinctPollutants = Final_list
+                    .Select(s => s.PollutantName)
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Select(name => name!)
+                    .Distinct()
+                    .OrderBy(m => m)
+                    .ToList();
                 var stationfetchdate = Convert.ToDateTime(data.StationReadDate).ToString();
 
                 using var memoryStream = new MemoryStream();
@@ -29,7 +35,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
-        private void WriteCsvHeader(StreamWriter writer, QueryStringData data, string stationfetchdate)
+        private static void WriteCsvHeader(StreamWriter writer, QueryStringData data, string stationfetchdate)
         {
             writer.WriteLine($"Hourly data from Defra on {stationfetchdate}");
             writer.WriteLine($"Site Name,{data.SiteName}");
@@ -51,28 +57,28 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             writer.WriteLine();
         }
 
-        private void WriteCsvRows(StreamWriter writer, List<PivotPollutant> groupedData, List<string> pollutants)
+        private static void WriteCsvRows(StreamWriter writer, List<PivotPollutant> groupedData, List<string> pollutants)
         {
             foreach (var item in groupedData)
             {
                 writer.Write($"{item.Date},{item.Time}");
                 foreach (var pollutant in pollutants)
                 {
-                    var sub = item.SubPollutant.FirstOrDefault(s => s.PollutantName == pollutant);
+                    var sub = item.SubPollutant?.FirstOrDefault(s => s.PollutantName == pollutant);
                     writer.Write($",{sub?.PollutantValue ?? ""},{sub?.Verification ?? ""}");
                 }
                 writer.WriteLine();
             }
         }
 
-        private string GetPollutantHeader(string pollutant) => pollutant switch
+        private static string GetPollutantHeader(string pollutant) => pollutant switch
         {
             "PM10" => "PM10 particulate matter (Hourly measured)",
             "PM2.5" => "PM2.5 particulate matter (Hourly measured)",
             _ => pollutant
         };
 
-        private List<PivotPollutant> GroupFinalData(List<FinalData> finalList)
+        private static List<PivotPollutant> GroupFinalData(List<FinalData> finalList)
         {
             return finalList
                 .GroupBy(x => new { Date = Convert.ToDateTime(x.StartTime).Date, Time = Convert.ToDateTime(x.StartTime).TimeOfDay })

@@ -39,6 +39,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         private readonly Channel<JobItem> _jobChannel = Channel.CreateUnbounded<JobItem>();
         private Task? _processorTask;
         private readonly object _processorLock = new();
+        private static readonly HashSet<string> NonAurnPollutants =
+                                            [
+                                            "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+                                            "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31",
+                                            "32", "33", "34", "35", "41", "42", "43", "168", "169", "170",
+                                            "171", "172", "173", "174", "175", "176", "177", "178", "179"
+                                            ];
 
         public async Task<object> GetAtomDataSelectionStation(AtomHistoryModel.QueryStringData queryStringData)
         {
@@ -62,16 +69,26 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 List<SiteInfo> filteredSites = new List<SiteInfo>();
 
                 var resolvedPollutantName = await AtomSiteFilterHelper.ResolvePollutantNameAsync(pollutantName, Logger, MongoDbClientFactory);
+                if (datasource == "AURN" && NonAurnPollutants.Contains(pollutantName))
+                {
+                    datasource = "NON-AURN";
+                    networkId = "10";
+                }
                 if (datasource == "AURN")
                 {
                     var token = await AuthService.GetRicardoToken();
                     var sitemetadatainfo = await RicardoSiteMetadata.FetchSiteMetadata(httpClientFactory, token);
                     filteredSites = AtomSiteFilterHelper.FilterSitesByPollutants(sitemetadatainfo, resolvedPollutantName, Logger);
                 }
-
-                if (datasource == "NON-AURN")
+                else if (datasource == "NON-AURN")
                 {
-                    filteredSites = await AtomSiteFilterHelper.GetSiteInfoAsync(pollutantName, networkId ?? string.Empty, MongoDbClientFactory);
+                    filteredSites = await AtomSiteFilterHelper.GetSiteInfoAsync(
+                        pollutantName, networkId ?? string.Empty, MongoDbClientFactory);
+
+                    if (networkId == "10")//Automatic Urban and Rural Network (AURN) is represented by networkId 10 in the NON-AURN data source
+                    {
+                        datasource = "AURN";
+                    }
                 }
 
                 if (datasource == "AURN" && regionid != null)

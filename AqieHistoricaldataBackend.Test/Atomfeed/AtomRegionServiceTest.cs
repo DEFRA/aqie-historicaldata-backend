@@ -148,6 +148,8 @@ namespace AqieHistoricaldataBackend.Tests.Services
             VerifyLog(LogLevel.Information, Times.Once());
         }
 
+        private static readonly string[] ExpectedOrderedRegionIds = ["1", "2", "10", "ABC"];
+
         [Fact]
         public async Task GetDistinctRegions_OrdersNumericallyAndPlacesNonNumericLast()
         {
@@ -155,7 +157,7 @@ namespace AqieHistoricaldataBackend.Tests.Services
 
             var result = await service.GetDistinctRegions();
 
-            Assert.Equal(new[] { "1", "2", "10", "ABC" }, result.Select(r => r.RegionId).ToArray());
+            Assert.Equal(ExpectedOrderedRegionIds, result.Select(r => r.RegionId).ToArray());
         }
 
         [Fact]
