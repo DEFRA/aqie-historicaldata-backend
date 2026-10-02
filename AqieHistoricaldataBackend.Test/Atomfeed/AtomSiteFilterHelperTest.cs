@@ -12,6 +12,7 @@ using MongoDB.Driver;
 using Moq;
 using Xunit;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
+using System.Net.Http;
 
 namespace AqieHistoricaldataBackend.Test.Atomfeed
 {
@@ -163,11 +164,11 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 Site("S2", "2"),
                 Site("S3", "3"),
                 Site("S4", null)
-            };      
+            };
 
             var result = AtomSiteFilterHelper.FilterSitesByRegionId(sites, "1, 3,,");
 
-            result.Select(s => s.LocalSiteId).Should().BeEquivalentTo(ExpectedRegionFilteredSiteIds );
+            result.Select(s => s.LocalSiteId).Should().BeEquivalentTo(ExpectedRegionFilteredSiteIds);
         }
 
         // ─── FilterSitesByYearRanges ──────────────────────────────────────────
@@ -415,5 +416,200 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             result.Should().BeEmpty();
         }
+
+        // ─── ResolveSitesAsync ──────────────────────────────────────────────────
+
+        private static readonly string SiteMetaJson = """
+        {
+          "member": [
+            {
+              "siteName": "Site 1",
+              "localSiteId": "S1",
+              "areaType": "Urban",
+              "siteType": "Background",
+              "governmentRegion": "South",
+              "zoneRegion": "1",
+              "latitude": "51.1",
+              "longitude": "-0.1",
+              "pollutantsMetaData": {
+                "no2": { "name": "Nitrogen dioxide", "startDate": "01/01/2020", "endDate": "31/12/2020" }
+              }
+            }
+          ]
+        }
+        """;
+
+        private static Mock<IHttpClientFactory> CreateHttpClientFactory(string json)
+        {
+            var handler = new StubHttpMessageHandler(json);
+            var client = new HttpClient(handler) { BaseAddress = new Uri("https://localhost/") };
+            var factory = new Mock<IHttpClientFactory>();
+            factory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(client);
+            return factory;
+        }
+
+        [Fact]
+        public async Task ResolveSitesAsync_AurnDataSource_FetchesAndFiltersRicardoSites()
+        {
+            var auth = new Mock<IAuthService>();
+            auth.Setup(a => a.GetRicardoToken()).ReturnsAsync("token");
+
+            var httpFactory = CreateHttpClientFactory(SiteMetaJson);
+            var mongo = new Mock<IMongoDbClientFactory>();
+
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = "AURN", networkId = null },
+                pollutantName: "NO2",            // not in NonAurnPollutants
+                resolvedPollutantName: "NO2",
+                auth.Object, httpFactory.Object, _logger, mongo.Object);
+
+            dataSource.Should().Be("AURN");
+            sites.Should().ContainSingle().Which.LocalSiteId.Should().Be("S1");
+            auth.Verify(a => a.GetRicardoToken(), Times.Once);
+        }
+
+        [Fact]
+        public async Task ResolveSitesAsync_AurnWithNonAurnPollutant_SwitchesToNonAurnAndBackToAurn()
+        {
+            var factory = new Mock<IMongoDbClientFactory>();
+            var docs = new List<StationDetailDocument>
+            {
+                new()
+                {
+                    SiteID = "S9", NetworkID = "10", SiteName = "Site 9",
+                    EnvironmentType = "Urban Background", PollutantName = "Benzene",
+                    pollutantID = "25", StartDate = "01/01/2020", EndDate = "31/12/2020"
+                }
+            };
+            SetupCollection(factory, "aqie_atom_non_aurn_networks_station_details", docs);
+
+            var auth = new Mock<IAuthService>();
+            var httpFactory = new Mock<IHttpClientFactory>();
+
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = "AURN", networkId = null },
+                pollutantName: "25",             // member of the internal NonAurnPollutants set
+                resolvedPollutantName: "Benzene",
+                auth.Object, httpFactory.Object, _logger, factory.Object);
+
+            // datasource flipped to NON-AURN, networkId forced to "10" => resolved back to AURN
+            dataSource.Should().Be("AURN");
+            sites.Should().ContainSingle().Which.LocalSiteId.Should().Be("S9");
+            auth.Verify(a => a.GetRicardoToken(), Times.Never);
+        }
+
+        [Theory]
+        [InlineData("10")]
+        [InlineData("179")]
+        public async Task ResolveSitesAsync_AllNonAurnPollutantIds_AreRecognised(string pollutantId)
+        {
+            var factory = new Mock<IMongoDbClientFactory>();
+            SetupCollection(factory, "aqie_atom_non_aurn_networks_station_details",
+                new List<StationDetailDocument>());
+
+            var auth = new Mock<IAuthService>();
+
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = "AURN", networkId = null },
+                pollutantId, "Any",
+                auth.Object, new Mock<IHttpClientFactory>().Object, _logger, factory.Object);
+
+            dataSource.Should().Be("AURN");
+            sites.Should().BeEmpty();
+            auth.Verify(a => a.GetRicardoToken(), Times.Never);
+        }
+
+        [Fact]
+        public async Task ResolveSitesAsync_NonAurnDataSource_KeepsNonAurn_WhenNetworkIdNot10()
+        {
+            var factory = new Mock<IMongoDbClientFactory>();
+            SetupCollection(factory, "aqie_atom_non_aurn_networks_station_details",
+                new List<StationDetailDocument>());
+
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = "NON-AURN", networkId = "3" },
+                "1", "Ozone",
+                new Mock<IAuthService>().Object, new Mock<IHttpClientFactory>().Object,
+                _logger, factory.Object);
+
+            dataSource.Should().Be("NON-AURN");
+            sites.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task ResolveSitesAsync_NonAurnDataSource_NullNetworkId_UsesEmptyString()
+        {
+            var factory = new Mock<IMongoDbClientFactory>();
+            SetupCollection(factory, "aqie_atom_non_aurn_networks_station_details",
+                new List<StationDetailDocument>());
+
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = "NON-AURN", networkId = null },
+                "1", "Ozone",
+                new Mock<IAuthService>().Object, new Mock<IHttpClientFactory>().Object,
+                _logger, factory.Object);
+
+            dataSource.Should().Be("NON-AURN");
+            sites.Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task ResolveSitesAsync_UnknownDataSource_ReturnsEmptySites()
+        {
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = "OTHER", networkId = "1" },
+                "1", "Ozone",
+                new Mock<IAuthService>().Object, new Mock<IHttpClientFactory>().Object,
+                _logger, new Mock<IMongoDbClientFactory>().Object);
+
+            dataSource.Should().Be("OTHER");
+            sites.Should().BeEmpty();
+        }
+
+        // ─── BuildCountResult ───────────────────────────────────────────────────
+
+        [Fact]
+        public void BuildCountResult_ReturnsCountString_WhenAurn()
+        {
+            var sites = new List<SiteInfo> { Site("S1", "1"), Site("S2", "2") };
+
+            AtomSiteFilterHelper.BuildCountResult(sites, "AURN").Should().Be("2");
+        }
+
+        [Fact]
+        public void BuildCountResult_GroupsByNetworkType_WhenNonAurn()
+        {
+            var s1 = Site("S1", "1"); s1.NetworkType = "Defra";
+            var s2 = Site("S2", "2"); s2.NetworkType = "Defra";
+            var s3 = Site("S3", "3"); s3.NetworkType = null; // => "Unknown"
+
+            var result = AtomSiteFilterHelper.BuildCountResult(
+                new List<SiteInfo> { s1, s2, s3 }, "NON-AURN");
+
+            var json = System.Text.Json.JsonSerializer.Serialize(result);
+            json.Should().Contain("Defra").And.Contain("Unknown");
+        }
+
+        [Fact]
+        public void BuildCountResult_ReturnsUnknownFallback_WhenNoStations()
+        {
+            var result = AtomSiteFilterHelper.BuildCountResult(new List<SiteInfo>(), "NON-AURN");
+
+            var json = System.Text.Json.JsonSerializer.Serialize(result);
+            json.Should().Contain("Unknown").And.Contain("0");
+        }
+    }
+
+    internal sealed class StubHttpMessageHandler : HttpMessageHandler
+    {
+        private readonly string _json;
+        public StubHttpMessageHandler(string json) => _json = json;
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(_json, System.Text.Encoding.UTF8, "application/json")
+            });
     }
 }

@@ -39,94 +39,52 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         private readonly Channel<JobItem> _jobChannel = Channel.CreateUnbounded<JobItem>();
         private Task? _processorTask;
         private readonly object _processorLock = new();
-        private static readonly HashSet<string> NonAurnPollutants =
-                                            [
-                                            "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
-                                            "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31",
-                                            "32", "33", "34", "35", "41", "42", "43", "168", "169", "170",
-                                            "171", "172", "173", "174", "175", "176", "177", "178", "179"
-                                            ];
 
         public async Task<object> GetAtomDataSelectionStation(AtomHistoryModel.QueryStringData queryStringData)
         {
             try
             {
                 string? pollutantName = queryStringData.pollutantName;
-                string? networkId = queryStringData.networkId;
-                string? datasource = queryStringData.dataSource;
                 string? year = queryStringData.Year;
-                string? regionid = queryStringData.RegionId;
-                string? region = queryStringData.Region;
-                string? regiontype = queryStringData.regiontype;
-                string? dataselectorfiltertype = queryStringData.dataselectorfiltertype;
-                string? dataselectordownloadtype = queryStringData.dataselectordownloadtype;
 
                 if (string.IsNullOrEmpty(pollutantName) || string.IsNullOrEmpty(year))
                 {
                     Logger.LogWarning("GetAtomDataSelectionStation called with null or empty pollutantName or year.");
                     return FailureResult;
                 }
-                List<SiteInfo> filteredSites = new List<SiteInfo>();
 
                 var resolvedPollutantName = await AtomSiteFilterHelper.ResolvePollutantNameAsync(pollutantName, Logger, MongoDbClientFactory);
-                if (datasource == "AURN" && NonAurnPollutants.Contains(pollutantName))
-                {
-                    datasource = "NON-AURN";
-                    networkId = "10";
-                }
-                if (datasource == "AURN")
-                {
-                    var token = await AuthService.GetRicardoToken();
-                    var sitemetadatainfo = await RicardoSiteMetadata.FetchSiteMetadata(httpClientFactory, token);
-                    filteredSites = AtomSiteFilterHelper.FilterSitesByPollutants(sitemetadatainfo, resolvedPollutantName, Logger);
-                }
-                else if (datasource == "NON-AURN")
-                {
-                    filteredSites = await AtomSiteFilterHelper.GetSiteInfoAsync(
-                        pollutantName, networkId ?? string.Empty, MongoDbClientFactory);
 
-                    if (networkId == "10")//Automatic Urban and Rural Network (AURN) is represented by networkId 10 in the NON-AURN data source
-                    {
-                        datasource = "AURN";
-                    }
-                }
+                var (datasource, filteredSites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                                                    queryStringData,
+                                                    pollutantName,
+                                                    resolvedPollutantName,
+                                                    AuthService,
+                                                    httpClientFactory,
+                                                    Logger,
+                                                    MongoDbClientFactory);
 
-                if (datasource == "AURN" && regionid != null)
+                if (datasource == "AURN" && queryStringData.RegionId != null)
                 {
-                    filteredSites = AtomSiteFilterHelper.FilterSitesByRegionId(filteredSites, regionid);
+                    filteredSites = AtomSiteFilterHelper.FilterSitesByRegionId(filteredSites, queryStringData.RegionId);
                 }
 
                 var filterpollutantyear = AtomSiteFilterHelper.FilterSitesByYearRanges(filteredSites, year);
 
                 var stationData = await atomDataSelectionServices.StationBoundry.GetAtomDataSelectionStationBoundryService(
                     filterpollutantyear,
-                    region ?? string.Empty,
-                    regiontype ?? string.Empty);
-                var stationcountresult = stationData.Count;
+                    queryStringData.Region ?? string.Empty,
+                    queryStringData.regiontype ?? string.Empty);
 
-                if (dataselectorfiltertype == "dataSelectorCount" && datasource == "AURN")
+                if (queryStringData.dataselectorfiltertype == "dataSelectorCount")
                 {
-                    return stationcountresult.ToString();
+                    return AtomSiteFilterHelper.BuildCountResult(stationData, datasource);
                 }
-                if (dataselectorfiltertype == "dataSelectorCount" && datasource == "NON-AURN")
-                {
-                    var networkTypeCounts = stationData
-                        .GroupBy(s => s.NetworkType ?? "Unknown")
-                        .Select(g => new
-                        {
-                            NetworkType = g.Key,
-                            Count = g.Count()
-                        })
-                        .ToList();
 
-                    return networkTypeCounts.Count > 0
-                        ? networkTypeCounts
-                        : new[] { new { NetworkType = "Unknown", Count = stationcountresult } }.ToList();
-                }
-                pollutantName = resolvedPollutantName;
-                if (dataselectorfiltertype == "dataSelectorHourly")
+                if (queryStringData.dataselectorfiltertype == "dataSelectorHourly")
                 {
-                    return await HandleHourlyDataSelection(stationData, pollutantName, year, queryStringData, dataselectordownloadtype ?? string.Empty);
+                    return await HandleHourlyDataSelection(stationData, resolvedPollutantName, year, queryStringData,
+                        queryStringData.dataselectordownloadtype ?? string.Empty);
                 }
 
                 return FailureResult;
@@ -271,5 +229,54 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
         }
 
+        //private async Task<(string? DataSource, List<SiteInfo> Sites)> ResolveSitesAsync(
+        //    QueryStringData queryStringData, string pollutantName, string resolvedPollutantName)
+        //{
+        //    string? datasource = queryStringData.dataSource;
+        //    string? networkId = queryStringData.networkId;
+        //    var sites = new List<SiteInfo>();
+
+        //    if (datasource == "AURN" && NonAurnPollutants.Contains(pollutantName))
+        //    {
+        //        datasource = "NON-AURN";
+        //        networkId = "10";
+        //    }
+
+        //    if (datasource == "AURN")
+        //    {
+        //        var token = await AuthService.GetRicardoToken();
+        //        var sitemetadatainfo = await RicardoSiteMetadata.FetchSiteMetadata(httpClientFactory, token);
+        //        sites = AtomSiteFilterHelper.FilterSitesByPollutants(sitemetadatainfo, resolvedPollutantName, Logger);
+        //    }
+        //    else if (datasource == "NON-AURN")
+        //    {
+        //        sites = await AtomSiteFilterHelper.GetSiteInfoAsync(pollutantName, networkId ?? string.Empty, MongoDbClientFactory);
+
+        //        // networkId 10 represents AURN within the NON-AURN data source
+        //        if (networkId == "10")
+        //        {
+        //            datasource = "AURN";
+        //        }
+        //    }
+
+        //    return (datasource, sites);
+        //}
+
+        //private static object BuildCountResult(List<SiteInfo> stationData, string? datasource)
+        //{
+        //    if (datasource == "AURN")
+        //    {
+        //        return stationData.Count.ToString();
+        //    }
+
+        //    var networkTypeCounts = stationData
+        //        .GroupBy(s => s.NetworkType ?? "Unknown")
+        //        .Select(g => new { NetworkType = g.Key, Count = g.Count() })
+        //        .ToList();
+
+        //    return networkTypeCounts.Count > 0
+        //        ? networkTypeCounts
+        //        : new[] { new { NetworkType = "Unknown", Count = stationData.Count } }.ToList();
+        //}
     }
 }
