@@ -46,7 +46,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             writer.WriteLine("Notes:,[1] All Data GMT hour ending;  [2] Some shorthand is used V = Verified P = Provisionally Verified N = Not Verified S = Suspect [3] Unit of measurement (for pollutants) = ugm-3");
         }
 
-        private void WriteCsvColumnHeaders(StreamWriter writer, List<string> pollutants)
+        private static void WriteCsvColumnHeaders(StreamWriter writer, List<string> pollutants)
         {
             writer.Write("Date,Time");
             foreach (var pollutant in pollutants)
