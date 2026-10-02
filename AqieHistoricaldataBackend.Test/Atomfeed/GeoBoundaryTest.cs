@@ -168,13 +168,16 @@ public sealed class GeoBoundaryTest : IDisposable
         Assert.True(boundary!.Geometry.IsValid);
     }
 
+    private static readonly string[] EnglandAndWales = ["England", "Wales"];
+    private static readonly string[] MixedCountryNames = ["England", "Atlantis", "", "Scotland"];
+
     [Fact]
     public void GetMany_ReturnsOnlyResolvedBoundaries()
     {
         WriteAllValid();
         var provider = CreateProvider();
 
-        var result = provider.GetMany(new[] { "England", "Atlantis", "", "Scotland" });
+        var result = provider.GetMany(MixedCountryNames);
 
         Assert.Equal(2, result.Count);
         Assert.Collection(result,

@@ -12,6 +12,7 @@ using MongoDB.Driver;
 using Moq;
 using Xunit;
 using static AqieHistoricaldataBackend.Atomfeed.Models.AtomHistoryModel;
+using Amazon.S3;
 
 namespace AqieHistoricaldataBackend.Test.Atomfeed
 {
@@ -87,36 +88,49 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             _httpClientFactoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(client);
         }
 
-        private static Mock<IAsyncCursor<T>> BuildCursor<T>(List<T> items)
+        private static IAsyncCursor<T> BuildCursor<T>(List<T> items)
         {
             var cursor = new Mock<IAsyncCursor<T>>();
-            cursor.SetupSequence(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
-                  .ReturnsAsync(items.Count > 0)
-                  .ReturnsAsync(false);
+            var moved = false;
+
+            cursor.Setup(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
+                  .ReturnsAsync(() =>
+                  {
+                      if (moved) return false;
+                      moved = true;
+                      return items.Count > 0;
+                  });
+            cursor.Setup(c => c.MoveNext(It.IsAny<CancellationToken>()))
+                  .Returns(() =>
+                  {
+                      if (moved) return false;
+                      moved = true;
+                      return items.Count > 0;
+                  });
             cursor.Setup(c => c.Current).Returns(items);
-            return cursor;
+            return cursor.Object;
         }
 
         private void SetupPollutantMaster(params PollutantMasterDocument[] docs)
         {
-            var cursor = BuildCursor(docs.ToList());
+            var items = docs.ToList();
             _pollutantCollectionMock
                 .Setup(c => c.FindAsync(
                     It.IsAny<FilterDefinition<PollutantMasterDocument>>(),
                     It.IsAny<FindOptions<PollutantMasterDocument, PollutantMasterDocument>>(),
                     It.IsAny<CancellationToken>()))
-                .ReturnsAsync(cursor.Object);
+                .ReturnsAsync(() => BuildCursor(items)); // new cursor per call
         }
 
         private void SetupStationDetails(params StationDetailDocument[] docs)
         {
-            var cursor = BuildCursor(docs.ToList());
+            var items = docs.ToList();
             _stationCollectionMock
                 .Setup(c => c.FindAsync(
                     It.IsAny<FilterDefinition<StationDetailDocument>>(),
                     It.IsAny<FindOptions<StationDetailDocument, StationDetailDocument>>(),
                     It.IsAny<CancellationToken>()))
-                .ReturnsAsync(cursor.Object);
+                .ReturnsAsync(() => BuildCursor(items));
         }
 
         private void SetupBoundry(List<SiteInfo> result)
@@ -426,7 +440,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
               "longitude": "-0.1",
               "pollutantsMetaData": {
                 "no2": {
-                  "pollutantName": "Nitrogen dioxide",
+                  "name": "Nitrogen dioxide",
                   "startDate": "01/01/2020",
                   "endDate": "31/12/2025"
                 }
@@ -435,5 +449,348 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
           ]
         }
         """;
+
+        // ───────────── AURN → NON-AURN re-mapping for non-AURN pollutants ─────────────
+
+        [Theory]
+        [InlineData("10")]
+        [InlineData("43")]
+        [InlineData("179")]
+        public async Task GetAtomDataSelectionStation_SwitchesToNonAurn_WhenPollutantIsNonAurn(string pollutantId)
+        {
+            SetupPollutantMaster(new PollutantMasterDocument { pollutantID = pollutantId, pollutantName = "Benzene" });
+            SetupStationDetails(new StationDetailDocument
+            {
+                SiteID = "S1",
+                SiteName = "Station 1",
+                NetworkID = "10",
+                NetworkType = "Industrial",
+                pollutantID = pollutantId,
+                PollutantName = "Benzene",
+                EnvironmentType = "Urban Background",
+                StartDate = "01/01/2020",
+                EndDate = "31/12/2025"
+            });
+            SetupBoundry(new List<SiteInfo> { Site("A", "Industrial"), Site("B", "Industrial") });
+
+            // datasource "AURN" + non-AURN pollutant => NON-AURN + networkId 10 => flipped back to AURN
+            var result = await _sut.GetAtomDataSelectionStation(Query(pollutant: pollutantId));
+
+            Assert.Equal("2", result);                      // AURN count branch taken
+            _authMock.Verify(a => a.GetRicardoToken(), Times.Never); // Ricardo metadata not used
+            _mongoFactoryMock.Verify(
+                f => f.GetCollection<StationDetailDocument>("aqie_atom_non_aurn_networks_station_details"),
+                Times.Once);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_KeepsNonAurn_WhenNetworkIdIsNotTen()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A", "Industrial") });
+
+            var result = await _sut.GetAtomDataSelectionStation(Query(source: "NON-AURN", networkId: "7"));
+
+            var json = System.Text.Json.JsonSerializer.Serialize(result);
+            Assert.Contains("Industrial", json); // NON-AURN grouped-count branch
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_UsesEmptyNetworkId_WhenNetworkIdIsNull()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A", "Rural") });
+
+            var result = await _sut.GetAtomDataSelectionStation(Query(source: "NON-AURN", networkId: null));
+
+            var json = System.Text.Json.JsonSerializer.Serialize(result);
+            Assert.Contains("Rural", json);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_SkipsRegionFilter_ForNonAurnWithRegionId()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A", "Industrial"), Site("B", "Industrial") });
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(source: "NON-AURN", networkId: "7", regionId: "999"));
+
+            var json = System.Text.Json.JsonSerializer.Serialize(result);
+            Assert.Contains("Industrial", json); // region filter not applied for NON-AURN
+        }
+
+        // ───────────── Unknown data source (neither AURN nor NON-AURN) ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsEmptyUnknownBucket_ForUnknownDataSource()
+        {
+            SetupBoundry(new List<SiteInfo>());
+
+            var result = await _sut.GetAtomDataSelectionStation(Query(source: "OTHER"));
+
+            var json = System.Text.Json.JsonSerializer.Serialize(result);
+            Assert.Contains("Unknown", json);
+            Assert.Contains("0", json);
+
+            // neither the AURN (Ricardo) nor the NON-AURN (Mongo) lookup is used
+            _authMock.Verify(a => a.GetRicardoToken(), Times.Never);
+            _mongoFactoryMock.Verify(
+                f => f.GetCollection<StationDetailDocument>("aqie_atom_non_aurn_networks_station_details"),
+                Times.Never);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsFailure_ForUnknownDataSourceAndUnknownFilterType()
+        {
+            SetupBoundry(new List<SiteInfo>());
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(source: "OTHER", filterType: "somethingElse"));
+
+            Assert.Equal(Failure, result);
+            _authMock.Verify(a => a.GetRicardoToken(), Times.Never);
+        }
+
+        // ───────────── Hourly download after re-mapping ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_UsesResolvedPollutantName_ForHourlyDownload()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            string? capturedPollutant = null;
+            _hourlyMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .Callback<List<SiteInfo>, string, string, QueryStringData>((_, p, _, _) => capturedPollutant = p)
+                .ReturnsAsync(new List<FinalData> { new() });
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .ReturnsAsync("https://s3/resolved.csv");
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorMultiple"));
+
+            Assert.Equal("https://s3/resolved.csv", result);
+            Assert.Equal("NO2", capturedPollutant); // resolved from pollutant master, not the raw id
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenHourlyDownloadTypeMissingAndS3Throws()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+            _hourlyMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .ReturnsAsync(new List<FinalData>());
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), string.Empty))
+                .ThrowsAsync(new AmazonS3Exception("s3 failure"));
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: null));
+
+            Assert.Equal(Failure, result);
+        }
+
+        // ───────────── Queue processor reuse / restart ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ProcessesMultipleQueuedJobs_ReusingProcessor()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            var insertedIds = new List<string>();
+            _jobCollectionMock
+                .Setup(c => c.InsertOneAsync(It.IsAny<JobDocument>(), It.IsAny<InsertOneOptions>(), It.IsAny<CancellationToken>()))
+                .Callback<JobDocument, InsertOneOptions, CancellationToken>((d, _, _) => insertedIds.Add(d.JobId!))
+                .Returns(Task.CompletedTask);
+
+            var allDone = new TaskCompletionSource();
+            var updateCount = 0;
+            _jobCollectionMock
+                .Setup(c => c.UpdateOneAsync(
+                    It.IsAny<FilterDefinition<JobDocument>>(),
+                    It.IsAny<UpdateDefinition<JobDocument>>(),
+                    It.IsAny<UpdateOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback(() =>
+                {
+                    // 2 jobs x (Processing + Completed)
+                    if (Interlocked.Increment(ref updateCount) == 4) allDone.TrySetResult();
+                })
+                .ReturnsAsync(Mock.Of<UpdateResult>());
+
+            _hourlyMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .ReturnsAsync(new List<FinalData> { new() });
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .ReturnsAsync("https://s3/job-result.csv");
+
+            var first = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorSingle"));
+            var second = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorSingle"));
+
+            Assert.NotEqual(first as string, second as string);
+            Assert.Equal(2, insertedIds.Count);
+
+            await allDone.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            _s3Mock.Verify(s => s.WriteCsvToAwsS3BucketAsync(
+                It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), "dataSelectorSingle"), Times.Exactly(2));
+            _indexManagerMock.Verify(i => i.CreateOneAsync(
+                It.IsAny<CreateIndexModel<JobDocument>>(), It.IsAny<CreateOneIndexOptions>(), It.IsAny<CancellationToken>()),
+                Times.Exactly(2));
+        }
+
+        // ───────────── Year range filtering ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_FiltersOutSites_WhenYearOutsidePollutantRange()
+        {
+            SetupBoundry(new List<SiteInfo>());
+
+            List<SiteInfo>? sitesPassedToBoundry = null;
+            _boundryMock
+                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Callback<List<SiteInfo>, string, string>((s, _, _) => sitesPassedToBoundry = s)
+                .ReturnsAsync(new List<SiteInfo>());
+
+            // Ricardo metadata site covers 2020-2025 only
+            var result = await _sut.GetAtomDataSelectionStation(Query(year: "1999"));
+
+            Assert.Equal("0", result);
+            Assert.NotNull(sitesPassedToBoundry);
+            Assert.Empty(sitesPassedToBoundry!);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_KeepsSites_WhenYearInsidePollutantRange()
+        {
+            List<SiteInfo>? sitesPassedToBoundry = null;
+            _boundryMock
+                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Callback<List<SiteInfo>, string, string>((s, _, _) => sitesPassedToBoundry = s)
+                .ReturnsAsync(new List<SiteInfo> { Site("A") });
+
+            var result = await _sut.GetAtomDataSelectionStation(Query(year: "2022"));
+
+            Assert.Equal("1", result);
+            Assert.NotNull(sitesPassedToBoundry);
+            Assert.Single(sitesPassedToBoundry!);
+        }
+
+        // ───────────── Null Region / regiontype coalescing ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_PassesEmptyStrings_WhenRegionAndRegionTypeAreNull()
+        {
+            string? capturedRegion = null;
+            string? capturedRegionType = null;
+
+            _boundryMock
+                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Callback<List<SiteInfo>, string, string>((_, r, rt) =>
+                {
+                    capturedRegion = r;
+                    capturedRegionType = rt;
+                })
+                .ReturnsAsync(new List<SiteInfo> { Site("A") });
+
+            var query = Query();
+            query.Region = null;
+            query.regiontype = null;
+
+            var result = await _sut.GetAtomDataSelectionStation(query);
+
+            Assert.Equal("1", result);
+            Assert.Equal(string.Empty, capturedRegion);
+            Assert.Equal(string.Empty, capturedRegionType);
+        }
+
+        // ───────────── AURN with null RegionId skips region filtering ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_SkipsRegionFilter_WhenAurnAndRegionIdIsNull()
+        {
+            var sites = new List<SiteInfo> { Site("A"), Site("B") };
+            List<SiteInfo>? passed = null;
+
+            _boundryMock
+                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Callback<List<SiteInfo>, string, string>((s, _, _) => passed = s)
+                .ReturnsAsync(sites);
+
+            var result = await _sut.GetAtomDataSelectionStation(Query(regionId: null));
+
+            Assert.Equal("2", result);
+            Assert.NotNull(passed);
+        }
+
+        // ───────────── Hourly: explicit non-single download type ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_UsesEmailPath_ForNonSingleDownloadType()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            string? capturedDownloadType = null;
+            _hourlyMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .ReturnsAsync(new List<FinalData> { new() });
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .Callback<List<FinalData>, QueryStringData, string>((_, _, d) => capturedDownloadType = d)
+                .ReturnsAsync("https://s3/email.csv");
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorEmail"));
+
+            Assert.Equal("https://s3/email.csv", result);
+            Assert.Equal("dataSelectorEmail", capturedDownloadType);
+
+            _jobCollectionMock.Verify(
+                c => c.InsertOneAsync(It.IsAny<JobDocument>(), It.IsAny<InsertOneOptions>(), It.IsAny<CancellationToken>()),
+                Times.Never);
+        }
+
+        // ───────────── Email download returns empty url ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsEmptyUrl_WhenS3ReturnsEmpty()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            _hourlyMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .ReturnsAsync(new List<FinalData>());
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .ReturnsAsync(string.Empty);
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorMultiple"));
+
+            Assert.Equal(string.Empty, result);
+
+            _loggerMock.Verify(l => l.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()), Times.AtLeast(4));
+        }
     }
 }

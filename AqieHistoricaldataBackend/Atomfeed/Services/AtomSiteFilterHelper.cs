@@ -1,3 +1,4 @@
+using Amazon.Runtime;
 using AqieHistoricaldataBackend.Atomfeed.Models;
 using AqieHistoricaldataBackend.Utils.Mongo;
 using MongoDB.Driver;
@@ -11,6 +12,69 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
     /// </summary>
     public static class AtomSiteFilterHelper
     {
+        private static readonly HashSet<string> NonAurnPollutants =
+        [
+            "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+            "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31",
+            "32", "33", "34", "35", "41", "42", "43", "168", "169", "170",
+            "171", "172", "173", "174", "175", "176", "177", "178", "179"
+        ];
+
+        public static async Task<(string? DataSource, List<SiteInfo> Sites)> ResolveSitesAsync(
+            QueryStringData queryStringData,
+            string pollutantName,
+            string resolvedPollutantName,
+            IAuthService authService,
+            IHttpClientFactory httpClientFactory,
+            ILogger logger,
+            IMongoDbClientFactory mongoDbClientFactory)
+        {
+            string? datasource = queryStringData.dataSource;
+            string? networkId = queryStringData.networkId;
+            var sites = new List<SiteInfo>();
+
+            if (datasource == "AURN" && NonAurnPollutants.Contains(pollutantName))
+            {
+                datasource = "NON-AURN";
+                networkId = "10";
+            }
+
+            if (datasource == "AURN")
+            {
+                var token = await authService.GetRicardoToken();
+                var sitemetadatainfo = await RicardoSiteMetadata.FetchSiteMetadata(httpClientFactory, token);
+                sites = AtomSiteFilterHelper.FilterSitesByPollutants(sitemetadatainfo, resolvedPollutantName, logger);
+            }
+            else if (datasource == "NON-AURN")
+            {
+                sites = await AtomSiteFilterHelper.GetSiteInfoAsync(pollutantName, networkId ?? string.Empty, mongoDbClientFactory);
+
+                // networkId 10 represents AURN within the NON-AURN data source
+                if (networkId == "10")
+                {
+                    datasource = "AURN";
+                }
+            }
+
+            return (datasource, sites);
+        }
+
+        internal static object BuildCountResult(List<SiteInfo> stationData, string? datasource)
+        {
+            if (datasource == "AURN")
+            {
+                return stationData.Count.ToString();
+            }
+
+            var networkTypeCounts = stationData
+                .GroupBy(s => s.NetworkType ?? "Unknown")
+                .Select(g => new { NetworkType = g.Key, Count = g.Count() })
+                .ToList();
+
+            return networkTypeCounts.Count > 0
+                ? networkTypeCounts
+                : new[] { new { NetworkType = "Unknown", Count = stationData.Count } }.ToList();
+        }
         public static List<SiteInfo> FilterSitesByPollutants(List<SiteInfo> sites, string pollutantName, ILogger logger)
         {
             var mappedPollutants = GetMappedPollutants(pollutantName, logger, includeUnknowns: true);

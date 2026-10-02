@@ -45,71 +45,46 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             try
             {
                 string? pollutantName = queryStringData.pollutantName;
-                string? networkId = queryStringData.networkId;
-                string? datasource = queryStringData.dataSource;
                 string? year = queryStringData.Year;
-                string? regionid = queryStringData.RegionId;
-                string? region = queryStringData.Region;
-                string? regiontype = queryStringData.regiontype;
-                string? dataselectorfiltertype = queryStringData.dataselectorfiltertype;
-                string? dataselectordownloadtype = queryStringData.dataselectordownloadtype;
 
                 if (string.IsNullOrEmpty(pollutantName) || string.IsNullOrEmpty(year))
                 {
                     Logger.LogWarning("GetAtomDataSelectionStation called with null or empty pollutantName or year.");
                     return FailureResult;
                 }
-                List<SiteInfo> filteredSites = new List<SiteInfo>();
 
                 var resolvedPollutantName = await AtomSiteFilterHelper.ResolvePollutantNameAsync(pollutantName, Logger, MongoDbClientFactory);
-                if (datasource == "AURN")
-                {
-                    var token = await AuthService.GetRicardoToken();
-                    var sitemetadatainfo = await RicardoSiteMetadata.FetchSiteMetadata(httpClientFactory, token);
-                    filteredSites = AtomSiteFilterHelper.FilterSitesByPollutants(sitemetadatainfo, resolvedPollutantName, Logger);
-                }
 
-                if (datasource == "NON-AURN")
-                {
-                    filteredSites = await AtomSiteFilterHelper.GetSiteInfoAsync(pollutantName, networkId ?? string.Empty, MongoDbClientFactory);
-                }
+                var (datasource, filteredSites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                                                    queryStringData,
+                                                    pollutantName,
+                                                    resolvedPollutantName,
+                                                    AuthService,
+                                                    httpClientFactory,
+                                                    Logger,
+                                                    MongoDbClientFactory);
 
-                if (datasource == "AURN" && regionid != null)
+                if (datasource == "AURN" && queryStringData.RegionId != null)
                 {
-                    filteredSites = AtomSiteFilterHelper.FilterSitesByRegionId(filteredSites, regionid);
+                    filteredSites = AtomSiteFilterHelper.FilterSitesByRegionId(filteredSites, queryStringData.RegionId);
                 }
 
                 var filterpollutantyear = AtomSiteFilterHelper.FilterSitesByYearRanges(filteredSites, year);
 
                 var stationData = await atomDataSelectionServices.StationBoundry.GetAtomDataSelectionStationBoundryService(
                     filterpollutantyear,
-                    region ?? string.Empty,
-                    regiontype ?? string.Empty);
-                var stationcountresult = stationData.Count;
+                    queryStringData.Region ?? string.Empty,
+                    queryStringData.regiontype ?? string.Empty);
 
-                if (dataselectorfiltertype == "dataSelectorCount" && datasource == "AURN")
+                if (queryStringData.dataselectorfiltertype == "dataSelectorCount")
                 {
-                    return stationcountresult.ToString();
+                    return AtomSiteFilterHelper.BuildCountResult(stationData, datasource);
                 }
-                if (dataselectorfiltertype == "dataSelectorCount" && datasource == "NON-AURN")
-                {
-                    var networkTypeCounts = stationData
-                        .GroupBy(s => s.NetworkType ?? "Unknown")
-                        .Select(g => new
-                        {
-                            NetworkType = g.Key,
-                            Count = g.Count()
-                        })
-                        .ToList();
 
-                    return networkTypeCounts.Count > 0
-                        ? networkTypeCounts
-                        : new[] { new { NetworkType = "Unknown", Count = stationcountresult } }.ToList();
-                }
-                pollutantName = resolvedPollutantName;
-                if (dataselectorfiltertype == "dataSelectorHourly")
+                if (queryStringData.dataselectorfiltertype == "dataSelectorHourly")
                 {
-                    return await HandleHourlyDataSelection(stationData, pollutantName, year, queryStringData, dataselectordownloadtype ?? string.Empty);
+                    return await HandleHourlyDataSelection(stationData, resolvedPollutantName, year, queryStringData,
+                        queryStringData.dataselectordownloadtype ?? string.Empty);
                 }
 
                 return FailureResult;
@@ -253,6 +228,5 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 }
             }
         }
-
     }
 }

@@ -29,7 +29,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 _loggerMock.Object,
                 _httpClientFactoryMock.Object);
 
-        private HttpClient CreateMockHttpClient(
+        private static HttpClient CreateMockHttpClient(
             string allLocalAuthoritiesJson,
             string singleDtDataJson)
         {

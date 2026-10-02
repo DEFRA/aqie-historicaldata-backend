@@ -410,5 +410,141 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);
         }
+
+        // =====================================================================
+        // 15. Hydrocarbon pollutant only -> AurnCategory with Hydrocarbon network
+        // =====================================================================
+        [Fact]
+        public async Task GetAtomPollutantDataSource_HydrocarbonPollutantOnly_ReturnsHydrocarbonNetwork()
+        {
+            var sut  = CreateSutWithProjections([]);
+            var data = new QueryStringData { pollutantId = "10" };
+
+            var result  = await InvokeAsync(sut, data);
+            var network = result[0].GetProperty("networks").EnumerateArray().Single();
+
+            Assert.Equal("Near real-time data from Defra", result[0].GetProperty("category").GetString());
+            Assert.Equal("Automatic Hydrocarbon Network", network.GetProperty("name").GetString());
+            Assert.Equal("10", network.GetProperty("pollutantID").GetString());
+        }
+
+        // =====================================================================
+        // 16. AURN + hydrocarbon pollutants -> two networks in one category,
+        //     AURN first, hydrocarbon second
+        // =====================================================================
+        [Fact]
+        public async Task GetAtomPollutantDataSource_AurnAndHydrocarbonPollutants_ReturnsBothNetworksInOrder()
+        {
+            var sut  = CreateSutWithProjections([]);
+            var data = new QueryStringData { pollutantId = "38,10,179" };
+
+            var result   = await InvokeAsync(sut, data);
+            var networks = result[0].GetProperty("networks").EnumerateArray().ToList();
+
+            Assert.Single(result);
+            Assert.Equal(2, networks.Count);
+
+            Assert.Equal("Automatic Urban and Rural Network (AURN)", networks[0].GetProperty("name").GetString());
+            Assert.Equal("38", networks[0].GetProperty("pollutantID").GetString());
+
+            Assert.Equal("Automatic Hydrocarbon Network", networks[1].GetProperty("name").GetString());
+            Assert.Equal("10,179", networks[1].GetProperty("pollutantID").GetString());
+        }
+
+        // =====================================================================
+        // 17. Hydrocarbon networks never carry an "id" property
+        // =====================================================================
+        [Fact]
+        public async Task GetAtomPollutantDataSource_HydrocarbonNetwork_HasNoIdProperty()
+        {
+            var sut  = CreateSutWithProjections([]);
+            var data = new QueryStringData { pollutantId = "22" };
+
+            var result  = await InvokeAsync(sut, data);
+            var network = result[0].GetProperty("networks").EnumerateArray().Single();
+
+            Assert.False(network.TryGetProperty("id", out _));
+        }
+
+        // =====================================================================
+        // 18. Every hydrocarbon pollutant ID maps to the hydrocarbon network
+        // =====================================================================
+        [Theory]
+        [InlineData("10")] [InlineData("15")] [InlineData("22")] [InlineData("31")]
+        [InlineData("35")] [InlineData("41")] [InlineData("43")] [InlineData("168")]
+        [InlineData("175")] [InlineData("179")]
+        public async Task GetAtomPollutantDataSource_EachHydrocarbonPollutantId_ProducesHydrocarbonNetwork(string pollutantId)
+        {
+            var sut  = CreateSutWithProjections([]);
+            var data = new QueryStringData { pollutantId = pollutantId };
+
+            var result = await InvokeAsync(sut, data);
+
+            Assert.Contains(
+                result[0].GetProperty("networks").EnumerateArray(),
+                n => n.GetProperty("name").GetString() == "Automatic Hydrocarbon Network");
+        }
+
+        // =====================================================================
+        // 19. Pollutant IDs that are neither AURN nor hydrocarbon produce no
+        //     near real-time category
+        // =====================================================================
+        [Fact]
+        public async Task GetAtomPollutantDataSource_UnknownPollutantId_ProducesNoNearRealTimeCategory()
+        {
+            var sut  = CreateSutWithProjections([]);
+            var data = new QueryStringData { pollutantId = "129" };
+
+            var result = await InvokeAsync(sut, data);
+
+            Assert.DoesNotContain(result,
+                r => r.GetProperty("category").GetString() == "Near real-time data from Defra");
+        }
+
+        // =====================================================================
+        // 20. The Mongo filter excludes NetworkID = "10"
+        // =====================================================================
+        [Fact]
+        public async Task GetAtomPollutantDataSource_BuildsFilterExcludingNetworkId10()
+        {
+            FilterDefinition<StationDetailDocument>? capturedFilter = null;
+
+            var cursorMock = new Mock<IAsyncCursor<StationDetailDocument>>();
+            cursorMock
+                .SetupSequence(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true)
+                .ReturnsAsync(false);
+            cursorMock.Setup(c => c.Current).Returns([]);
+
+            _collectionMock
+                .Setup(c => c.FindAsync(
+                    It.IsAny<FilterDefinition<StationDetailDocument>>(),
+                    It.IsAny<FindOptions<StationDetailDocument, StationDetailDocument>>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback<FilterDefinition<StationDetailDocument>,
+                          FindOptions<StationDetailDocument, StationDetailDocument>,
+                          CancellationToken>((f, _, _) => capturedFilter = f)
+                .ReturnsAsync(cursorMock.Object);
+
+            _mongoFactoryMock
+                .Setup(f => f.GetCollection<StationDetailDocument>(
+                    "aqie_atom_non_aurn_networks_station_details"))
+                .Returns(_collectionMock.Object);
+
+            var sut = new AtomDataSelectionPollutantDataSource(
+                _loggerMock.Object, _mongoFactoryMock.Object);
+
+            await sut.GetAtomPollutantDataSource(new QueryStringData { pollutantId = "22" });
+
+            Assert.NotNull(capturedFilter);
+
+            var registry   = MongoDB.Bson.Serialization.BsonSerializer.SerializerRegistry;
+            var serializer = registry.GetSerializer<StationDetailDocument>();
+            var rendered   = capturedFilter!.Render(serializer, registry);
+
+            Assert.Contains("NetworkID", rendered.ToString());
+            Assert.Contains("$ne", rendered.ToString());
+            Assert.Contains("10", rendered.ToString());
+        }
     }
 }
