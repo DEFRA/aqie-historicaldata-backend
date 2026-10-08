@@ -138,7 +138,7 @@ public sealed class GeoBoundaryTest : IDisposable
         provider.LoadAll();
 
         Assert.Null(provider.Get("England"));
-        Assert.Empty(provider.GetMany(new[] { "England", "Wales" }));
+        Assert.Empty(provider.GetMany(EnglandAndWales));
     }
 
     [Fact]
