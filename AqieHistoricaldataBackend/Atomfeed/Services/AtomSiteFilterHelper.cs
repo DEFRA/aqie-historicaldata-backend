@@ -33,7 +33,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             string? networkId = queryStringData.networkId;
             var sites = new List<SiteInfo>();
 
-            if (datasource == "AURN" && NonAurnPollutants.Contains(pollutantName))
+            if (string.Equals(datasource?.Trim(), "AURN", StringComparison.OrdinalIgnoreCase)
+                && IsNonAurnPollutant(pollutantName))
             {
                 datasource = "NON-AURN";
                 networkId = "10";
@@ -315,6 +316,19 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
             logger.LogInformation("Resolved pollutant names: {Names}", resolvedPollutantName);
             return resolvedPollutantName;
+        }
+
+        private static bool IsNonAurnPollutant(string? pollutantName)
+        {
+            if (string.IsNullOrWhiteSpace(pollutantName))
+            {
+                return false;
+            }
+
+            var ids = pollutantName.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            // true only if every requested pollutant is NON-AURN
+            return ids.Length > 0 && ids.All(NonAurnPollutants.Contains);
         }
     }
 }
