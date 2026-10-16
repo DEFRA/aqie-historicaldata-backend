@@ -598,6 +598,134 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var json = System.Text.Json.JsonSerializer.Serialize(result);
             json.Should().Contain("Unknown").And.Contain("0");
         }
+
+        // ─── IsNonAurnPollutant (via ResolveSitesAsync) ───────────────────────────
+
+        [Theory]
+        [InlineData(" aurn ")]
+        [InlineData("AuRn")]
+        public async Task ResolveSitesAsync_DataSourceComparison_IsTrimmedAndCaseInsensitive(string dataSource)
+        {
+            var factory = new Mock<IMongoDbClientFactory>();
+            SetupCollection(factory, "aqie_atom_non_aurn_networks_station_details",
+                new List<StationDetailDocument>());
+
+            var auth = new Mock<IAuthService>();
+
+            var (resolvedDataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = dataSource, networkId = "5" },
+                pollutantName: "25",                 // NON-AURN pollutant
+                resolvedPollutantName: "Benzene",
+                auth.Object, new Mock<IHttpClientFactory>().Object, _logger, factory.Object);
+
+            // switched to NON-AURN, networkId forced to "10" => flipped back to AURN
+            resolvedDataSource.Should().Be("AURN");
+            sites.Should().BeEmpty();
+            auth.Verify(a => a.GetRicardoToken(), Times.Never);
+        }
+
+        [Fact]
+        public async Task ResolveSitesAsync_AllCommaSeparatedNonAurnPollutants_SwitchesDataSource()
+        {
+            var factory = new Mock<IMongoDbClientFactory>();
+            SetupCollection(factory, "aqie_atom_non_aurn_networks_station_details",
+                new List<StationDetailDocument>());
+
+            var auth = new Mock<IAuthService>();
+
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = "AURN", networkId = "3" },
+                pollutantName: " 10 , 25 ,168 ",
+                resolvedPollutantName: "Any",
+                auth.Object, new Mock<IHttpClientFactory>().Object, _logger, factory.Object);
+
+            dataSource.Should().Be("AURN");
+            sites.Should().BeEmpty();
+            auth.Verify(a => a.GetRicardoToken(), Times.Never);
+        }
+
+        [Fact]
+        public async Task ResolveSitesAsync_MixedAurnAndNonAurnPollutants_StaysAurn()
+        {
+            var auth = new Mock<IAuthService>();
+            auth.Setup(a => a.GetRicardoToken()).ReturnsAsync("token");
+
+            var httpFactory = CreateHttpClientFactory(SiteMetaJson);
+
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = "AURN", networkId = null },
+                pollutantName: "25,1",                // "1" is NOT in NonAurnPollutants
+                resolvedPollutantName: "Nitrogen dioxide",
+                auth.Object, httpFactory.Object, _logger, new Mock<IMongoDbClientFactory>().Object);
+
+            dataSource.Should().Be("AURN");
+            sites.Should().ContainSingle().Which.LocalSiteId.Should().Be("S1");
+            auth.Verify(a => a.GetRicardoToken(), Times.Once);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        [InlineData(",,")]
+        public async Task ResolveSitesAsync_BlankPollutantName_DoesNotSwitchToNonAurn(string? pollutantName)
+        {
+            var auth = new Mock<IAuthService>();
+            auth.Setup(a => a.GetRicardoToken()).ReturnsAsync("token");
+
+            var httpFactory = CreateHttpClientFactory(SiteMetaJson);
+
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = "AURN", networkId = null },
+                pollutantName!, "NO2",
+                auth.Object, httpFactory.Object, _logger, new Mock<IMongoDbClientFactory>().Object);
+
+            dataSource.Should().Be("AURN");
+            sites.Should().ContainSingle();
+            auth.Verify(a => a.GetRicardoToken(), Times.Once);
+        }
+
+        [Fact]
+        public async Task ResolveSitesAsync_NullDataSource_ReturnsNullAndEmptySites()
+        {
+            var auth = new Mock<IAuthService>();
+
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = null, networkId = "1" },
+                "25", "Benzene",
+                auth.Object, new Mock<IHttpClientFactory>().Object,
+                _logger, new Mock<IMongoDbClientFactory>().Object);
+
+            dataSource.Should().BeNull();
+            sites.Should().BeEmpty();
+            auth.Verify(a => a.GetRicardoToken(), Times.Never);
+        }
+
+        [Fact]
+        public async Task ResolveSitesAsync_NonAurnPollutantIdWithUntrimmedAurn_ButNotEqualAurn_ReturnsEmpty()
+        {
+            // datasource " AURN " with an AURN pollutant: trimmed check fails the
+            // NON-AURN switch and the "datasource == \"AURN\"" equality also fails.
+            var auth = new Mock<IAuthService>();
+
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = " AURN ", networkId = "1" },
+                "1", "Ozone",
+                auth.Object, new Mock<IHttpClientFactory>().Object,
+                _logger, new Mock<IMongoDbClientFactory>().Object);
+
+            dataSource.Should().Be(" AURN ");
+            sites.Should().BeEmpty();
+            auth.Verify(a => a.GetRicardoToken(), Times.Never);
+        }
+
+        [Fact]
+        public void GetMappedPollutants_UnknownAmongKnown_WithIncludeUnknowns_KeepsBoth()
+        {
+            var result = AtomSiteFilterHelper.GetMappedPollutants("NO2,Mystery Gas", _logger, includeUnknowns: true);
+
+            result.Should().Contain("Nitrogen dioxide").And.Contain("Mystery Gas");
+        }
     }
 
     internal sealed class StubHttpMessageHandler : HttpMessageHandler
