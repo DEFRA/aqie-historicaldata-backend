@@ -50,8 +50,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 sites = await AtomSiteFilterHelper.GetSiteInfoAsync(pollutantName, networkId ?? string.Empty, mongoDbClientFactory);
 
-                // networkId 10 represents AURN within the NON-AURN data source
-                if (networkId == "10")
+                // networkId 10 & 11 represents AURN within the NON-AURN data source
+                if (networkId == "10" || networkId == "11")
                 {
                     datasource = "AURN";
                 }
@@ -102,14 +102,14 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 .ToList();
         }
 
-        public static List<SiteInfo> FilterSitesByRegionId(List<SiteInfo> filteredSites, string? regionId)
+        public static List<SiteInfo> FilterSitesByRegionId(List<SiteInfo> filteredSites, string? regionId, string? agglomerationId)
         {
             if (filteredSites == null || filteredSites.Count == 0)
             {
                 return new List<SiteInfo>();
             }
 
-            if (string.IsNullOrWhiteSpace(regionId))
+            if (string.IsNullOrWhiteSpace(regionId) || string.IsNullOrWhiteSpace(agglomerationId))
             {
                 return filteredSites;
             }
@@ -119,8 +119,13 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+            // supports single or comma separated agglomeration ids e.g. "1,3,7"
+            var agglomerationIds = agglomerationId
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             return filteredSites
-                .Where(site => site.RegionId != null && regionIds.Contains(site.RegionId.Trim()))
+                .Where(site => (site.RegionId != null && regionIds.Contains(site.RegionId.Trim())) || (site.AgglomerationID != null && agglomerationIds.Contains(site.AgglomerationID.Trim())))
                 .ToList();
         }
 

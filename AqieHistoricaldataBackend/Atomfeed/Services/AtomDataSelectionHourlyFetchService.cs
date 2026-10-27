@@ -179,8 +179,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 new() { PollutantName = "O-xylene",                              PollutantMasterUrl = "482" },
                 new() { PollutantName = "1,2,3-trimethylbenzene",                              PollutantMasterUrl = "6012" },
                 new() { PollutantName = "1,2,4-trimethylbenzene",                              PollutantMasterUrl = "6011" },
-                new() { PollutantName = "1,3,5-trimethylbenzene",                              PollutantMasterUrl = "6013" }
-
+                new() { PollutantName = "1,3,5-trimethylbenzene",                              PollutantMasterUrl = "6013" },
+                new() { PollutantName = "Black Carbon",                              PollutantMasterUrl = "391" },
+                new() { PollutantName = "Black smoke",                              PollutantMasterUrl = "6" }
             };
 
             var filterList = (filter ?? string.Empty)

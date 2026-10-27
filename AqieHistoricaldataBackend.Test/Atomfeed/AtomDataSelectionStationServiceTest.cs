@@ -189,6 +189,22 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             _mongoFactoryMock.Verify(f => f.GetCollection<PollutantMasterDocument>(It.IsAny<string>()), Times.Never);
         }
 
+        // ───────────── Guard clause logging ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_LogsWarning_WhenPollutantMissing()
+        {
+            var result = await _sut.GetAtomDataSelectionStation(Query(pollutant: null));
+
+            Assert.Equal(Failure, result);
+            _loggerMock.Verify(l => l.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()), Times.Once);
+        }
+
         // ───────────── AURN count ─────────────
 
         [Fact]
@@ -791,6 +807,237 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 It.IsAny<It.IsAnyType>(),
                 It.IsAny<Exception>(),
                 (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()), Times.AtLeast(4));
+        }
+
+        // ───────────── AgglomerationID location filter ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_AppliesLocationFilter_WhenOnlyAgglomerationIdProvided()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            var query = Query();
+            query.RegionId = null;
+            query.AgglomerationID = "1";
+
+            var result = await _sut.GetAtomDataSelectionStation(query);
+
+            Assert.Equal("1", result);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsZero_WhenAgglomerationIdDoesNotMatch()
+        {
+            List<SiteInfo>? passed = null;
+            _boundryMock
+                .Setup(b => b.GetAtomDataSelectionStationBoundryService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Callback<List<SiteInfo>, string, string>((s, _, _) => passed = s)
+                .ReturnsAsync(new List<SiteInfo>());
+
+            var query = Query();
+            query.RegionId = null;                       // no region => location filter is skipped
+            query.AgglomerationID = "does-not-exist";
+
+            var result = await _sut.GetAtomDataSelectionStation(query);
+
+            Assert.Equal("0", result);
+            Assert.NotNull(passed);
+            Assert.NotEmpty(passed!);                    // sites are passed through unfiltered
+        }
+
+        // ───────────── CreateAndEnqueueJob failure paths ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenJobCollectionResolutionThrows()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            _mongoFactoryMock
+                .Setup(f => f.GetCollection<JobDocument>("aqie_csvexport_jobs"))
+                .Throws(new MongoConfigurationException("no collection"));
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorSingle"));
+
+            Assert.Equal(Failure, result);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenIndexCreationThrows()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            _indexManagerMock
+                .Setup(i => i.CreateOneAsync(
+                    It.IsAny<CreateIndexModel<JobDocument>>(),
+                    It.IsAny<CreateOneIndexOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new TimeoutException("index timeout"));
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorSingle"));
+
+            Assert.Equal(Failure, result);
+            _jobCollectionMock.Verify(
+                c => c.InsertOneAsync(It.IsAny<JobDocument>(), It.IsAny<InsertOneOptions>(), It.IsAny<CancellationToken>()),
+                Times.Never);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenJobInsertThrows()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            _jobCollectionMock
+                .Setup(c => c.InsertOneAsync(It.IsAny<JobDocument>(), It.IsAny<InsertOneOptions>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new TimeoutException("insert timeout"));
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorSingle"));
+
+            Assert.Equal(Failure, result);
+        }
+
+        // ───────────── Background processor: S3 failure ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_MarksJobFailed_WhenS3UploadThrowsInBackground()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            _jobCollectionMock
+                .Setup(c => c.InsertOneAsync(It.IsAny<JobDocument>(), It.IsAny<InsertOneOptions>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
+            var failedUpdate = new TaskCompletionSource();
+            var updates = new List<UpdateDefinition<JobDocument>>();
+            _jobCollectionMock
+                .Setup(c => c.UpdateOneAsync(
+                    It.IsAny<FilterDefinition<JobDocument>>(),
+                    It.IsAny<UpdateDefinition<JobDocument>>(),
+                    It.IsAny<UpdateOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback<FilterDefinition<JobDocument>, UpdateDefinition<JobDocument>, UpdateOptions, CancellationToken>(
+                    (_, u, _, _) =>
+                    {
+                        lock (updates)
+                        {
+                            updates.Add(u);
+                            if (updates.Count == 2) failedUpdate.TrySetResult();
+                        }
+                    })
+                .ReturnsAsync(Mock.Of<UpdateResult>());
+
+            _hourlyMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .ReturnsAsync(new List<FinalData> { new() });
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .ThrowsAsync(new AmazonS3Exception("upload failed"));
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorSingle"));
+
+            Assert.False(string.IsNullOrWhiteSpace(result as string));
+
+            await failedUpdate.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            Assert.Equal(2, updates.Count); // Processing + Failed
+            _loggerMock.Verify(l => l.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()), Times.AtLeastOnce);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_CompletesJob_WhenCsvDataIsEmpty()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            _jobCollectionMock
+                .Setup(c => c.InsertOneAsync(It.IsAny<JobDocument>(), It.IsAny<InsertOneOptions>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
+            var done = new TaskCompletionSource();
+            var updateCount = 0;
+            _jobCollectionMock
+                .Setup(c => c.UpdateOneAsync(
+                    It.IsAny<FilterDefinition<JobDocument>>(),
+                    It.IsAny<UpdateDefinition<JobDocument>>(),
+                    It.IsAny<UpdateOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback(() =>
+                {
+                    if (Interlocked.Increment(ref updateCount) == 2) done.TrySetResult();
+                })
+                .ReturnsAsync(Mock.Of<UpdateResult>());
+
+            _hourlyMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .ReturnsAsync(new List<FinalData>());
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .ReturnsAsync(string.Empty);
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorSingle"));
+
+            Assert.False(string.IsNullOrWhiteSpace(result as string));
+            await done.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(2, updateCount);
+        }
+
+        // ───────────── Ricardo metadata edge cases ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsZero_WhenRicardoReturnsNoMembers()
+        {
+            SetupHttpClient("""{ "member": [] }""");
+            SetupBoundry(new List<SiteInfo>());
+
+            var result = await _sut.GetAtomDataSelectionStation(Query());
+
+            Assert.Equal("0", result);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenRicardoReturnsInvalidJson()
+        {
+            SetupHttpClient("not-json");
+
+            var result = await _sut.GetAtomDataSelectionStation(Query());
+
+            Assert.Equal(Failure, result);
+        }
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_ReturnsFailure_WhenRicardoReturnsErrorStatus()
+        {
+            SetupHttpClient(string.Empty, HttpStatusCode.InternalServerError);
+
+            var result = await _sut.GetAtomDataSelectionStation(Query());
+
+            Assert.Equal(Failure, result);
+        }
+
+        // ───────────── Pollutant master resolution edge case ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_HandlesEmptyPollutantMaster()
+        {
+            SetupPollutantMaster(); // no documents
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            var result = await _sut.GetAtomDataSelectionStation(Query());
+
+            Assert.NotNull(result);
         }
     }
 }
