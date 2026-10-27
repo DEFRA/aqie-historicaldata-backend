@@ -115,12 +115,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             }
 
             // supports single or comma separated region ids e.g. "1,3,7"
-            var regionIds = (regionId ?? string.Empty)
+            var regionIds = regionId
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             // supports single or comma separated agglomeration ids e.g. "1,3,7"
-            var agglomerationIds = (agglomerationId ?? string.Empty)
+            var agglomerationIds = agglomerationId
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
