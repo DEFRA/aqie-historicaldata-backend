@@ -64,9 +64,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                                     Logger,
                                                     MongoDbClientFactory);
 
-                if (datasource == "AURN" && queryStringData.RegionId != null)
+                bool hasLocationFilter = queryStringData.RegionId != null || queryStringData.AgglomerationID != null;
+                if (datasource == "AURN" && hasLocationFilter)
                 {
-                    filteredSites = AtomSiteFilterHelper.FilterSitesByRegionId(filteredSites, queryStringData.RegionId);
+                    filteredSites = AtomSiteFilterHelper.FilterSitesByRegionId(filteredSites, queryStringData.RegionId, queryStringData.AgglomerationID);
                 }
 
                 var filterpollutantyear = AtomSiteFilterHelper.FilterSitesByYearRanges(filteredSites, year);

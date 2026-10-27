@@ -44,6 +44,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
         {
             public string? StationReadDate { get; set; }
             public string? RegionId { get; set; }
+            public string? AgglomerationID { get; set; }
             public string? Region { get; set; }
             public string? regiontype { get; set; }
             public string? SiteType { get; set; }
@@ -108,6 +109,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? LocalSiteId { get; init; }
             public string? AreaType { get; init; }
             public string? SiteType { get; init; }
+            public string? AgglomerationID { get; init; }
             public string? ZoneRegion { get; init; }
             public string? RegionId { get; init; }
             public string? Latitude { get; init; }

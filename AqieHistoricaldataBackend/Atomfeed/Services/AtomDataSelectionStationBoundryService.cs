@@ -57,6 +57,9 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 if (string.Equals(regiontype, "Region", StringComparison.OrdinalIgnoreCase))
                     return filteredstationpollutant;
 
+                if (string.Equals(regiontype, "Agglomeration", StringComparison.OrdinalIgnoreCase))
+                    return filteredstationpollutant;
+
                 return new List<SiteInfo>();
             }
             catch (Exception ex)
