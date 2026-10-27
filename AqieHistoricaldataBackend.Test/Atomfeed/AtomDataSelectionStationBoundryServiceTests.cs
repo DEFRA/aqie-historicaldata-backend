@@ -280,7 +280,12 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         {
             _localAuthServiceMock
                 .Setup(s => s.GetAtomDataSelectionLocalAuthoritiesService(It.IsAny<string>()))
-                .ReturnsAsync(new List<LocalAuthorityData> { null!, MakeLA(0d, 0d), MakeLA(51.5, 0.1) });
+                .ReturnsAsync(new List<LocalAuthorityData>
+                {
+                    null!,                 // hits `la is null` continue
+                    MakeLA(0d, 0d),        // hits the 0/0 continue
+                    MakeLA(51.5, 0.1)      // valid – the only one indexed
+                });
 
             var result = await _service.GetAtomDataSelectionStationBoundryService(
                 new List<SiteInfo> { MakeSite("51.5", "0.1") }, "Kent", "LocalAuthority");
@@ -289,33 +294,31 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         [Fact]
-        public async Task LocalAuthority_ChoosesNearestCandidate()
+        public async Task LocalAuthority_NullRegion_SetsEmptyCountry()
         {
             _localAuthServiceMock
                 .Setup(s => s.GetAtomDataSelectionLocalAuthoritiesService(It.IsAny<string>()))
-                .ReturnsAsync(new List<LocalAuthorityData>
-                {
-                    MakeLA(51.54, 0.1, "Far"),
-                    MakeLA(51.5001, 0.1, "Near")
-                });
+                .ReturnsAsync(new List<LocalAuthorityData> { MakeLA(51.5, 0.1, null!) });
 
             var result = await _service.GetAtomDataSelectionStationBoundryService(
                 new List<SiteInfo> { MakeSite("51.5", "0.1") }, "Kent", "LocalAuthority");
 
-            Assert.Equal("Near", Assert.Single(result).Country);
+            Assert.Equal(string.Empty, Assert.Single(result).Country);
         }
 
-        [Fact]
-        public async Task LocalAuthority_InvalidSiteLatLon_IsSkipped()
+        [Theory]
+        [InlineData("Region")]
+        [InlineData("REGION")]
+        [InlineData("Agglomeration")]
+        [InlineData("agglomeration")]
+        public async Task RegionOrAgglomeration_ReturnsInputUnchanged(string regionType)
         {
-            _localAuthServiceMock
-                .Setup(s => s.GetAtomDataSelectionLocalAuthoritiesService(It.IsAny<string>()))
-                .ReturnsAsync(new List<LocalAuthorityData> { MakeLA(51.5, 0.1) });
+            var sites = new List<SiteInfo> { MakeSite("51.5", "0.1"), MakeSite("55.0", "-3.0") };
 
-            var result = await _service.GetAtomDataSelectionStationBoundryService(
-                new List<SiteInfo> { MakeSite("not-a-number", "0.1") }, "Kent", "LocalAuthority");
+            var result = await _service.GetAtomDataSelectionStationBoundryService(sites, "Kent", regionType);
 
-            Assert.Empty(result);
+            Assert.Same(sites, result);
+            Assert.Equal(2, result.Count);
         }
 
         // Optional, only if you must cover it:
