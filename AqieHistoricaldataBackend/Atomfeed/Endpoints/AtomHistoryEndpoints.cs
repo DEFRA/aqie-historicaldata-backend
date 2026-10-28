@@ -23,6 +23,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             app.MapGet("AtomDataSelectionPollutantMaster", GetAtomDataSelectionPollutantMaster);
             app.MapPost("AtomDataSelectionPollutantDataSource", GetAtomDataSelectionPollutantDataSource);
             app.MapGet("AtomDataSelectionRegionMaster", GetAtomDataSelectionRegionMaster);
+            app.MapGet("AtomDataSelectionAgglomerationMaster", GetAtomDataSelectionAgglomerationMaster);
         }
         private static async Task<IResult> GetHistorydataById([FromBody] QueryStringData data,IAtomHistoryService Persistence, ILogger<AtomHistoryService> logger)
         {
@@ -221,6 +222,20 @@ namespace AqieHistoricaldataBackend.Atomfeed.Endpoints
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error GetAtomDataSelectionRegionMaster endpoint {Error}", ex.Message);
+                return Results.NotFound();
+            }
+        }
+
+        private static async Task<IResult> GetAtomDataSelectionAgglomerationMaster(IAtomAgglomerationService Persistence, ILogger<AtomAgglomerationService> logger)
+        {
+            try
+            {
+                var agglomerations = await Persistence.GetDistinctAgglomerations();
+                return agglomerations is { Count: > 0 } ? Results.Ok(agglomerations) : Results.NotFound();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error GetAtomDataSelectionAgglomerationMaster endpoint {Error}", ex.Message);
                 return Results.NotFound();
             }
         }

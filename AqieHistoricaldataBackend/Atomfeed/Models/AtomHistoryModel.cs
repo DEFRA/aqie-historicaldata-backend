@@ -389,5 +389,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string? RegionId { get; set; }
             public string? RegionName { get; set; }
         }
+
+        public class AgglomerationInfo
+        {
+            public string? AgglomerationId { get; set; }
+            public string? AgglomerationRegion { get; set; }
+        }
     }
 }
