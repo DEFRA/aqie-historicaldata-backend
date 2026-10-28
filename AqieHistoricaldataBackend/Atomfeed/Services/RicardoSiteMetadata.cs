@@ -49,6 +49,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 LocalSiteId = site.TryGetProperty("localSiteId", out var localSiteIdEl) ? localSiteIdEl.ToString() : null,
                 AreaType = site.TryGetProperty("areaType", out var areaTypeEl) ? areaTypeEl.ToString() : null,
                 SiteType = site.TryGetProperty("siteType", out var siteTypeEl) ? siteTypeEl.ToString() : null,
+                AgglomerationID = site.TryGetProperty("agglomerationRegion", out var agglomerationEl) ? agglomerationEl.ToString() : null,
                 ZoneRegion = site.TryGetProperty("governmentRegion", out var zoneRegionEl) ? zoneRegionEl.ToString() : null,
                 RegionId = site.TryGetProperty("zoneRegion", out var regionIdEl) ? regionIdEl.ToString() : null,
                 Latitude = site.TryGetProperty("latitude", out var latitudeEl) ? latitudeEl.ToString() : null,

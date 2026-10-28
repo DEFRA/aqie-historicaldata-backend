@@ -158,6 +158,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Services.AddSingleton<IDataSelectionHourlyAtomFeedExportCsv, DataSelectionHourlyAtomFeedExportCsv>();
     builder.Services.AddSingleton<IAuthService, AuthService>();
     builder.Services.AddSingleton<IAtomRegionService, AtomRegionService>();
+    builder.Services.AddSingleton<IAtomAgglomerationService, AtomAgglomerationService>();
     builder.Services.AddSingleton<IAtomDataSelectionJobStatus, AtomDataSelectionJobStatus>();
     builder.Services.AddSingleton<IAtomDataSelectionEmailJobService, AtomDataSelectionEmailJobService>();
     builder.Services.AddSingleton<IAtomDataSelectionPresignedUrlMail, AtomDataSelectionPresignedUrlMail>();
