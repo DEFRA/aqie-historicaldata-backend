@@ -26,6 +26,13 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             string? siteId = "S1",
             string? regionId = "1",
             params PollutantInfo[] pollutants) =>
+            Site(siteId, regionId, null, pollutants);
+
+        private static SiteInfo Site(
+            string? siteId,
+            string? regionId,
+            string? agglomerationId,
+            params PollutantInfo[] pollutants) =>
             new()
             {
                 SiteName = "Site " + siteId,
@@ -33,6 +40,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 AreaType = "Urban",
                 SiteType = "Background",
                 RegionId = regionId,
+                AgglomerationID = agglomerationId,
                 ZoneRegion = "Zone",
                 Latitude = "51.1",
                 Longitude = "-0.1",
@@ -145,18 +153,18 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         }
 
         [Theory]
-        [InlineData(null, "A1")]
-        [InlineData("", "A1")]
-        [InlineData("   ", "A1")]
-        [InlineData("1", null)]
-        [InlineData("1", "")]
-        [InlineData("1", "   ")]
-        public void FilterSitesByRegionId_ReturnsAll_WhenRegionOrAgglomerationIdMissing(string? regionId, string? agglomerationId)
+        [InlineData("1", null, 1)]    // region only -> S1
+        [InlineData("1", "", 1)]
+        [InlineData("1", "   ", 1)]
+        [InlineData(null, "A1", 0)]   // agglomeration only; Site(...) leaves AgglomerationID null
+        [InlineData("", "A1", 0)]
+        [InlineData("   ", "A1", 0)]
+        public void FilterSitesByRegionId_FiltersOnWhicheverIdIsSupplied(string? regionId, string? agglomerationId, int expected)
         {
             var sites = new List<SiteInfo> { Site("S1", "1"), Site("S2", "2") };
 
             AtomSiteFilterHelper.FilterSitesByRegionId(sites, regionId!, agglomerationId!)
-                .Should().HaveCount(2);
+                .Should().HaveCount(expected);
         }
 
         private static readonly string[] ExpectedRegionFilteredSiteIds = ["S1", "S3", "S5"];
@@ -748,6 +756,84 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var result = AtomSiteFilterHelper.GetMappedPollutants("NO2,Mystery Gas", _logger, includeUnknowns: true);
 
             result.Should().Contain("Nitrogen dioxide").And.Contain("Mystery Gas");
+        }
+
+        // ─── Coverage top-ups ────────────────────────────────────────────────
+
+        [Fact]
+        public async Task ResolveSitesAsync_NonAurnDataSource_NetworkId11_FlipsBackToAurn()
+        {
+            var factory = new Mock<IMongoDbClientFactory>();
+            SetupCollection(factory, "aqie_atom_non_aurn_networks_station_details",
+                new List<StationDetailDocument>());
+
+            var auth = new Mock<IAuthService>();
+
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = "NON-AURN", networkId = "11" },
+                "25", "Benzene",
+                auth.Object, new Mock<IHttpClientFactory>().Object, _logger, factory.Object);
+
+            dataSource.Should().Be("AURN");
+            sites.Should().BeEmpty();
+            auth.Verify(a => a.GetRicardoToken(), Times.Never);
+        }
+
+        private static readonly string[] ExpectedRegionOnlySiteIds = ["S1", "S3"];
+
+        [Fact]
+        public void FilterSitesByRegionId_FiltersByRegionOnly_WhenAgglomerationIdMissing()
+        {
+            var sites = new List<SiteInfo>
+            {
+                RegionSite("S1", "1", "A1"),
+                RegionSite("S2", "2", "A1"),
+                RegionSite("S3", " 3 ", null),
+                RegionSite("S4", null, "A1")
+            };
+
+            var result = AtomSiteFilterHelper.FilterSitesByRegionId(sites, "1,3", null);
+
+            result.Select(s => s.LocalSiteId).Should().BeEquivalentTo(ExpectedRegionOnlySiteIds);
+        }
+
+        private static readonly string[] ExpectedAgglomerationOnlySiteIds = ["S1", "S3"];
+
+        [Fact]
+        public void FilterSitesByRegionId_FiltersByAgglomerationOnly_WhenRegionIdMissing()
+        {
+            var sites = new List<SiteInfo>
+            {
+                RegionSite("S1", "1", "A1"),
+                RegionSite("S2", "1", "A9"),
+                RegionSite("S3", null, " a2 "),
+                RegionSite("S4", "1", null)
+            };
+
+            var result = AtomSiteFilterHelper.FilterSitesByRegionId(sites, "   ", "A1,A2");
+
+            result.Select(s => s.LocalSiteId).Should().BeEquivalentTo(ExpectedAgglomerationOnlySiteIds);
+        }
+
+        [Fact]
+        public void FilterSitesByPollutants_PreservesAgglomerationId()
+        {
+            var site = Site("S1", "1", "A7", Pollutant("Ozone"));
+
+            var result = AtomSiteFilterHelper.FilterSitesByPollutants(
+                new List<SiteInfo> { site }, "Ozone", _logger);
+
+            result.Should().ContainSingle().Which.AgglomerationID.Should().Be("A7");
+        }
+
+        [Fact]
+        public void BuildCountResult_GroupsByNetworkType_WhenDataSourceNull()
+        {
+            var s1 = Site("S1", "1"); s1.NetworkType = "Defra";
+
+            var result = AtomSiteFilterHelper.BuildCountResult(new List<SiteInfo> { s1 }, null);
+
+            System.Text.Json.JsonSerializer.Serialize(result).Should().Contain("Defra");
         }
     }
 

@@ -651,7 +651,9 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         private static eMailJobDocument BuildPendingJob(
             string jobId,
             string email,
-            DateTime? createdAt = null) =>
+            DateTime? createdAt = null,
+            string regionId = "RGN-001",
+            string agglomerationId = "AGG-001") =>
             new()
             {
                 JobId = jobId,
@@ -662,6 +664,8 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 NetworkId = "NET01",
                 DataSource = "AURN",
                 Year = "2024",
+                RegionId = regionId,
+                AgglomerationID = agglomerationId,
                 Region = "London",
                 Regiontype = "country",
                 Dataselectorfiltertype = "all",
@@ -715,6 +719,95 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                     It.IsAny<UpdateOptions>(),
                     It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new UpdateResult.Acknowledged(1, 1, null));
+        }
+
+        // -----------------------------------------------------------------------
+        // REGION ID AND AGGLOMERATION ID TESTS
+        // -----------------------------------------------------------------------
+
+        [Theory]
+        [InlineData("RGN-001", "AGG-001")]
+        [InlineData("", "")]
+        [InlineData(null, null)]
+        public async Task GetAtomemailjobDataSelection_MapsRegionIdAndAgglomerationId(
+            string? regionId, string? agglomerationId)
+        {
+            eMailJobDocument capturedDoc = null!;
+            _collectionMock
+                .Setup(c => c.InsertOneAsync(
+                    It.IsAny<eMailJobDocument>(),
+                    It.IsAny<InsertOneOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback<eMailJobDocument, InsertOneOptions, CancellationToken>(
+                    (doc, _, _) => capturedDoc = doc)
+                .Returns(Task.CompletedTask);
+
+            var result = await CreateService().GetAtomemailjobDataSelection(new QueryStringData
+            {
+                email = "user@test.com",
+                RegionId = regionId,
+                AgglomerationID = agglomerationId
+            });
+
+            Assert.Equal("Success", result);
+            Assert.Equal(regionId ?? string.Empty, capturedDoc.RegionId);
+            Assert.Equal(agglomerationId ?? string.Empty, capturedDoc.AgglomerationID);
+        }
+
+        [Fact]
+        public async Task ProcessPendingEmailJobsAsync_PassesRegionIdAndAgglomerationId_ToStationService()
+        {
+            var job = BuildPendingJob("job-regions", "region@test.com",
+                regionId: "RGN-042", agglomerationId: "AGG-042");
+            SetupFindReturning([job]);
+            SetupClaimReturning(job);
+            SetupUpdateOneSucceeds();
+            SetNotifyEnvVars();
+
+            QueryStringData captured = null!;
+            _stationServiceMock
+                .Setup(s => s.GetAtomDataSelectionStation(It.IsAny<QueryStringData>()))
+                .Callback<QueryStringData>(q => captured = q)
+                .ReturnsAsync("https://s3.bucket/file.csv");
+
+            await CreateTestableService(CreateMockHttpClient(HttpStatusCode.OK))
+                .ProcessPendingEmailJobsAsync(CancellationToken.None);
+
+            Assert.NotNull(captured);
+            Assert.Equal("RGN-042", captured.RegionId);
+            Assert.Equal("AGG-042", captured.AgglomerationID);
+            Assert.Equal(job.PollutantName, captured.pollutantName);
+            Assert.Equal(job.NetworkId, captured.networkId);
+            Assert.Equal(job.DataSource, captured.dataSource);
+            Assert.Equal(job.Year, captured.Year);
+            Assert.Equal(job.Region, captured.Region);
+            Assert.Equal(job.Regiontype, captured.regiontype);
+            Assert.Equal(job.Dataselectorfiltertype, captured.dataselectorfiltertype);
+            Assert.Equal(job.Dataselectordownloadtype, captured.dataselectordownloadtype);
+            Assert.Equal(job.Email, captured.email);
+        }
+
+        [Fact]
+        public async Task ProcessPendingEmailJobsAsync_HandlesEmptyRegionIdAndAgglomerationId()
+        {
+            var job = BuildPendingJob("job-empty-regions", "empty@test.com",
+                regionId: string.Empty, agglomerationId: string.Empty);
+            SetupFindReturning([job]);
+            SetupClaimReturning(job);
+            SetupUpdateOneSucceeds();
+            SetNotifyEnvVars();
+
+            QueryStringData captured = null!;
+            _stationServiceMock
+                .Setup(s => s.GetAtomDataSelectionStation(It.IsAny<QueryStringData>()))
+                .Callback<QueryStringData>(q => captured = q)
+                .ReturnsAsync("https://s3.bucket/file.csv");
+
+            await CreateTestableService(CreateMockHttpClient(HttpStatusCode.OK))
+                .ProcessPendingEmailJobsAsync(CancellationToken.None);
+
+            Assert.Equal(string.Empty, captured.RegionId);
+            Assert.Equal(string.Empty, captured.AgglomerationID);
         }
     }
 }

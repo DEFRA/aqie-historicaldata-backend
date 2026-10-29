@@ -836,14 +836,14 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 .ReturnsAsync(new List<SiteInfo>());
 
             var query = Query();
-            query.RegionId = null;                       // no region => location filter is skipped
-            query.AgglomerationID = "does-not-exist";
+            query.RegionId = null;
+            query.AgglomerationID = "does-not-exist";   // AgglomerationID alone still triggers the location filter
 
             var result = await _sut.GetAtomDataSelectionStation(query);
 
             Assert.Equal("0", result);
             Assert.NotNull(passed);
-            Assert.NotEmpty(passed!);                    // sites are passed through unfiltered
+            Assert.Empty(passed!);                      // no site matches the agglomeration => nothing passed through
         }
 
         // ───────────── CreateAndEnqueueJob failure paths ─────────────

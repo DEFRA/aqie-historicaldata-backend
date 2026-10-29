@@ -88,6 +88,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                     AreaType = site.AreaType,
                     SiteType = site.SiteType,
                     RegionId = site.RegionId,
+                    AgglomerationID = site.AgglomerationID,
                     ZoneRegion = site.ZoneRegion,
                     Latitude = site.Latitude,
                     Longitude = site.Longitude,
@@ -109,23 +110,30 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return new List<SiteInfo>();
             }
 
-            if (string.IsNullOrWhiteSpace(regionId) || string.IsNullOrWhiteSpace(agglomerationId))
+            bool hasRegion = !string.IsNullOrWhiteSpace(regionId);
+            bool hasAgglomeration = !string.IsNullOrWhiteSpace(agglomerationId);
+
+            // only skip filtering when neither filter was supplied
+            if (!hasRegion && !hasAgglomeration)
             {
                 return filteredSites;
             }
 
-            // supports single or comma separated region ids e.g. "1,3,7"
-            var regionIds = regionId
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            // supports single or comma separated ids e.g. "1,3,7"
+            var regionIds = hasRegion
+                ? regionId!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                           .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            // supports single or comma separated agglomeration ids e.g. "1,3,7"
-            var agglomerationIds = agglomerationId
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var agglomerationIds = hasAgglomeration
+                ? agglomerationId!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                              .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             return filteredSites
-                .Where(site => (site.RegionId != null && regionIds.Contains(site.RegionId.Trim())) || (site.AgglomerationID != null && agglomerationIds.Contains(site.AgglomerationID.Trim())))
+                .Where(site =>
+                    (hasRegion && site.RegionId != null && regionIds.Contains(site.RegionId.Trim())) ||
+                    (hasAgglomeration && site.AgglomerationID != null && agglomerationIds.Contains(site.AgglomerationID.Trim())))
                 .ToList();
         }
 
