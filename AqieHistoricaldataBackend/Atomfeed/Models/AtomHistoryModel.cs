@@ -200,6 +200,10 @@ namespace AqieHistoricaldataBackend.Atomfeed.Models
             public string DataSource { get; set; } = string.Empty;
             [BsonElement("year")]
             public string Year { get; set; } = string.Empty;
+            [BsonElement("regionId")]
+            public string RegionId { get; set; } = string.Empty;
+            [BsonElement("agglomerationID")]
+            public string AgglomerationID { get; set; } = string.Empty;
             [BsonElement("region")]
             public string Region { get; set; } = string.Empty;
             [BsonElement("regiontype")]
