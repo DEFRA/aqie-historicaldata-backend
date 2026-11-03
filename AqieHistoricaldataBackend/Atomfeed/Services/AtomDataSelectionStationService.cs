@@ -64,6 +64,12 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                                                     Logger,
                                                     MongoDbClientFactory);
 
+                // Keep the request model in sync with the resolved data source (e.g. "AURN")
+                if (!string.IsNullOrEmpty(datasource))
+                {
+                    queryStringData.dataSource = datasource;
+                }
+
                 bool hasLocationFilter = queryStringData.RegionId != null || queryStringData.AgglomerationID != null;
                 if (datasource == "AURN" && hasLocationFilter)
                 {
