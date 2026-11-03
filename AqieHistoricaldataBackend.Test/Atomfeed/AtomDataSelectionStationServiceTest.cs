@@ -1039,5 +1039,141 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             Assert.NotNull(result);
         }
+
+        // ───────────── dataSource sync with resolved datasource ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_SyncsDataSourceOnModel_WhenResolvedDatasourceIsNonAurn()
+        {
+            SetupPollutantMaster(new PollutantMasterDocument { pollutantID = "10", pollutantName = "Benzene" });
+            SetupStationDetails(new StationDetailDocument
+            {
+                SiteID = "S1",
+                SiteName = "Station 1",
+                NetworkID = "7",
+                NetworkType = "Industrial",
+                pollutantID = "10",
+                PollutantName = "Benzene",
+                EnvironmentType = "Urban Background",
+                StartDate = "01/01/2020",
+                EndDate = "31/12/2025"
+            });
+            SetupBoundry(new List<SiteInfo> { Site("A", "Industrial") });
+
+            QueryStringData? captured = null;
+            _hourlyMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .Callback<List<SiteInfo>, string, string, QueryStringData>((_, _, _, q) => captured = q)
+                .ReturnsAsync(new List<FinalData> { new() });
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .ReturnsAsync("https://s3/sync.csv");
+
+            var query = Query(pollutant: "10", filterType: "dataSelectorHourly", downloadType: "dataSelectorMultiple", networkId: "7");
+
+            var result = await _sut.GetAtomDataSelectionStation(query);
+
+            Assert.Equal("https://s3/sync.csv", result);
+            Assert.NotNull(captured);
+            Assert.False(string.IsNullOrEmpty(captured!.dataSource));
+            Assert.Equal(captured.dataSource, query.dataSource); // model kept in sync with resolved datasource
+        }
+
+        // ───────────── Queue processor restarts after draining ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_RestartsQueueProcessor_AfterPreviousRunCompleted()
+        {
+            SetupBoundry(new List<SiteInfo> { Site("A") });
+
+            _jobCollectionMock
+                .Setup(c => c.InsertOneAsync(It.IsAny<JobDocument>(), It.IsAny<InsertOneOptions>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
+            var firstDone = new TaskCompletionSource();
+            var secondDone = new TaskCompletionSource();
+            var updateCount = 0;
+            _jobCollectionMock
+                .Setup(c => c.UpdateOneAsync(
+                    It.IsAny<FilterDefinition<JobDocument>>(),
+                    It.IsAny<UpdateDefinition<JobDocument>>(),
+                    It.IsAny<UpdateOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback(() =>
+                {
+                    var count = Interlocked.Increment(ref updateCount);
+                    if (count == 2) firstDone.TrySetResult();
+                    if (count == 4) secondDone.TrySetResult();
+                })
+                .ReturnsAsync(Mock.Of<UpdateResult>());
+
+            _hourlyMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .ReturnsAsync(new List<FinalData> { new() });
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .ReturnsAsync("https://s3/restart.csv");
+
+            var first = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorSingle"));
+            await firstDone.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            // second enqueue happens after the first batch finished → exercises the restart guard
+            var second = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorSingle"));
+            await secondDone.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            Assert.NotEqual(first as string, second as string);
+            Assert.Equal(4, updateCount); // 2 jobs × (Processing + Completed)
+        }
+
+        // ───────────── Hourly path when boundary returns no stations ─────────────
+
+        [Fact]
+        public async Task GetAtomDataSelectionStation_StillQueuesJob_WhenNoStationsMatch()
+        {
+            SetupBoundry(new List<SiteInfo>());
+
+            List<SiteInfo>? capturedStations = null;
+            _jobCollectionMock
+                .Setup(c => c.InsertOneAsync(It.IsAny<JobDocument>(), It.IsAny<InsertOneOptions>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+
+            var done = new TaskCompletionSource();
+            var updateCount = 0;
+            _jobCollectionMock
+                .Setup(c => c.UpdateOneAsync(
+                    It.IsAny<FilterDefinition<JobDocument>>(),
+                    It.IsAny<UpdateDefinition<JobDocument>>(),
+                    It.IsAny<UpdateOptions>(),
+                    It.IsAny<CancellationToken>()))
+                .Callback(() =>
+                {
+                    if (Interlocked.Increment(ref updateCount) == 2) done.TrySetResult();
+                })
+                .ReturnsAsync(Mock.Of<UpdateResult>());
+
+            _hourlyMock
+                .Setup(h => h.GetAtomDataSelectionHourlyFetchService(
+                    It.IsAny<List<SiteInfo>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<QueryStringData>()))
+                .Callback<List<SiteInfo>, string, string, QueryStringData>((s, _, _, _) => capturedStations = s)
+                .ReturnsAsync(new List<FinalData>());
+            _s3Mock
+                .Setup(s => s.WriteCsvToAwsS3BucketAsync(
+                    It.IsAny<List<FinalData>>(), It.IsAny<QueryStringData>(), It.IsAny<string>()))
+                .ReturnsAsync("https://s3/empty.csv");
+
+            var result = await _sut.GetAtomDataSelectionStation(
+                Query(filterType: "dataSelectorHourly", downloadType: "dataSelectorSingle"));
+
+            Assert.False(string.IsNullOrWhiteSpace(result as string));
+            await done.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.NotNull(capturedStations);
+            Assert.Empty(capturedStations!);
+        }
     }
 }
