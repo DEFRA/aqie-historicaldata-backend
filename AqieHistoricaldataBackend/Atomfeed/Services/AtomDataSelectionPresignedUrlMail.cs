@@ -54,6 +54,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 Logger.LogInformation("Document CreatedAt value: {CreatedAt}", doc.CreatedAt);
 
+                if(doc.NetworkId == "11")
+                {
+                    doc.DataSource = "AURN";
+                }
+
                 string s3Key = $"{doc.DataSource}_{doc.PollutantName}_{doc.Region}_{doc.Year}.zip";
                 string? resultUrl = await GetS3data(s3Key);
                 if (resultUrl == null) return null;
