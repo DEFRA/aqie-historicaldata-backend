@@ -329,5 +329,54 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
                 It.IsAny<CancellationToken>()), Times.Once);
         }
 
+        // ─── NetworkId == "11" overrides DataSource to AURN ───────────────────
+
+        [Fact]
+        public async Task GetPresignedUrlMail_OverridesDataSourceToAurn_WhenNetworkIdIs11()
+        {
+            const string expectedUrl = "https://example.com/AURN_NO2_London_2024.zip";
+            var doc = BuildEmailJobDocument(dataSource: "OTHER");
+            doc.NetworkId = "11";
+            SetupFindReturns(doc);
+
+            _AwsPreSignedUrLServiceMock
+                .Setup(s => s.GeneratePreSignedURL("test-bucket", "AURN_NO2_London_2024.zip", 604800))
+                .ReturnsAsync(expectedUrl);
+
+            var result = await _sut.GetPresignedUrlMail(doc.JobId);
+
+            Assert.Equal(expectedUrl, result);
+            Assert.Equal("AURN", doc.DataSource);
+            _AwsPreSignedUrLServiceMock.Verify(
+                s => s.GeneratePreSignedURL("test-bucket", "AURN_NO2_London_2024.zip", 604800), Times.Once);
+        }
+
+        // ─── Outer catch when collection was never initialised ───────────────
+
+        [Fact]
+        public async Task GetPresignedUrlMail_ReturnsNull_WhenGetCollectionThrows()
+        {
+            _mongoFactoryMock
+                .Setup(f => f.GetCollection<eMailJobDocument>("aqie_csvemailexport_jobs"))
+                .Throws(new InvalidOperationException("Mongo unavailable"));
+
+            var result = await _sut.GetPresignedUrlMail("job-001");
+
+            Assert.Null(result);
+            // _jobCollection stayed null, so no failure-status update is attempted
+            _collectionMock.Verify(c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<eMailJobDocument>>(),
+                It.IsAny<UpdateDefinition<eMailJobDocument>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()), Times.Never);
+            _loggerMock.Verify(
+                x => x.Log(
+                    LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.IsAny<It.IsAnyType>(),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.Once);
+        }
     }
 }
