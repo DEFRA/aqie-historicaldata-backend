@@ -169,20 +169,24 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
         private static readonly string[] ExpectedRegionFilteredSiteIds = ["S1", "S3", "S5"];
 
-        private static SiteInfo RegionSite(string siteId, string? regionId, string? agglomerationId) =>
-            new()
-            {
-                SiteName = "Site " + siteId,
-                LocalSiteId = siteId,
-                AreaType = "Urban",
-                SiteType = "Background",
-                RegionId = regionId,
-                AgglomerationID = agglomerationId,
-                ZoneRegion = "Zone",
-                Latitude = "51.1",
-                Longitude = "-0.1",
-                Pollutants = new List<PollutantInfo>()
-            };
+        private static SiteInfo RegionSite(
+        string siteId,
+        string? regionId,
+        string? agglomerationId,
+        string? zoneRegion = "Zone") =>
+        new()
+        {
+            SiteName = "Site " + siteId,
+            LocalSiteId = siteId,
+            AreaType = "Urban",
+            SiteType = "Background",
+            RegionId = regionId,
+            AgglomerationID = agglomerationId,
+            ZoneRegion = zoneRegion,
+            Latitude = "51.1",
+            Longitude = "-0.1",
+            Pollutants = new List<PollutantInfo>()
+        };
 
         [Fact]
         public void FilterSitesByRegionId_FiltersByCommaSeparatedIds_AndIgnoresNullIds()
@@ -834,6 +838,95 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
             var result = AtomSiteFilterHelper.BuildCountResult(new List<SiteInfo> { s1 }, null);
 
             System.Text.Json.JsonSerializer.Serialize(result).Should().Contain("Defra");
+        }
+
+        // ─── FilterSitesByRegionId : Country assignment (foreach loop) ─────────
+
+        [Fact]
+        public void FilterSitesByRegionId_SetsCountryFromTrimmedZoneRegion_ForEverySite()
+        {
+            var matching = RegionSite("S1", "1", null, "  South East  ");
+            var nonMatching = RegionSite("S2", "2", null, "  North West  ");
+
+            var sites = new List<SiteInfo> { matching, nonMatching };
+
+            var result = AtomSiteFilterHelper.FilterSitesByRegionId(sites, "1", null);
+
+            result.Should().ContainSingle().Which.Country.Should().Be("South East");
+
+            // loop runs over all sites, even those filtered out afterwards
+            nonMatching.Country.Should().Be("North West");
+        }
+
+        [Fact]
+        public void FilterSitesByRegionId_SetsCountryNull_WhenZoneRegionNull()
+        {
+            var site = RegionSite("S1", "1", null, null);
+
+            var result = AtomSiteFilterHelper.FilterSitesByRegionId(
+                new List<SiteInfo> { site }, "1", null);
+
+            result.Should().ContainSingle().Which.Country.Should().BeNull();
+        }
+
+        [Fact]
+        public void FilterSitesByRegionId_SetsCountry_WhenOnlyAgglomerationSupplied()
+        {
+            var site = RegionSite("S1", null, " A1 ", " Wales ");
+
+            var result = AtomSiteFilterHelper.FilterSitesByRegionId(
+                new List<SiteInfo> { site }, null, "A1");
+
+            result.Should().ContainSingle().Which.Country.Should().Be("Wales");
+        }
+
+        [Theory]
+        [InlineData(null, null)]
+        [InlineData("", "")]
+        [InlineData("   ", "   ")]
+        public void FilterSitesByRegionId_ReturnsAllSites_AndSkipsCountryLoop_WhenNoFiltersSupplied(
+            string? regionId, string? agglomerationId)
+        {
+            var site = RegionSite("S1", "1", "A1", " South ");
+            var sites = new List<SiteInfo> { site };
+
+            var result = AtomSiteFilterHelper.FilterSitesByRegionId(sites, regionId!, agglomerationId!);
+
+            result.Should().BeSameAs(sites);
+            // early return happens before the foreach, so Country is never populated
+            result[0].Country.Should().BeNull();
+        }
+
+        [Fact]
+        public void FilterSitesByRegionId_MatchesOnAgglomeration_WhenRegionIdDoesNotMatch()
+        {
+            var site = RegionSite("S1", "99", "A1", "Scotland");
+
+            var result = AtomSiteFilterHelper.FilterSitesByRegionId(
+                new List<SiteInfo> { site }, "1", "a1");
+
+            result.Should().ContainSingle().Which.Country.Should().Be("Scotland");
+        }
+
+        // ─── ResolveSitesAsync : networkId "11" maps back to AURN ──────────────
+
+        [Theory]
+        [InlineData("10")]
+        [InlineData("11")]
+        public async Task ResolveSitesAsync_NonAurnDataSource_FlipsToAurn_WhenNetworkIdIs10Or11(string networkId)
+        {
+            var factory = new Mock<IMongoDbClientFactory>();
+            SetupCollection(factory, "aqie_atom_non_aurn_networks_station_details",
+                new List<StationDetailDocument>());
+
+            var (dataSource, sites) = await AtomSiteFilterHelper.ResolveSitesAsync(
+                new QueryStringData { dataSource = "NON-AURN", networkId = networkId },
+                "1", "Ozone",
+                new Mock<IAuthService>().Object, new Mock<IHttpClientFactory>().Object,
+                _logger, factory.Object);
+
+            dataSource.Should().Be("AURN");
+            sites.Should().BeEmpty();
         }
     }
 
