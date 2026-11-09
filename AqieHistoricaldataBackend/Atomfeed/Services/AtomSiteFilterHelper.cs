@@ -119,6 +119,11 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 return filteredSites;
             }
 
+            foreach (var site in filteredSites)
+            {
+                site.Country = site.ZoneRegion?.Trim();
+            }
+
             // supports single or comma separated ids e.g. "1,3,7"
             var regionIds = hasRegion
                 ? regionId!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
