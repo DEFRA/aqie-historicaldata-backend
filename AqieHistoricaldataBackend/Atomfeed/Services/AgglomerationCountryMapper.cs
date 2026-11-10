@@ -12,34 +12,34 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
         private static readonly IReadOnlyDictionary<string, string> AgglomerationIdToCountry =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["1"] = "Northern Ireland",   // Northern Ireland
-                ["2"] = "England",            // South East
-                ["3"] = "England",            // North West & Merseyside
-                ["4"] = "England",            // East Midlands
-                ["5"] = "England",            // South West
-                ["6"] = "Scotland",           // Scotland
-                ["7"] = "England",            // North East
-                ["8"] = "England",            // North East
-                ["9"] = "England",            // Greater London
-                ["10"] = "England",           // Eastern
-                ["11"] = "Wales",             // Wales
-                ["12"] = "Wales",             // Wales
-                ["13"] = "England",           // South West
-                ["14"] = "England",           // South East
-                ["15"] = "England",           // South East
-                ["16"] = "England",           // North West & Merseyside
-                ["17"] = "England",           // North West & Merseyside
-                ["18"] = "England",           // North West & Merseyside
-                ["19"] = "England",           // North West & Merseyside
-                ["20"] = "England",           // East Midlands
-                ["21"] = "Scotland",          // Scotland
-                ["22"] = "England",           // West Midlands
-                ["23"] = "England",           // West Midlands
-                ["24"] = "England",           // South East
-                ["25"] = "England",           // West Midlands
-                ["26"] = "England",           // Yorkshire & Humberside
-                ["27"] = "England",           // Yorkshire & Humberside
-                ["28"] = "England"            // Yorkshire & Humberside
+                ["1"] = "Northern Ireland",   // Belfast Metropolitan Urban Area
+                ["2"] = "England",            // Reading/Wokingham Urban Area
+                ["3"] = "England",            // Greater Manchester Urban Area
+                ["4"] = "England",            // Nottingham Urban Area
+                ["5"] = "England",            // Bournemouth Urban Area
+                ["6"] = "Scotland",           // Glasgow Urban Area
+                ["7"] = "England",            // Tyneside
+                ["8"] = "England",            // Teesside Urban Area
+                ["9"] = "England",            // Greater London Urban Area
+                ["10"] = "England",           // Southend Urban Area
+                ["11"] = "Wales",             // Swansea Urban Area
+                ["12"] = "Wales",             // Cardiff Urban Area
+                ["13"] = "England",           // Bristol Urban Area
+                ["14"] = "England",           // Portsmouth Urban Area
+                ["15"] = "England",           // Southampton Urban Area
+                ["16"] = "England",           // Blackpool Urban Area
+                ["17"] = "England",           // Liverpool Urban Area
+                ["18"] = "England",           // Preston Urban Area
+                ["19"] = "England",           // Birkenhead Urban Area
+                ["20"] = "England",           // Leicester Urban Area
+                ["21"] = "Scotland",          // Edinburgh Urban Area
+                ["22"] = "England",           // The Potteries
+                ["23"] = "England",           // West Midlands Urban Area
+                ["24"] = "England",           // Brighton/Worthing/Littlehampton
+                ["25"] = "England",           // Coventry/Bedworth
+                ["26"] = "England",           // West Yorkshire Urban Area
+                ["27"] = "England",           // Kingston upon Hull
+                ["28"] = "England"            // Sheffield Urban Area
             };
 
         /// <summary>

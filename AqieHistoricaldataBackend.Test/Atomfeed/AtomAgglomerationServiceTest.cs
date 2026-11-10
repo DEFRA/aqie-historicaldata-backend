@@ -116,34 +116,35 @@ namespace AqieHistoricaldataBackend.Tests.Services
 
             Assert.Equal(2, result.Count);
             Assert.Equal("1", result[0].AgglomerationId);
-            Assert.Equal("Northern Ireland", result[0].AgglomerationRegion);
+            Assert.Equal("Belfast Metropolitan Urban Area", result[0].AgglomerationRegion);
             Assert.Equal("9", result[1].AgglomerationId);
-            Assert.Equal("Greater London", result[1].AgglomerationRegion);
+            Assert.Equal("Greater London Urban Area", result[1].AgglomerationRegion);
             VerifyLog(LogLevel.Information, Times.Once());
         }
 
         [Fact]
         public async Task GetDistinctAgglomerations_GroupsIdsSharingTheSameRegion()
         {
-            var service = CreateService(json: BuildJson("7", "8"));
+            // 9 and 10 both map to "Greater London Urban Area"
+            var service = CreateService(json: BuildJson("9", "10"));
 
             var result = await service.GetDistinctAgglomerations();
 
             var item = Assert.Single(result);
-            Assert.Equal("7,8", item.AgglomerationId);
-            Assert.Equal("North East", item.AgglomerationRegion);
+            Assert.Equal("9,10", item.AgglomerationId);
+            Assert.Equal("Greater London Urban Area", item.AgglomerationRegion);
         }
 
         [Fact]
         public async Task GetDistinctAgglomerations_OrdersIdsNumericallyWithinGroup()
         {
-            var service = CreateService(json: BuildJson("19", "3", "18", "16", "17"));
+            var service = CreateService(json: BuildJson("10", "9"));
 
             var result = await service.GetDistinctAgglomerations();
 
             var item = Assert.Single(result);
-            Assert.Equal("3,16,17,18,19", item.AgglomerationId);
-            Assert.Equal("North West & Merseyside", item.AgglomerationRegion);
+            Assert.Equal("9,10", item.AgglomerationId);
+            Assert.Equal("Greater London Urban Area", item.AgglomerationRegion);
         }
 
         [Fact]
@@ -155,7 +156,7 @@ namespace AqieHistoricaldataBackend.Tests.Services
 
             var item = Assert.Single(result);
             Assert.Equal("6", item.AgglomerationId);
-            Assert.Equal("Scotland", item.AgglomerationRegion);
+            Assert.Equal("Glasgow Urban Area", item.AgglomerationRegion);
         }
 
         [Theory]
@@ -172,7 +173,8 @@ namespace AqieHistoricaldataBackend.Tests.Services
             VerifyLog(LogLevel.Information, Times.Once());
         }
 
-        private static readonly string[] ExpectedOrderedGroups = ["1", "2,14,15,24", "999,ABC"];
+        private static readonly string[] ExpectedOrderedGroups =
+            ["1", "2", "14", "15", "24", "999,ABC"];
 
         [Fact]
         public async Task GetDistinctAgglomerations_OrdersGroupsNumerically_AndPlacesNonNumericLast()
