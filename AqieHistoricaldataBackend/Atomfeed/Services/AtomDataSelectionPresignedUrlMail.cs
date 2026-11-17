@@ -54,7 +54,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
 
                 Logger.LogInformation("Document CreatedAt value: {CreatedAt}", doc.CreatedAt);
 
-                if(doc.NetworkId == "11")
+                if(doc.NetworkId == "11" || doc.NetworkId == "13")
                 {
                     doc.DataSource = "AURN";
                 }

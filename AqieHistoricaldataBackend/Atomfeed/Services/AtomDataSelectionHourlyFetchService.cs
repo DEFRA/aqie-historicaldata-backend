@@ -27,7 +27,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var siteYearPairs = filteredstationpollutant
                     .SelectMany(siteinfo => years.Select(year => new { siteinfo, year }));
 
-                await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 3 }, async (pair, ct) =>
+                await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 1 }, async (pair, ct) =>
                 {
                     try
                     {
@@ -181,7 +181,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 new() { PollutantName = "1,2,4-trimethylbenzene",                              PollutantMasterUrl = "6011" },
                 new() { PollutantName = "1,3,5-trimethylbenzene",                              PollutantMasterUrl = "6013" },
                 new() { PollutantName = "Black Carbon",                              PollutantMasterUrl = "391" },
-                new() { PollutantName = "Black smoke",                              PollutantMasterUrl = "6" }
+                new() { PollutantName = "Black smoke",                              PollutantMasterUrl = "6" },
+                new() { PollutantName = "Gaseous sulphur dioxide",                          PollutantMasterUrl = "1" }
             };
 
             var filterList = (filter ?? string.Empty)
