@@ -50,8 +50,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
             {
                 sites = await AtomSiteFilterHelper.GetSiteInfoAsync(pollutantName, networkId ?? string.Empty, mongoDbClientFactory);
 
-                // networkId 10 & 11 represents AURN within the NON-AURN data source
-                if (networkId == "10" || networkId == "11")
+                // networkId 10,11 & 13 represents AURN within the NON-AURN data source
+                if (networkId == "10" || networkId == "11" || networkId == "13")
                 {
                     datasource = "AURN";
                 }
