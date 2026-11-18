@@ -120,7 +120,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
         /// <summary>Two rows with StartTime values 14 days apart within a single feature.
         /// Used to verify the Days == "7days" branch (AtomDataSelectionFilterLast7Days.ByStartTime)
-        /// keeps only rows within 7 days of the most recent StartTime and drops the older one.</summary>
+        /// against fixed historical data (the 7-day test substitutes dates relative to today).</summary>
         private const string XmlSpanningMoreThan7Days =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
             "<gml:FeatureCollection xmlns:gml=\"http://www.opengis.net/gml/3.2\"" +
@@ -403,20 +403,31 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
         [Fact]
         public async Task GetAtomData_FiltersToLast7Days_WhenDaysIs7Days()
         {
+            var today = DateTime.Today;
+            string Fmt(DateTime d) => d.ToString("yyyy-MM-dd'T'HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+            var tooOld = today.AddDays(-8);
+            var inWindow = today.AddDays(-3);
+            var lastHourYesterday = today.AddHours(-1);
+            var values =
+                $"{Fmt(tooOld)},{Fmt(tooOld.AddHours(1))},1,1,40" +
+                $"@@{Fmt(inWindow)},{Fmt(inWindow.AddHours(1))},1,1,50" +
+                $"@@{Fmt(lastHourYesterday)},{Fmt(today)},1,1,55" +
+                $"@@{Fmt(today)},{Fmt(today.AddHours(1))},1,1,60";
+            var xml = XmlSpanningMoreThan7Days.Replace(
+                "2024-01-01T00:00,2024-01-08T00:00,1,1,50@@2024-01-15T00:00,2024-01-22T00:00,1,1,60", values);
+
             SetupHttpClient(new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(XmlSpanningMoreThan7Days, Encoding.UTF8, "application/xml")
+                Content = new StringContent(xml, Encoding.UTF8, "application/xml")
             });
 
             var data = new QueryStringData { dataSource = "AURN", Days = "7days" };
 
             var result = await _service.GetAtomDataSelectionHourlyFetchService(
-                [DefaultSite], "Nitrogen dioxide", "2024", data);
+                [DefaultSite], "Nitrogen dioxide", today.Year.ToString(), data);
 
-            // Only the row anchored on the most recent StartTime (2024-01-15) falls
-            // within the 7-day window; the row starting 2024-01-01 is excluded.
-            result.Should().HaveCount(1);
-            result.Single().StartTime.Should().Be("2024-01-15T00:00");
+            // Only rows from the 7 days before today are kept; older rows and the current day are excluded.
+            result.Select(r => r.StartTime).Should().BeEquivalentTo(Fmt(inWindow), Fmt(lastHourYesterday));
         }
 
         [Fact]

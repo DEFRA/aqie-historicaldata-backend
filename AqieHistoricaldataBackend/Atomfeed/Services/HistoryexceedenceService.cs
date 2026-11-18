@@ -15,7 +15,8 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 string year = data.Year ?? string.Empty;
                 string downloadfilter = "All";
 
-                var hourlyData = await AtomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
+                var rawHourlyData = await AtomHourlyFetchService.GetAtomHourlydatafetch(siteId, year, downloadfilter);
+                var hourlyData = GetHourlyOnlyData(rawHourlyData);
                 var distinctPollutants = GetOrderedDistinctPollutants(hourlyData);
                 var filteredHourly = GetFilteredHourlyPollutants(hourlyData);
                 var hourlyExceedances = GetHourlyExceedances(distinctPollutants, filteredHourly);
@@ -181,6 +182,15 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                         dataVerifiedTag = verifiedTag,
                         dataCapturePercentage = Math.Round(p.DataCapturePercentage)
                     }).ToList<dynamic>();
+        }
+
+        private static List<FinalData> GetHourlyOnlyData(List<FinalData> data)
+        {
+            return data
+                .Where(p => DateTimeOffset.TryParse(p.StartTime, CultureInfo.InvariantCulture,
+                                DateTimeStyles.None, out var dt)
+                            && dt.Minute == 0 && dt.Second == 0)
+                .ToList();
         }
     }
 }
