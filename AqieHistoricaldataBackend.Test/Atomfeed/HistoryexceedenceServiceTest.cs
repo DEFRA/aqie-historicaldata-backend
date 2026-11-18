@@ -15,6 +15,9 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
     public class HistoryexceedenceServiceTests
     {
         private const string NO2 = "Nitrogen dioxide", SO2 = "Sulphur dioxide";
+        private static readonly string[] ExpectedOnTheHourStartTimes =
+            { "2023-01-01T01:00:00", "2023-01-01T02:00:00", "2023-01-01T03:00:00" };
+        private static readonly string[] ExpectedPollutantOrder = { "PM2.5", "PM10", NO2, "Ozone", SO2 };
         private readonly Mock<ILogger<HistoryexceedenceService>> _loggerMock = new();
         private readonly Mock<IAtomHourlyFetchService> _hourlyServiceMock = new();
         private readonly Mock<IAtomDailyFetchService> _dailyServiceMock = new();
@@ -39,8 +42,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             await RunAsync(hourly, new List<FinalData> { Daily(NO2, 10) });
 
-            Assert.Equal(new[] { "2023-01-01T01:00:00", "2023-01-01T02:00:00", "2023-01-01T03:00:00" },
-                _hourlyPassedToDaily!.Select(h => h.StartTime));
+            Assert.Equal(ExpectedOnTheHourStartTimes, _hourlyPassedToDaily!.Select(h => h.StartTime));
         }
 
         [Fact]
@@ -61,7 +63,7 @@ namespace AqieHistoricaldataBackend.Test.Atomfeed
 
             var rows = await RunAsync(hourly, daily);
 
-            Assert.Equal(new[] { "PM2.5", "PM10", NO2, "Ozone", SO2 }, rows.Select(r => Prop<string>(r, "PollutantName")));
+            Assert.Equal(ExpectedPollutantOrder, rows.Select(r => Prop<string>(r, "PollutantName")));
             AssertRow(rows[0], "n/a", "n/a", "-", 0);
             AssertRow(rows[1], "n/a", "2", "50", 100);
             AssertRow(rows[2], "3", "n/a", "45", 100);
