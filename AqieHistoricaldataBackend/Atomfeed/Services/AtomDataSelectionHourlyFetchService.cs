@@ -27,7 +27,7 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 var siteYearPairs = filteredstationpollutant
                     .SelectMany(siteinfo => years.Select(year => new { siteinfo, year }));
 
-                await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 1 }, async (pair, ct) =>
+                await Parallel.ForEachAsync(siteYearPairs, new ParallelOptions { MaxDegreeOfParallelism = 3 }, async (pair, ct) =>
                 {
                     try
                     {
@@ -182,7 +182,23 @@ namespace AqieHistoricaldataBackend.Atomfeed.Services
                 new() { PollutantName = "1,3,5-trimethylbenzene",                              PollutantMasterUrl = "6013" },
                 new() { PollutantName = "Black Carbon",                              PollutantMasterUrl = "391" },
                 new() { PollutantName = "Black smoke",                              PollutantMasterUrl = "6" },
-                new() { PollutantName = "Gaseous sulphur dioxide",                          PollutantMasterUrl = "1" }
+                new() { PollutantName = "Gaseous sulphur dioxide",                          PollutantMasterUrl = "1" },
+                new() { PollutantName = "Calcium in PM10",                          PollutantMasterUrl = "5629" },
+                new() { PollutantName = "Chloride in PM10",                          PollutantMasterUrl = "5631" },
+                new() { PollutantName = "Sodium in PM10",                          PollutantMasterUrl = "5668" },
+                new() { PollutantName = "Ammonium in PM10",                          PollutantMasterUrl = "5045" },
+                new() { PollutantName = "Nitrate in PM10",                          PollutantMasterUrl = "5046" },
+                new() { PollutantName = "Sulphate in PM10",                          PollutantMasterUrl = "5047" },
+                new() { PollutantName = "Calcium in PM2.5",                          PollutantMasterUrl = "1629" },
+                new() { PollutantName = "Chloride in PM2.5",                          PollutantMasterUrl = "1631" },
+                new() { PollutantName = "Potassium in PM2.5",                          PollutantMasterUrl = "1657" },
+                new() { PollutantName = "Magnesium in PM2.5",                          PollutantMasterUrl = "1659" },
+                new() { PollutantName = "Sodium in PM2.5",                          PollutantMasterUrl = "1668" },
+                new() { PollutantName = "Ammonium in PM2.5",                          PollutantMasterUrl = "1045" },
+                new() { PollutantName = "Nitrate in PM2.5",                          PollutantMasterUrl = "1046" },
+                new() { PollutantName = "Sulphate in PM2.5",                          PollutantMasterUrl = "1047" },
+                new() { PollutantName = "Gaseous ammonia",                          PollutantMasterUrl = "35" }
+
             };
 
             var filterList = (filter ?? string.Empty)
